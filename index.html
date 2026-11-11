@@ -124,7 +124,7 @@ h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-
 .l2 .task{color:var(--dim);overflow:hidden;text-overflow:ellipsis}
 /* flex 居中：工具徽标与回复文字共用一条中线 */
 .l3{display:flex;align-items:center;font-size:11px;color:var(--faint);margin-top:3px;white-space:nowrap;overflow:hidden;cursor:pointer;max-width:100%}
-.l3::before{content:"↳";margin-right:.35em;flex:none;color:var(--line2)}
+.l3::before{content:"↳";margin-right:.35em;flex:none;color:var(--text)}
 .l3 .rt{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .l3 .tool{display:inline-flex;align-items:center;gap:3px;font-size:10px;letter-spacing:.04em;color:var(--work);border:1px solid color-mix(in srgb,var(--work) 40%,transparent);border-radius:4px;padding:3px 5px 3px 3px;margin-right:6px;line-height:9px;flex:none}
 .l3 .tool svg{flex:none;width:9px;height:9px;display:block}
@@ -374,8 +374,8 @@ function bar(item, isLead){
   return `<div class="tl">${s}</div>`;
 }
 
-/* 工具名显示：去掉 mcp 前缀，连续下划线换成一个空格（mcp__Claude_Browser__computer → Claude Browser computer） */
-function toolName(t){ return String(t).replace(/^mcp(?=_)/i,"").replace(/_+/g," ").trim() || String(t); }
+/* 工具名显示：去掉 mcp 前缀，连续下划线换成一个空格并全部转大写（mcp__Claude_Browser__computer → CLAUDE BROWSER COMPUTER） */
+function toolName(t){ return (String(t).replace(/^mcp(?=_)/i,"").replace(/_+/g," ").trim() || String(t)).toUpperCase(); }
 function replyLine(item){
   // 工具只显示名字（仅在工作中显示，结束后的工具名已过时）；回复只显示文字
   const tool = item.status==="working" && item.tool ? `<span class="tool">${GEAR}${h(toolName(item.tool))}</span>` : "";
