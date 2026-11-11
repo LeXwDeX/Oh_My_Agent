@@ -374,9 +374,11 @@ function bar(item, isLead){
   return `<div class="tl">${s}</div>`;
 }
 
+/* 工具名显示：去掉 mcp 前缀，连续下划线换成一个空格（mcp__Claude_Browser__computer → Claude Browser computer） */
+function toolName(t){ return String(t).replace(/^mcp(?=_)/i,"").replace(/_+/g," ").trim() || String(t); }
 function replyLine(item){
   // 工具只显示名字（仅在工作中显示，结束后的工具名已过时）；回复只显示文字
-  const tool = item.status==="working" && item.tool ? `<span class="tool">${GEAR}${h(item.tool)}</span>` : "";
+  const tool = item.status==="working" && item.tool ? `<span class="tool">${GEAR}${h(toolName(item.tool))}</span>` : "";
   if(!item.reply && !tool) return "";
   const k=item.id||"";
   return `<div class="l3 ${S.openReply.has(k)?"open":""}" data-reply="${h(k)}" title="${h(item.reply||"")}">${tool}<span class="rt">${h(item.reply||"")}</span></div>`;
