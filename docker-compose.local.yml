@@ -1,0 +1,37 @@
+# Agent Deck · local 模式：在本机直接扫描会话文件并提供页面（不经过 hub）。
+#   docker compose -f docker-compose.local.yml up -d --build  →  http://127.0.0.1:7788
+# 全部配置写在本文件 environment 中，不使用 .env；运行时不需要任何密钥。
+services:
+  agent-deck:
+    build: .
+    image: agent-deck:local
+    container_name: agent-deck-local
+    user: "0:0"                 # 需要读取宿主机上权限为 600 的会话文件
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7788:7788"   # 只监听本机，面板会显示会话标题与任务描述，不要暴露到公网
+    environment:
+      DECK_MODE: "local"
+      DECK_HOST: "0.0.0.0"       # 容器内监听全部网卡，对外由上面的 ports 限制
+      DECK_PORT: "7788"
+      DECK_NAME: "CatWork🐱"     # 面板顶部显示的设备名
+      DECK_HOURS: "12"           # 回看多少小时的会话
+      DECK_PID_CHECK: "0"        # 容器看不到宿主机进程，关闭 PID 检查
+      DECK_REGISTRY_TTL_HOURS: "12"  # 改用登记文件新鲜度判断会话是否在线
+      TZ: "Asia/Shanghai"
+      # 档位：dir 为容器内路径，对应下方 volumes 的挂载点；entry 按会话入口过滤（"!x" 取反，null 不过滤）
+      DECK_SOURCES: >-
+        [
+          {"id": "app",  "label": "Claude App",  "dir": "/data/claude",          "entry": "claude-desktop"},
+          {"id": "cli",  "label": "claude",      "dir": "/data/claude",          "entry": "!claude-desktop"},
+          {"id": "ds",   "label": "claude-ds",   "dir": "/data/claude-deepseek", "entry": null},
+          {"id": "qwen", "label": "claude-qwen", "dir": "/data/claude-qwen",     "entry": null}
+        ]
+    # 只读挂载各档位的 projects（会话记录）与 sessions（在线登记），不挂载整个配置目录，避免把凭据暴露给容器
+    volumes:
+      - ${HOME}/.claude/projects:/data/claude/projects:ro
+      - ${HOME}/.claude/sessions:/data/claude/sessions:ro
+      - ${HOME}/.claude-deepseek/projects:/data/claude-deepseek/projects:ro
+      - ${HOME}/.claude-deepseek/sessions:/data/claude-deepseek/sessions:ro
+      - ${HOME}/.claude-qwen/projects:/data/claude-qwen/projects:ro
+      - ${HOME}/.claude-qwen/sessions:/data/claude-qwen/sessions:ro

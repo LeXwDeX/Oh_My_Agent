@@ -1,0 +1,11 @@
+.git
+.claude
+__pycache__
+*.pyc
+tools
+README.md
+docker-compose.yml
+Dockerfile
+.dockerignore
+.gitignore
+collector/target

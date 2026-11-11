@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Deck · 值班台</title>
+<style>
+:root{
+  --bg:#0c0d10; --panel:#131418; --panel2:#17181d; --line:#22242b; --line2:#2c2f37;
+  --text:#ebe7df; --dim:#8b877f; --faint:#5b5852;
+  --work:#ff9a3c; --idle:#e8c46a; --done:#6fcf8a; --stop:#8c93a3; --fail:#ff6b6b;
+  --app:#e08a5f; --cli:#b8b3a8; --ds:#5b9dff; --qwen:#a884ff;
+  --mono:"JetBrains Mono","SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;-webkit-font-smoothing:antialiased}
+body{padding:18px 22px 14px;min-height:100vh}
+.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
+.dim{color:var(--dim)} .faint{color:var(--faint)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+
+/* header */
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-spacing:-.01em}
+.clockbox{display:flex;align-items:flex-end;gap:18px}
+.livebadge{display:flex;align-items:center;gap:7px;color:var(--work);font-size:11px;letter-spacing:.16em;justify-content:flex-end}
+.livebadge i{width:8px;height:8px;border-radius:50%;background:var(--work);box-shadow:0 0 10px var(--work);animation:pulse 1.6s infinite}
+.livebadge.off{color:var(--fail)} .livebadge.off i{background:var(--fail);box-shadow:0 0 10px var(--fail)}
+@keyframes pulse{50%{opacity:.35}}
+.date{font-size:11px;letter-spacing:.14em;color:var(--dim);margin-top:6px;text-align:right}
+.clock{font-family:var(--sans);font-size:38px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1}
+.clock .s{color:var(--faint)}
+
+/* ticker */
+.ticker{margin-top:14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;align-items:center;height:32px;overflow:hidden}
+.ticker .lab{flex:none;padding-right:14px;color:var(--work);font-size:11px;letter-spacing:.16em;border-right:1px solid var(--line);margin-right:14px}
+.ticker .track{flex:1;overflow:hidden;mask-image:linear-gradient(90deg,#000 85%,transparent)}
+.ticker .run{display:inline-flex;gap:26px;white-space:nowrap;animation:tick 70s linear infinite}
+.ticker:hover .run{animation-play-state:paused}
+@keyframes tick{to{transform:translateX(-50%)}}
+.tk .t{color:var(--faint);margin-right:6px}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin:14px 0 12px}
+.stat{padding:2px 14px;border-left:1px solid var(--line);min-width:0}
+.stat .row2{display:flex;align-items:center;gap:10px;margin-top:4px;min-width:0}
+.stat:first-child{border-left:0;padding-left:0}
+.stat .k{font-size:10.5px;letter-spacing:.16em;color:var(--dim);display:flex;align-items:center;gap:6px}
+.stat .k b{width:8px;height:8px;display:inline-block}
+.stat .v{font-family:var(--sans);font-size:28px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;flex:none}
+.stat .sub{color:var(--dim);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.stat .col{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.bar{height:5px;background:var(--line);border-radius:3px;overflow:hidden;width:100%}
+.bar i{display:block;height:100%;background:var(--work)}
+
+/* sources */
+.sources{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.sources .lab{font-size:10.5px;letter-spacing:.16em;color:var(--faint);margin-right:4px}
+.src{display:flex;align-items:center;gap:8px;padding:5px 11px;background:var(--panel);border:1px solid var(--line);border-radius:999px;transition:border-color .15s,opacity .15s;white-space:nowrap}
+.src:hover{border-color:var(--line2)}
+.src.off{opacity:.38}
+.src .dot{width:10px;height:10px;border-radius:3px;flex:none}
+.src .nm{font-weight:700;font-size:12px}
+.src .meta{font-size:11px;color:var(--dim)}
+.src .meta em{font-style:normal;color:var(--work)}
+
+/* layout */
+.grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(250px,1fr);gap:14px;align-items:start}
+@media (min-width:1300px){.grid{grid-template-columns:minmax(0,1fr) 340px}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.ph{display:flex;align-items:baseline;gap:12px;padding:16px 16px 10px;flex-wrap:wrap}
+.ph h2{font-family:var(--sans);font-size:19px;font-weight:600;margin:0}
+.ph .note{font-size:11.5px;color:var(--dim)}
+.ph .sp{flex:1}
+.seg{display:flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
+.seg button{padding:3px 9px;font-size:11px;color:var(--dim)}
+.seg button.on{background:var(--line2);color:var(--text)}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px}
+.chip{font-size:11.5px;padding:3px 9px;border-radius:999px;border:1px solid var(--line2);color:var(--faint)}
+.chip.has{color:var(--c);border-color:color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent)}
+.chip.sel{background:color-mix(in srgb,var(--c) 26%,transparent);color:var(--text)}
+.chip .n{opacity:.75;margin-left:4px}
+
+/* lanes */
+.lanes{--L:minmax(0,46%);--R:86px}
+.lhead,.row{display:grid;grid-template-columns:var(--L) minmax(40px,1fr) var(--R);align-items:center}
+.lhead{font-size:10.5px;letter-spacing:.14em;color:var(--faint);padding:8px 16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.lhead .ax{position:relative;height:14px}
+.lhead .ax span{position:absolute;transform:translateX(-50%);top:0;white-space:nowrap}
+.lhead .ax .now{color:var(--work)}
+.lhead .w{text-align:right}
+.group{margin:10px 10px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel2)}
+.group.lv{background:linear-gradient(180deg,color-mix(in srgb,var(--work) 6%,var(--panel2)),var(--panel2) 70%)}
+.gh{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.14em;color:var(--faint);padding:9px 12px;border-bottom:1px solid var(--line)}
+.blk{margin:6px 6px 0;border-radius:9px;background:color-mix(in srgb,var(--sc) 5%,transparent);border:1px solid color-mix(in srgb,var(--sc) 12%,transparent);overflow:hidden}
+.blk.w{background:color-mix(in srgb,var(--work) 6%,transparent);border-color:color-mix(in srgb,var(--work) 18%,transparent)}
+.row{padding:6px 10px;min-height:48px;position:relative}
+.row.lead{min-height:54px}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.row.lead.kids::after{content:"";position:absolute;left:30px;top:calc(50% + 20px);bottom:0;border-left:2px solid color-mix(in srgb,var(--sc) 60%,transparent)}
+.child::before{content:"";position:absolute;left:30px;top:0;height:50%;width:18px;border-left:2px solid color-mix(in srgb,var(--sc) 60%,transparent);border-bottom:2px solid color-mix(in srgb,var(--sc) 60%,transparent);border-bottom-left-radius:8px}
+.child.mid::after{content:"";position:absolute;left:30px;top:50%;bottom:0;border-left:2px solid color-mix(in srgb,var(--sc) 60%,transparent)}
+.child .av{margin-left:40px}
+.av{width:34px;height:34px;border-radius:8px;flex:none;border:1.5px solid var(--line2);background:#1d1f25;position:relative}
+.av img{width:100%;height:100%;display:block;border-radius:6px;object-fit:cover}
+.av svg{width:100%;height:100%;display:block;border-radius:6px;image-rendering:pixelated}
+.row.lead .av{width:40px;height:40px}
+.av .sb{position:absolute;right:-4px;bottom:-4px;width:12px;height:12px;border-radius:4px;border:2px solid var(--panel2)}
+.row.isw .av{border-color:var(--work);box-shadow:0 0 0 2px color-mix(in srgb,var(--work) 20%,transparent)}
+.txt{min-width:0;flex:1}
+.l1{display:flex;align-items:baseline;gap:8px;white-space:nowrap;overflow:hidden}
+.l1 .n{font-weight:700;font-size:13.5px}
+.l1 .job{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase}
+.l1 .mdl{font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis}
+.l2{display:flex;gap:8px;align-items:baseline;font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:hidden}
+.l2 .task{color:var(--dim);overflow:hidden;text-overflow:ellipsis}
+.l3{font-size:11px;color:var(--faint);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-width:100%}
+.l3::before{content:"↳ ";color:var(--line2)}
+.l3.open{white-space:normal;color:var(--dim);line-height:1.5;background:color-mix(in srgb,var(--line) 40%,transparent);border-radius:5px;padding:4px 6px;margin-top:4px}
+.row.hasreply{min-height:60px}
+.st{font-size:10.5px;letter-spacing:.12em;flex:none}
+.st.working{color:var(--work)} .st.idle{color:var(--idle)} .st.finished,.st.done{color:var(--done)} .st.stopped{color:var(--stop)} .st.failed{color:var(--fail)}
+.spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pill{font-size:11px;border:1px solid var(--line2);border-radius:5px;padding:1px 7px;color:var(--dim);flex:none}
+.pill.hot{border-color:color-mix(in srgb,var(--work) 55%,transparent);color:var(--work)}
+.tl{position:relative;height:100%;min-height:30px;margin:0 6px}
+.tl .seg-b{position:absolute;top:50%;height:12px;transform:translateY(-50%);border-radius:3px;min-width:3px;background:var(--c);opacity:.85}
+.tl .seg-b.ghost{opacity:.35}
+.tl .nowl{position:absolute;top:-8px;bottom:-8px;width:1.5px;background:color-mix(in srgb,var(--work) 70%,transparent)}
+.tl .orb{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,#fff 0 25%,var(--work) 55%,transparent 72%);box-shadow:0 0 18px 4px color-mix(in srgb,var(--work) 55%,transparent);animation:pulse 1.6s infinite}
+.wk{text-align:right}
+.wk .d{font-weight:700;font-variant-numeric:tabular-nums}
+.wk .s{font-size:11px;color:var(--faint);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk{min-width:0}
+.more{padding:8px 12px 9px 92px;font-size:11.5px;color:var(--dim);border-top:1px solid var(--line)}
+.more button{color:var(--text);text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
+.lead .tgl{font-size:11px;color:var(--faint);margin-left:4px}
+.empty{padding:26px 16px;color:var(--faint);text-align:center}
+.lanesbody{padding-bottom:12px}
+
+/* log */
+.log .ph{padding-bottom:8px}
+.logl{max-height:calc(100vh - 240px);min-height:420px;overflow:auto;padding:0 6px 8px}
+.ev{display:grid;grid-template-columns:60px 64px minmax(0,1fr);gap:6px;padding:7px 10px;font-size:12px;border-radius:6px;align-items:baseline}
+.ev:nth-child(odd){background:color-mix(in srgb,var(--line) 35%,transparent)}
+.ev.hl{background:color-mix(in srgb,var(--work) 12%,transparent)}
+.ev .t{color:var(--dim);font-variant-numeric:tabular-nums}
+.ev .k{font-size:10px;letter-spacing:.12em;color:var(--faint)}
+.ev .k.on{color:var(--work)} .ev .k.finished,.ev .k.done{color:var(--done)} .ev .k.failed{color:var(--fail)}
+.ev .w{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev .w b{font-weight:700}
+.logl::-webkit-scrollbar{width:6px}.logl::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+footer{margin-top:14px;font-size:11px;color:var(--faint);display:flex;justify-content:space-between}
+
+@media (max-width:860px){.lanes{--L:minmax(0,58%);--R:74px}.stat .sub{display:none}.stat .col .bar{display:block}}
+@media (max-width:720px){.grid{grid-template-columns:1fr}.logl{max-height:420px}}
+@media (max-width:560px){body{padding:14px 16px}.stats{grid-template-columns:repeat(2,1fr);row-gap:12px}.stat:nth-child(3){border-left:0;padding-left:0}.lanes{--L:minmax(0,1fr);--R:64px}.lhead .ax,.tl{display:none}.lhead,.row{grid-template-columns:minmax(0,1fr) var(--R)}h1{font-size:24px}.clock{font-size:28px}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="eyebrow" id="eyebrow">AGENT DECK · 值班台</div>
+    <h1>谁在值班</h1>
+  </div>
+  <div class="clockbox">
+    <div>
+      <div class="livebadge" id="live"><i></i><span>LIVE</span></div>
+      <div class="date" id="date"></div>
+    </div>
+    <div class="clock" id="clock"></div>
+  </div>
+</header>
+
+<div class="ticker"><div class="lab">◀ FEED</div><div class="track"><div class="run" id="ticker"></div></div></div>
+
+<section class="stats" id="stats"></section>
+<section class="sources" id="sources"></section>
+
+<div class="grid">
+  <section class="panel lanes">
+    <div class="ph">
+      <h2>泳道</h2><span class="note">进行中优先 · 用时 = 最后活动 − 开始</span>
+      <span class="sp"></span>
+      <div class="seg" id="win"></div>
+    </div>
+    <div class="chips" id="jobs"></div>
+    <div class="lhead"><span>AGENT · JOB · TASK</span><div class="ax" id="axis"></div><span class="w">用时</span></div>
+    <div class="lanesbody" id="lanes"></div>
+  </section>
+  <aside class="panel log">
+    <div class="ph"><h2>日志</h2><span class="note" id="logn"></span></div>
+    <div class="logl" id="log"></div>
+  </aside>
+</div>
+<footer><span id="foot">本机各档位 Agent 会话 · 只读扫描</span><span id="upd"></span></footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const SRC_COLOR = {app:"var(--app)", cli:"var(--cli)", ds:"var(--ds)", qwen:"var(--qwen)"};
+const SRC_HEX = {app:"#e08a5f", cli:"#b8b3a8", ds:"#5b9dff", qwen:"#a884ff"};
+const JOB_PALETTE = ["#ff9a3c","#5b9dff","#6fcf8a","#a884ff","#e8c46a","#4fd1c5","#ff7aa8","#9ccc65","#f0a35e","#7aa2ff"];
+const KIND_LABEL = {on:"ON DUTY", finished:"FINISHED", done:"DONE", stopped:"STOPPED", failed:"FAILED"};
+const ST_LABEL = {working:"WORKING", idle:"IDLE", finished:"✓ FINISHED", done:"✓ DONE", stopped:"■ STOPPED", failed:"✕ FAILED"};
+const VERB = {on:"上岗", finished:"完成", done:"收工", stopped:"中止", failed:"失败"};
+
+const S = {openReply:new Set(), data:null, ok:true, win:+(localGet("win")||3), job:null, off:new Set(JSON.parse(localGet("off")||"[]")), open:new Set(), showAll:new Set(), skew:0};
+function localGet(k){try{return localStorage.getItem("deck."+k)}catch{return null}}
+function localSet(k,v){try{localStorage.setItem("deck."+k,v)}catch{}}
+
+function srcBase(id){return String(id||"").split("@")[0]}
+function sCol(id){return SRC_COLOR[srcBase(id)]||"#9a958c"}
+function sHex(id){return SRC_HEX[srcBase(id)]||"#9a958c"}
+function h(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function hash(s){let x=2166136261;for(const c of String(s)){x^=c.charCodeAt(0);x=Math.imul(x,16777619)}return x>>>0}
+function jobColor(j){return j==="lead"?"#ebe7df":JOB_PALETTE[hash(j)%JOB_PALETTE.length]}
+function now(){return Date.now()+S.skew}
+function dur(ms){ms=Math.max(0,ms);const s=Math.round(ms/1000);if(s<60)return s+"s";const m=Math.floor(s/60);if(m<60)return m+"m "+String(s%60).padStart(2,"0")+"s";return Math.floor(m/60)+"h "+String(m%60).padStart(2,"0")+"m"}
+function ago(t){const s=Math.round((now()-t)/1000);if(s<60)return s+"s 前";const m=Math.round(s/60);if(m<120)return m+"m 前";return Math.round(m/60)+"h 前"}
+function hm(t,sec){const d=new Date(t);const p=n=>String(n).padStart(2,"0");return p(d.getHours())+":"+p(d.getMinutes())+(sec?":"+p(d.getSeconds()):"")}
+function shortModel(m){return m?m.replace(/^claude-/,"").replace(/-(\d+)-(\d+)$/,"-$1.$2"):""}
+
+/* 像素头像：按 id 生成 8x8 左右对称小人，颜色由哈希决定 */
+const AV_CACHE = new Map();
+function avatar(id, kind, name){
+  if(name && S.data && S.data.avatars && S.data.avatars.includes(name.toLowerCase())) return `<img src="/avatars/${name.toLowerCase()}.png" alt="" loading="lazy">`;
+  const key=id+kind; if(AV_CACHE.has(key)) return AV_CACHE.get(key);
+  let r=hash(id); const rnd=()=>{r^=r<<13;r^=r>>>17;r^=r<<5;return (r>>>0)/4294967296};
+  const hue=Math.floor(rnd()*360), hue2=(hue+140+Math.floor(rnd()*80))%360;
+  const skin=["#f1c9a5","#d9a17a","#b77b52","#8a5a3b","#f5dcc4"][Math.floor(rnd()*5)];
+  const hair=`hsl(${hue2} 55% ${28+rnd()*25}%)`, shirt=`hsl(${hue} 65% 58%)`, bg=`hsl(${hue} 30% 16%)`;
+  const grid=[];
+  // 行 0-2 头发/头部，3-4 脸，5-7 身体
+  for(let y=0;y<8;y++){grid.push([]);for(let x=0;x<4;x++){
+    let c=null;
+    if(kind==="lead"){ // 主会话：头盔/天线造型
+      if(y===0) c = x===3? hair : null;
+      else if(y===1) c = x>=1? hair: null;
+      else if(y<=4) c = x===0? null : (y===3&&x===2? "#111" : (y===2&&x===1? hair : skin));
+      else c = x===0&&y===5? null : shirt;
+    } else {
+      const longHair=rnd()>.5;
+      if(y===0) c = x>=1 && rnd()>.25 ? hair : null;
+      else if(y===1) c = x>=1? hair: (longHair?hair:null);
+      else if(y<=4) c = x===0? (longHair&&y<4?hair:null) : (y===3&&x===2? "#111" : (y===4&&x===3&&rnd()>.5? "#c0564b": skin));
+      else c = x===0&&y===5? null : (y===7&&x===3? `hsl(${hue} 60% 42%)` : shirt);
+    }
+    grid[y].push(c);
+  }}
+  let rects=`<rect width="8" height="8" fill="${bg}"/>`;
+  for(let y=0;y<8;y++)for(let x=0;x<4;x++){const c=grid[y][x];if(c){rects+=`<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/><rect x="${7-x}" y="${y}" width="1" height="1" fill="${c}"/>`}}
+  const svg=`<svg viewBox="0 0 8 8" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">${rects}</svg>`;
+  AV_CACHE.set(key,svg); return svg;
+}
+
+function visibleLeads(){
+  const d=S.data; if(!d) return [];
+  return d.leads.filter(l=>!S.off.has(l.src)).map(l=>{
+    const agents = S.job ? l.agents.filter(a=>a.type===S.job) : l.agents;
+    return {...l, agents};
+  }).filter(l=>!S.job || l.agents.length || S.job==="lead");
+}
+
+function renderStats(){
+  const d=S.data, leads=d.leads.filter(l=>!S.off.has(l.src));
+  const all=leads.flatMap(l=>l.agents.map(a=>({...a,lead:l})));
+  const working=[...leads.filter(l=>l.status==="working").map(l=>l.name), ...all.filter(a=>a.status==="working").map(a=>a.name)];
+  const fin=all.filter(a=>a.status==="finished").sort((a,b)=>b.last-a.last);
+  const bad=all.filter(a=>a.status==="failed"||a.status==="stopped");
+  const online=leads.filter(l=>l.status==="working"||l.status==="idle");
+  const nf=bad.filter(a=>a.status==="failed").length, ns=bad.length-nf;
+  const stat=(k,v,vc,sub,extra="")=>`<div class="stat"><div class="k">${k}</div><div class="row2"><div class="v" style="color:${vc}">${v}</div><div class="col">${extra}<div class="sub">${sub}</div></div></div></div>`;
+  $("stats").innerHTML=
+    stat(`<b style="background:var(--work);border-radius:50%"></b>WORKING`, working.length, working.length?"var(--work)":"var(--text)",
+      h(working.length? working.slice(0,2).join(", ")+(working.length>2?` +${working.length-2}`:"") : "都在待命"))+
+    stat(`<b style="background:var(--done)"></b>FINISHED`, fin.length, "var(--text)", fin[0]?`最近 ${h(fin[0].name)} · ${ago(fin[0].last)}`:"—")+
+    stat(`<b style="border:1.5px solid var(--stop)"></b>STOPPED · FAILED`, bad.length, nf?"var(--fail)":bad.length?"var(--text)":"var(--faint)", bad.length?`失败 ${nf} · 中止 ${ns}`:"一切正常")+
+    stat(`ONLINE`, online.length, "var(--text)", `共 ${leads.length} 会话 · 近 ${Number(d.hours)||12}h`, `<div class="bar"><i style="width:${leads.length?online.length/leads.length*100:0}%"></i></div>`);
+}
+
+function renderSources(){
+  $("sources").innerHTML=`<span class="lab">SOURCES</span>`+S.data.sources.filter(s=>s.sessions||srcBase(s.id)!=="cli").map(s=>`
+    <button class="src ${S.off.has(s.id)?"off":""}" data-src="${h(s.id)}" title="${h(s.dir)} · 点击显示/隐藏">
+      <span class="dot" style="background:${sCol(s.id)}"></span>
+      <span class="nm">${h(s.label)}</span>
+      <span class="meta">${s.working?`<em>${s.working} 工作</em> · `:""}${s.online}/${s.sessions} 在线${s.agents?` · ${s.agents} 子`:""}</span>
+    </button>`).join("");
+}
+
+function renderJobs(){
+  const counts=Object.create(null);
+  for(const l of S.data.leads) if(!S.off.has(l.src)) for(const a of l.agents) counts[a.type]=(counts[a.type]||0)+1;
+  const keys=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  $("jobs").innerHTML=keys.map(k=>`<button class="chip has ${S.job===k?"sel":""}" style="--c:${jobColor(k)}" data-job="${h(k)}">${h(k)}<span class="n">${counts[k]}</span></button>`).join("")
+    || `<span class="chip">暂无子 agent</span>`;
+}
+
+function axisRange(){const t=now(); return [t-S.win*3600e3, t]}
+function pct(t){const [a,b]=axisRange();return Math.max(0,Math.min(100,(t-a)/(b-a)*100))}
+
+function renderAxis(){
+  const [a,b]=axisRange(); const px=($("axis").clientWidth||300)*0.84;
+  const maxTicks=Math.max(1,Math.floor(px/52)), mins=S.win*60;
+  const step=[5,10,15,30,60,120,180,240,360].find(m=>mins/m<=maxTicks)||720;
+  const first=Math.ceil(a/(step*60e3))*step*60e3; let out="";
+  for(let t=first;t<b-(b-a)*0.16;t+=step*60e3) out+=`<span style="left:${pct(t)}%">${hm(t)}</span>`;
+  out+=`<span class="now" style="left:auto;right:0;transform:none">NOW ▾</span>`;
+  $("axis").innerHTML=out;
+  $("win").innerHTML=[1,3,6,12].map(w=>`<button class="${S.win===w?"on":""}" data-win="${w}">${w}h</button>`).join("");
+}
+
+function bar(item, isLead){
+  const end = (item.status==="working"||item.status==="idle") ? now() : item.last;
+  const L=pct(item.start), R=pct(end); const c = isLead ? sHex(item.src) : jobColor(item.type);
+  let s=`<div class="nowl" style="left:100%"></div>`;
+  if(end>=axisRange()[0]) s+=`<div class="seg-b ${isLead?"ghost":""}" style="--c:${c};left:${L}%;width:${Math.max(R-L,0.4)}%"></div>`;
+  if(item.status==="working") s+=`<div class="orb" style="left:100%"></div>`;
+  return `<div class="tl">${s}</div>`;
+}
+
+function replyLine(item){
+  if(!item.reply) return "";
+  const k=item.id||"";
+  return `<div class="l3 ${S.openReply.has(k)?"open":""}" data-reply="${h(k)}" title="${h(item.reply)}">${h(item.reply)}</div>`;
+}
+function stLabel(st){st=ST_LABEL[st]?st:"stopped";return `<span class="st ${st}">${st==="working"?'<span class="spin">◐</span> ':""}${ST_LABEL[st]}</span>`}
+
+function leadRow(l, live, hasKids){
+  const n=l.agents.length, w=l.agents.filter(a=>a.status==="working").length;
+  const fin=l.agents.filter(a=>a.status==="finished").length, stp=n-w-fin;
+  const isW=l.status==="working";
+  return `<div class="row lead ${isW?"isw":""} ${hasKids?"kids":""}">
+    <div class="who">
+      <div class="av">${avatar(l.id,"lead",l.face||l.name)}<span class="sb" style="background:${sCol(l.src)}"></span></div>
+      <div class="txt">
+        <div class="l1"><span class="n" style="color:${sHex(l.src)}">${h(l.name)}</span><span class="mdl">${h(shortModel(l.model))}</span>${stLabel(l.status)}</div>
+        <div class="l2"><span class="task" title="${h(l.title)}">${h(l.project)} · ${h(l.title)}</span></div>
+        ${replyLine(l)}
+      </div>
+    </div>
+    ${bar(l,true)}
+    <div class="wk"><div class="d">${dur((isW||l.status==="idle"?now():l.last)-l.start)}</div><div class="s">${n? (w?`<span style="color:var(--work)">${w}</span>/${n} 工作`:`${n} agent${n>1?"s":""}`) :"无子 agent"}</div></div>
+  </div>`;
+}
+
+function childRow(a, mid){
+  return `<div class="row child ${mid?"mid":""} ${a.status==="working"?"isw":""}">
+    <div class="who">
+      <div class="av">${avatar(a.id,"agent",a.name)}</div>
+      <div class="txt">
+        <div class="l1"><span class="n">${h(a.name)}</span><span class="job" style="color:${jobColor(a.type)}">${h(a.type)}</span><span class="mdl">${h(shortModel(a.model))}${a.bg?" · bg":""}</span></div>
+        <div class="l2">${stLabel(a.status)}<span class="task" title="${h(a.task||"")}">${h(a.task||"—")}</span></div>
+        ${replyLine(a)}
+      </div>
+    </div>
+    ${bar(a,false)}
+    <div class="wk"><div class="d">${dur((a.status==="working"?now():a.last)-a.start)}</div><div class="s">${a.status==="working"?"在岗":ago(a.last)}</div></div>
+  </div>`;
+}
+
+function leadBlock(l, live){
+  const LIMIT = live ? 8 : 3;
+  const all=S.showAll.has(l.id); const kids = all? l.agents : l.agents.slice(0, LIMIT);
+  let s=leadRow(l, live, kids.length>0);
+  kids.forEach((a,i)=>{ s+=childRow(a, i<kids.length-1) });
+  const rest=l.agents.length-kids.length;
+  if(rest>0){const fin=l.agents.slice(kids.length).filter(a=>a.status==="finished").length;
+    s+=`<div class="more">+ ${rest} more · ${fin} 完成 · ${rest-fin} 其他 · <button data-all="${h(l.id)}">▾ 全部展开</button></div>`}
+  else if(all && l.agents.length>LIMIT) s+=`<div class="more"><button data-all="${h(l.id)}">▴ 收起</button></div>`;
+  const hot = l.status==="working" || l.agents.some(a=>a.status==="working");
+  return `<div class="blk ${hot?"w":""}" style="--sc:${sHex(l.src)}">${s}</div>`;
+}
+
+function renderLanes(){
+  const leads=visibleLeads();
+  const live=leads.filter(l=>l.status==="working"||l.status==="idle");
+  const recent=leads.filter(l=>!(l.status==="working"||l.status==="idle"));
+  const liveAgents=live.reduce((n,l)=>n+l.agents.filter(a=>a.status==="working").length,0);
+  let html="";
+  html+=`<div class="group lv"><div class="gh"><span>LIVE · ${live.length} 会话 · ${liveAgents} 子 agent 在岗</span><span>用时</span></div>
+    ${live.length? live.map(l=>leadBlock(l,true)).join("") : `<div class="empty">当前没有在线会话</div>`}</div>`;
+  html+=`<div class="group"><div class="gh"><span>RECENT · ${recent.length} 会话</span><span>用时</span></div>
+    ${recent.length? recent.map(l=>leadBlock(l,false)).join("") : `<div class="empty">近 ${Number(S.data.hours)||12}h 没有已结束的会话</div>`}</div>`;
+  $("lanes").innerHTML=html;
+}
+
+function evLine(e){
+  const who = e.job==="lead" ? `<b style="color:${sHex(e.src)}">${h(e.who)}</b> <span class="dim">${h(e.task||"")}</span>`
+    : `<b style="color:${jobColor(e.job)}">${h(e.who)}</b> <span class="dim">${h(e.job)}</span> <span class="faint">@${h(e.lead)}</span>`;
+  return who;
+}
+function renderLog(){
+  const ev=S.data.events.filter(e=>!S.off.has(e.src) && (!S.job||e.job===S.job));
+  $("logn").textContent=`${ev.length} 条 · 最新在前`;
+  $("log").innerHTML=ev.slice(0,250).map(e=>`<div class="ev ${now()-e.at<120e3?"hl":""}"><span class="t">${hm(e.at,true)}</span><span class="k ${KIND_LABEL[e.kind]?e.kind:""}">${h(KIND_LABEL[e.kind]||e.kind)}</span><span class="w" title="${h(e.task||"")}">${evLine(e)}</span></div>`).join("")
+    || `<div class="empty">暂无事件</div>`;
+  const tk=ev.slice(0,14).map(e=>`<span class="tk"><span class="t">${hm(e.at,true)}</span><b style="color:${e.job==="lead"?sHex(e.src):jobColor(e.job)}">${h(e.who)}</b> ${h(VERB[e.kind]||e.kind)} · <span class="dim">${h(e.job==="lead"?"会话":e.job)}</span></span>`).join("");
+  $("ticker").innerHTML = tk ? tk + tk : `<span class="dim">等待事件…</span>`;
+}
+
+function render(){
+  if(!S.data) return;
+  $("eyebrow").innerHTML=`AGENT DECK · <span style="text-transform:none;color:var(--text)">${h(S.data.host)}</span> · 值班台`;
+  renderStats(); renderSources(); renderJobs(); renderAxis(); renderLanes(); renderLog();
+}
+
+function tickClock(){
+  const d=new Date(now()); const p=n=>String(n).padStart(2,"0");
+  $("clock").innerHTML=`${p(d.getHours())}:${p(d.getMinutes())}<span class="s">:${p(d.getSeconds())}</span>`;
+  const off=-d.getTimezoneOffset()/60;
+  $("date").textContent=d.toLocaleDateString("en-US",{weekday:"short",day:"2-digit",month:"short"}).toUpperCase().replace(",","")+` · GMT${off>=0?"+":""}${off}`;
+}
+
+let lastHtmlKey="";
+async function poll(){
+  try{
+    const r=await fetch("/api/state",{cache:"no-store"}); if(!r.ok) throw 0;
+    const d=await r.json(); S.data=d; S.skew=d.now-Date.now(); S.ok=true;
+    $("upd").textContent=(d.devices?`设备 ${d.devices.length?d.devices.map(x=>x.name).join("、"):"无（等待推送）"} · `:"")+"更新于 "+hm(Date.now(),true);
+  }catch{ S.ok=false }
+  $("live").classList.toggle("off",!S.ok); $("live").querySelector("span").textContent=S.ok?"LIVE":"OFFLINE";
+  const sc=$("log").scrollTop; render(); $("log").scrollTop=sc;
+}
+
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-src],[data-job],[data-win],[data-all],[data-reply]"); if(!t) return;
+  if(t.dataset.reply!==undefined){const k=t.dataset.reply; S.openReply.has(k)?S.openReply.delete(k):S.openReply.add(k); render(); return;}
+  if(t.dataset.src){const k=t.dataset.src; S.off.has(k)?S.off.delete(k):S.off.add(k); localSet("off",JSON.stringify([...S.off]))}
+  else if(t.dataset.job){S.job = S.job===t.dataset.job? null : t.dataset.job}
+  else if(t.dataset.win){S.win=+t.dataset.win; localSet("win",S.win)}
+  else if(t.dataset.all){const k=t.dataset.all; S.showAll.has(k)?S.showAll.delete(k):S.showAll.add(k)}
+  render();
+});
+
+tickClock(); setInterval(tickClock,1000);
+poll(); setInterval(poll,3000);
+setInterval(()=>{ if(S.data){ renderAxis(); } },15000);
+</script>
+</body>
+</html>
