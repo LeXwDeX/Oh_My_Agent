@@ -453,7 +453,15 @@ function renderLog(){
   if(!document.querySelector(".ticker").matches(":hover") && tkKey!==S.tkKey){
     S.tkKey=tkKey;
     patch($("ticker"), tk ? tk + tk : `<span class="dim">等待事件…</span>`);
+    restartTicker($("ticker"));
   }
+}
+/* translateX(-50%) 的百分比在合成层动画开始时按当时宽度定死（页面刚加载时内容为空、宽度为 0，
+   之后填进内容也一直位移 0，要等悬停暂停/恢复才重新计算）。内容变化后重启动画，并保留进度。 */
+function restartTicker(run){
+  const old=run.getAnimations()[0], t=old?old.currentTime:0;
+  run.style.animation="none"; void run.offsetWidth; run.style.animation="";
+  const an=run.getAnimations()[0]; if(an&&t) an.currentTime=t;
 }
 
 function render(){
