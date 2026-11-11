@@ -4,6 +4,10 @@
 
 hub（`server.py`）零依赖：Python 3 标准库 + 单个 `index.html`；推送采集器 `deck-push` 为 Rust 实现。
 
+![Agent Deck 面板截图](docs/screenshot.png)
+
+<sub>截图中的设备、会话与回复均为 `tools/demo_push.py` 生成的演示数据。</sub>
+
 ## 来源声明
 
 本项目的界面是**照着 [squad.flikq.dev](https://squad.flikq.dev)（页面标题 “The Squad · Mission control”）克隆的**，目标就是做一个“一模一样”的本机版本。具体借用了哪些、没借用哪些，如实列在下面：
@@ -223,6 +227,17 @@ docker compose -f docker-compose.local.yml up -d --build
 - `/api/ingest` 无密钥，访问控制依赖 nginx 的内网限制，见“部署 hub”。
 - 服务与采集器只读取配置目录下的文件，不写入、不修改。
 - `tools/gen_avatars.py` 所需的接口地址与密钥只通过环境变量提供，不要写入仓库；`.env` 已被 `.gitignore` 忽略。
+
+## 演示数据
+
+不接真实设备也能看效果：起一个 hub，再推一份仿真数据（两台虚构设备，不读取任何真实会话）。设备超过 `DECK_DEVICE_TTL`（默认 90 秒）没推送会从面板消失，需要时重复执行推送即可。
+
+```bash
+python3 server.py --mode hub --port 7799 &
+python3 tools/demo_push.py http://127.0.0.1:7799
+```
+
+然后打开 `http://127.0.0.1:7799`。
 
 ## API
 
