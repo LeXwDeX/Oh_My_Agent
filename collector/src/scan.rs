@@ -5,6 +5,8 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
+#[cfg(test)]
+use std::fs::OpenOptions;
 use std::io::{self, Read, Seek, SeekFrom};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
@@ -29,6 +31,9 @@ pub const LIVE_SECS: f64 = 90.0; // 记录文件在这段时间内有写入，�
 const HEAD_BYTES: u64 = 96 * 1024;
 const TAIL_BYTES: u64 = 256 * 1024;
 const SMALL_JSON_MAX: u64 = 64 * 1024;
+/// 尾窗里找不到 reply 时，从尾窗起点往前分块回看
+const BACK_CHUNK: u64 = 256 * 1024;
+const BACK_MAX: u64 = 4 * 1024 * 1024;
 
 // ---------------------------------------------------------------- 名字池
 
@@ -216,11 +221,13 @@ impl Serialize for Num {
 // ---------------------------------------------------------------- jsonl 读取与摘要
 
 /// 读文件头尾若干行 JSON（大文件不全读）。只接受 object 行，坏行/半行跳过。
-fn read_head_tail(path: &Path, size: u64) -> io::Result<(Vec<Obj>, Vec<Obj>)> {
+/// 返回 (head 行, tail 行, tail 第一行在文件中的偏移；tail 覆盖整个文件时为 0)。
+fn read_head_tail(path: &Path, size: u64) -> io::Result<(Vec<Obj>, Vec<Obj>, u64)> {
     let mut f = File::open(path)?;
     let mut head = Vec::new();
     (&mut f).take(HEAD_BYTES).read_to_end(&mut head)?;
     let tail;
+    let mut tail_start = 0;
     if size > HEAD_BYTES + TAIL_BYTES {
         f.seek(SeekFrom::Start(size - TAIL_BYTES))?;
         let mut t = Vec::new();
@@ -228,6 +235,7 @@ fn read_head_tail(path: &Path, size: u64) -> io::Result<(Vec<Obj>, Vec<Obj>)> {
         (&mut f).take(HEAD_BYTES + TAIL_BYTES).read_to_end(&mut t)?;
         let cut = t.iter().position(|&b| b == b'\n').map(|i| i + 1).unwrap_or(0);
         tail = t.split_off(cut);
+        tail_start = size - TAIL_BYTES + cut as u64;
     } else if size > HEAD_BYTES {
         let mut t = head;
         (&mut f).take(HEAD_BYTES + TAIL_BYTES).read_to_end(&mut t)?;
@@ -236,7 +244,59 @@ fn read_head_tail(path: &Path, size: u64) -> io::Result<(Vec<Obj>, Vec<Obj>)> {
     } else {
         tail = head.clone();
     }
-    Ok((parse_lines(&head, size > HEAD_BYTES), parse_lines(&tail, false)))
+    Ok((parse_lines(&head, size > HEAD_BYTES), parse_lines(&tail, false), tail_start))
+}
+
+/// 从尾窗起点 start（= size - TAIL_BYTES，可能落在行中间）往前按 BACK_CHUNK 分块反向读取，
+/// 逐块解析完整行找 reply，累计回看不超过 BACK_MAX（同 Python reply_with_lookback 的范围）。
+/// 跨 start 的那一行与回看下界处的半行都不解析；块起点处的半行留给下一块拼接；任何读错误都只返回 null。
+fn reply_backward(path: &Path, start: u64) -> Value {
+    if start == 0 {
+        return Value::Null;
+    }
+    let Ok(mut f) = File::open(path) else { return Value::Null };
+    let floor = start.saturating_sub(BACK_MAX);
+    let mut end = start; // 尚未解析区域的右边界：首块可能落在行中间，之后始终是行首
+    let mut lo = end;
+    while lo > floor {
+        lo = lo.saturating_sub(BACK_CHUNK).max(floor);
+        let mut buf = Vec::new();
+        if f.seek(SeekFrom::Start(lo)).is_err() || (&mut f).take(end - lo).read_to_end(&mut buf).is_err() {
+            return Value::Null;
+        }
+        // lo 之前若还有内容，lo 处可能是半行：从第一个换行之后开始解析，半行与更前一块拼接。
+        // 非首块时 buf 末字节是 end 前一行的换行符，不算作分界（否则会原地打转）。
+        let off = if lo == 0 {
+            0
+        } else {
+            let body = &buf[..buf.len().saturating_sub(1)];
+            match body.iter().position(|&b| b == b'\n') {
+                Some(i) => i + 1,
+                None => continue, // 整块都在同一行里：保持 end，继续向前扩
+            }
+        };
+        // 首块末尾若是跨 start 的半行则丢弃；之后的块都以换行结尾，不受影响
+        let r = last_reply(&parse_lines(&buf[off..], true));
+        if !r.is_null() {
+            return r;
+        }
+        end = lo + off as u64;
+        lo = end;
+    }
+    Value::Null
+}
+
+/// 尾窗没有 reply 时的回退（尾窗已覆盖整个文件时不回退）：
+/// 追加写（新 size >= 旧 size）沿用上次的 reply，否则从尾窗起点向前回看。
+fn reply_with_fallback(path: &Path, tail: &[Obj], size: u64, prev: Option<(u64, &Value)>) -> Value {
+    let r = last_reply(tail);
+    if !r.is_null() || size <= HEAD_BYTES + TAIL_BYTES {
+        return r;
+    }
+    match prev {
+        Some((old_size, old_reply)) if size >= old_size => old_reply.clone(),
+        _ => reply_backward(path, size - TAIL_BYTES),
+    }
 }
 
 fn parse_lines(buf: &[u8], drop_last_partial: bool) -> Vec<Obj> {
@@ -257,7 +317,6 @@ fn parse_lines(buf: &[u8], drop_last_partial: bool) -> Vec<Obj> {
     out
 }
 
-/// assistant 消息里的 message 对象（不是对象则视为空）
 /// 小 JSON 文件（registry / meta）：必须是普通文件，最多读 64KiB
 fn read_small(p: &Path) -> Option<String> {
     let m = fs::metadata(p).ok()?;
@@ -269,6 +328,7 @@ fn read_small(p: &Path) -> Option<String> {
     String::from_utf8(buf).ok()
 }
 
+/// assistant 消息里的 message 对象（不是对象则视为空）
 fn message_of(o: &Obj) -> Option<&Obj> {
     tget(o, "message").and_then(Value::as_object)
 }
@@ -351,6 +411,21 @@ fn last_reply(lines: &[Obj]) -> Value {
     Value::Null
 }
 
+/// 尾窗中最后一条 assistant 消息：若其 content 最后一个块是 tool_use，返回工具名（清洗后截到 40 字符）；
+/// SubagentHandback/StructuredOutput 不算。其余情况为 null。
+fn last_tool(lines: &[Obj]) -> Value {
+    let Some(o) = lines.iter().rev().find(|o| is_str(o, "type", "assistant")) else { return Value::Null };
+    let Some(Value::Array(content)) = message_of(o).and_then(|m| m.get("content")) else { return Value::Null };
+    let Some(Value::Object(c)) = content.last() else { return Value::Null };
+    if !is_str(c, "type", "tool_use") {
+        return Value::Null;
+    }
+    match c.get("name").and_then(Value::as_str) {
+        Some("SubagentHandback" | "StructuredOutput") | None => Value::Null,
+        Some(n) => Value::String(crate::text::clean(n, 40)),
+    }
+}
+
 fn last_model(tail: &[Obj], head: &[Obj]) -> Option<Value> {
     let ms = models_in(tail);
     let ms = if ms.is_empty() { models_in(head) } else { ms };
@@ -367,10 +442,11 @@ struct SessInfo {
     branch: Value,
     stop: Value,
     reply: Value,
+    tool: Value,
 }
 
-fn summarize_session(path: &Path, size: u64) -> io::Result<SessInfo> {
-    let (head, tail) = read_head_tail(path, size)?;
+fn summarize_session(path: &Path, size: u64, prev: Option<(u64, &SessInfo)>) -> io::Result<SessInfo> {
+    let (head, tail, _) = read_head_tail(path, size)?;
     let start = iso_ms(head.iter().find_map(|o| tget(o, "timestamp")));
     let entry = head.iter().chain(tail.iter()).find_map(|o| tget(o, "entrypoint")).cloned().unwrap_or(Value::Null);
     let cwd = tail
@@ -404,7 +480,8 @@ fn summarize_session(path: &Path, size: u64) -> io::Result<SessInfo> {
         model: last_model(&tail, &head).unwrap_or(Value::Null),
         branch,
         stop: last_assistant_stop(&tail),
-        reply: last_reply(&tail),
+        reply: reply_with_fallback(path, &tail, size, prev.map(|(s, p)| (s, &p.reply))),
+        tool: last_tool(&tail),
     })
 }
 
@@ -418,10 +495,11 @@ struct SubInfo {
     stop: Value,
     msgs: usize,
     reply: Value,
+    tool: Value,
 }
 
-fn summarize_sub(path: &Path, size: u64) -> io::Result<SubInfo> {
-    let (head, tail) = read_head_tail(path, size)?;
+fn summarize_sub(path: &Path, size: u64, prev: Option<(u64, &SubInfo)>) -> io::Result<SubInfo> {
+    let (head, tail, _) = read_head_tail(path, size)?;
     let start = iso_ms(head.iter().find_map(|o| tget(o, "timestamp")));
     let meta: Obj = path
         .file_name()
@@ -442,11 +520,16 @@ fn summarize_sub(path: &Path, size: u64) -> io::Result<SubInfo> {
         bg: is_str(&meta, "requestShape", "background"),
         stop: last_assistant_stop(&tail),
         msgs: tail.iter().filter(|o| is_str(o, "type", "assistant")).count(),
-        reply: last_reply(&tail),
+        reply: reply_with_fallback(path, &tail, size, prev.map(|(s, p)| (s, &p.reply))),
+        tool: last_tool(&tail),
     })
 }
 
+/// 摘要函数：(路径, 当前 size, 上一次的 (size, 摘要))
+type SummarizeFn<T> = fn(&Path, u64, Option<(u64, &T)>) -> io::Result<T>;
+
 /// 按 (mtime_ns, size) 缓存单个 jsonl 的解析摘要；每轮结束清理本轮未访问的项。
+/// 文件变化时把上一次的摘要交给摘要函数（用于追加写时沿用 reply）。
 struct FileCache<T: Clone> {
     d: HashMap<PathBuf, ((i64, i64, u64), T)>,
     seen: HashSet<PathBuf>,
@@ -456,15 +539,16 @@ impl<T: Clone> FileCache<T> {
     fn new() -> Self {
         FileCache { d: HashMap::new(), seen: HashSet::new() }
     }
-    fn get(&mut self, path: &Path, m: &fs::Metadata, f: fn(&Path, u64) -> io::Result<T>) -> Option<T> {
+    fn get(&mut self, path: &Path, m: &fs::Metadata, f: SummarizeFn<T>) -> Option<T> {
         let sig = (m.mtime(), m.mtime_nsec(), m.size());
         self.seen.insert(path.to_path_buf());
-        if let Some((s, v)) = self.d.get(path) {
+        let prev = self.d.get(path);
+        if let Some((s, v)) = prev {
             if *s == sig {
                 return Some(v.clone());
             }
         }
-        match f(path, m.size()) {
+        match f(path, m.size(), prev.map(|(s, v)| (s.2, v))) {
             Ok(v) => {
                 self.d.insert(path.to_path_buf(), (sig, v.clone()));
                 Some(v)
@@ -625,6 +709,7 @@ pub struct Agent {
     pub start: i64,
     pub last: i64,
     pub reply: Value,
+    pub tool: Value,
 }
 
 #[derive(Serialize, Clone)]
@@ -641,6 +726,7 @@ pub struct Lead {
     pub start: i64,
     pub last: Num,
     pub reply: Value,
+    pub tool: Value,
     pub agents: Vec<Agent>,
     pub face: String,
 }
@@ -827,6 +913,7 @@ impl Scanner {
                         start,
                         last: Num::max(Num::I(st_ms), upd),
                         reply: if self.conf.redact { Value::Null } else { info.reply.clone() },
+                        tool: info.tool.clone(),
                         agents: Vec::new(),
                         face: lead_name,
                     };
@@ -863,6 +950,7 @@ impl Scanner {
                             },
                             last: a_last,
                             reply: if self.conf.redact { Value::Null } else { si.reply.clone() },
+                            tool: si.tool.clone(),
                         };
                         let ev = |at: Num, kind: &'static str| Event {
                             src: src.id.clone(),
@@ -969,6 +1057,114 @@ mod tests {
         // python3 -c 'import hashlib;print(int(hashlib.sha1(b"abc").hexdigest()[:8],16))' → 2845392438
         let seq: Vec<String> = (0..7).map(|i| i.to_string()).collect();
         assert_eq!(pick(&seq, "abc"), (2845392438u64 % 7).to_string());
+    }
+
+    use std::io::Write as _;
+
+    fn tmp(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("deck-push-test-{}-{name}.jsonl", std::process::id()))
+    }
+
+    /// 约 n 字节的 tool_result 行（user）与 tool_use 行（assistant）交替
+    fn tool_noise(f: &mut File, n: usize) {
+        let blob = "x".repeat(8 * 1024);
+        let mut w = 0;
+        while w < n {
+            let u = format!("{{\"type\":\"user\",\"message\":{{\"content\":[{{\"type\":\"tool_result\",\"content\":\"{blob}\"}}]}}}}\n");
+            let a = "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"hmm\"},{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{}}]}}\n";
+            f.write_all(u.as_bytes()).unwrap();
+            f.write_all(a.as_bytes()).unwrap();
+            w += u.len() + a.len();
+        }
+    }
+
+    fn text_line(t: &str) -> String {
+        format!("{{\"type\":\"assistant\",\"message\":{{\"content\":[{{\"type\":\"text\",\"text\":\"{t}\"}}]}}}}\n")
+    }
+
+    fn size_of(p: &Path) -> u64 {
+        fs::metadata(p).unwrap().len()
+    }
+
+    #[test]
+    fn reply_found_before_tail_window() {
+        let p = tmp("back");
+        let mut f = File::create(&p).unwrap();
+        f.write_all(b"{\"type\":\"user\",\"timestamp\":\"2026-01-01T00:00:00Z\"}\n").unwrap();
+        tool_noise(&mut f, 100 * 1024);
+        f.write_all(text_line("early   reply\\n  text").as_bytes()).unwrap();
+        tool_noise(&mut f, 300 * 1024); // 最后 300KiB 都是工具输出
+        drop(f);
+        let size = size_of(&p);
+        let (_, tail, start) = read_head_tail(&p, size).unwrap();
+        assert!(start > 0 && last_reply(&tail).is_null(), "text 应在尾窗之外");
+        let s = summarize_session(&p, size, None).unwrap();
+        assert_eq!(s.reply, Value::String("early reply text".into()));
+        assert_eq!(s.tool, Value::String("Bash".into()));
+        let _ = fs::remove_file(&p);
+    }
+
+    #[test]
+    fn reply_line_longer_than_chunk() {
+        // 回复本身是一行超过 256KiB 的长文本，跨越多个回看块
+        let p = tmp("long");
+        let mut f = File::create(&p).unwrap();
+        tool_noise(&mut f, 50 * 1024);
+        let long = format!("head {}", "y".repeat(600 * 1024));
+        f.write_all(text_line(&long).as_bytes()).unwrap();
+        tool_noise(&mut f, 300 * 1024);
+        drop(f);
+        let s = summarize_session(&p, size_of(&p), None).unwrap();
+        let r = s.reply.as_str().unwrap();
+        assert!(r.starts_with("head yyy") && r.chars().count() == 400);
+        let _ = fs::remove_file(&p);
+    }
+
+    #[test]
+    fn reply_reused_from_cache_on_append() {
+        let p = tmp("cache");
+        let mut f = File::create(&p).unwrap();
+        tool_noise(&mut f, 100 * 1024);
+        f.write_all(text_line("first answer").as_bytes()).unwrap();
+        tool_noise(&mut f, 300 * 1024);
+        drop(f);
+        let mut cache: FileCache<SessInfo> = FileCache::new();
+        let m1 = fs::metadata(&p).unwrap();
+        let s1 = cache.get(&p, &m1, summarize_session).unwrap();
+        assert_eq!(s1.reply, Value::String("first answer".into()));
+        // 追加写：尾窗内仍无 text
+        let mut f = OpenOptions::new().append(true).open(&p).unwrap();
+        tool_noise(&mut f, 300 * 1024);
+        drop(f);
+        let size2 = size_of(&p);
+        // 上一次摘要（用哨兵值区分“沿用缓存”与“重新回看”）
+        let mut prev = s1.clone();
+        prev.reply = Value::String("cached".into());
+        let s2 = summarize_session(&p, size2, Some((m1.size(), &prev))).unwrap();
+        assert_eq!(s2.reply, Value::String("cached".into()), "追加写应沿用上次的 reply");
+        // 文件变小（被重写）时不沿用，改为回看
+        let s3 = summarize_session(&p, size2, Some((size2 + 1, &prev))).unwrap();
+        assert_eq!(s3.reply, Value::String("first answer".into()));
+        // 走 FileCache：签名变化后拿到沿用的 reply
+        let m2 = fs::metadata(&p).unwrap();
+        let s4 = cache.get(&p, &m2, summarize_session).unwrap();
+        assert_eq!(s4.reply, Value::String("first answer".into()));
+        let _ = fs::remove_file(&p);
+    }
+
+    #[test]
+    fn tool_rules() {
+        let parse = |s: &str| parse_lines(s.as_bytes(), false);
+        let l = parse("{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Read\"}]}}\n{\"type\":\"user\"}\n");
+        assert_eq!(last_tool(&l), Value::String("Read".into()));
+        let l = parse("{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"SubagentHandback\"}]}}\n");
+        assert!(last_tool(&l).is_null());
+        let l = parse("{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"name\":\"Read\"},{\"type\":\"text\",\"text\":\"ok\"}]}}\n");
+        assert!(last_tool(&l).is_null());
+        let long = format!("{{\"type\":\"assistant\",\"message\":{{\"content\":[{{\"type\":\"tool_use\",\"name\":\"mcp\\u202e{}\"}}]}}}}\n", "z".repeat(60));
+        let t = last_tool(&parse(&long));
+        assert_eq!(t.as_str().map(|s| s.chars().count()), Some(40));
+        assert!(!t.as_str().unwrap().contains('\u{202e}'));
     }
 
     #[test]

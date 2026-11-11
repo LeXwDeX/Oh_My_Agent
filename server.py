@@ -125,8 +125,10 @@ class FileCache:
         hit = self.d.get(key)
         if hit and hit[0] == sig:
             return hit[1]
+        # 文件只会追加写：把上一次的摘要交给解析函数，尾窗里找不到回复时可以沿用
+        prev = hit[1] if hit and st.st_size >= hit[0][1] else None
         try:
-            val = fn(path, st)
+            val = fn(path, st, prev)
         except Exception:  # noqa: BLE001
             return None
         self.d[key] = (sig, val)
@@ -191,7 +193,51 @@ def last_reply(lines: list[dict]):
     return None
 
 
-def summarize_session(path: Path, st: os.stat_result) -> dict:
+LOOKBACK_BYTES = 4 * 1024 * 1024
+TOOL_REPORT = ("SubagentHandback", "StructuredOutput")
+
+
+def last_tool(lines: list[dict]):
+    """最后一条 assistant 消息若以工具调用结尾，返回工具名（交回结果的工具不算）。"""
+    for o in reversed(lines):
+        if o.get("type") != "assistant":
+            continue
+        content = (o.get("message") or {}).get("content")
+        if isinstance(content, list) and content and isinstance(content[-1], dict) and content[-1].get("type") == "tool_use":
+            name = content[-1].get("name")
+            if isinstance(name, str) and name not in TOOL_REPORT:
+                return name[:40]
+        return None
+    return None
+
+
+def reply_with_lookback(path: Path, size: int, tail: list[dict], prev):
+    """回复只看文字。尾窗里没有时：追加写的文件沿用上一次的回复；首次见到则往前最多回看 4MiB。"""
+    r = last_reply(tail)
+    if r or size <= HEAD_BYTES + TAIL_BYTES:
+        return r
+    if prev is not None:
+        return prev.get("reply")
+    end = size - TAIL_BYTES
+    start = max(0, end - LOOKBACK_BYTES)
+    with path.open("rb") as f:
+        f.seek(start)
+        buf = f.read(end - start)
+    lines = buf.split(b"\n")
+    if start > 0:
+        lines = lines[1:]  # 丢掉开头的半行
+    parsed = []
+    for ln in lines:
+        try:
+            o = json.loads(ln)
+        except Exception:
+            continue
+        if isinstance(o, dict):
+            parsed.append(o)
+    return last_reply(parsed)
+
+
+def summarize_session(path: Path, st: os.stat_result, prev=None) -> dict:
     head, tail = read_head_tail(path, st.st_size)
     first_ts = next((iso_ms(o.get("timestamp")) for o in head if o.get("timestamp")), None)
     last_ts = next((iso_ms(o.get("timestamp")) for o in reversed(tail) if o.get("timestamp")), None)
@@ -217,11 +263,12 @@ def summarize_session(path: Path, st: os.stat_result) -> dict:
         "model": ms[-1] if ms else None,
         "branch": branch,
         "stop": last_assistant_stop(tail),
-        "reply": last_reply(tail),
+        "reply": reply_with_lookback(path, st.st_size, tail, prev),
+        "tool": last_tool(tail),
     }
 
 
-def summarize_sub(path: Path, st: os.stat_result) -> dict:
+def summarize_sub(path: Path, st: os.stat_result, prev=None) -> dict:
     head, tail = read_head_tail(path, st.st_size)
     first_ts = next((iso_ms(o.get("timestamp")) for o in head if o.get("timestamp")), None)
     last_ts = next((iso_ms(o.get("timestamp")) for o in reversed(tail) if o.get("timestamp")), None)
@@ -241,7 +288,8 @@ def summarize_sub(path: Path, st: os.stat_result) -> dict:
         "bg": meta.get("requestShape") == "background",
         "stop": last_assistant_stop(tail),
         "msgs": sum(1 for o in tail if o.get("type") == "assistant"),
-        "reply": last_reply(tail),
+        "reply": reply_with_lookback(path, st.st_size, tail, prev),
+        "tool": last_tool(tail),
     }
 
 
@@ -390,6 +438,7 @@ def scan(sources: list[dict], hours: float) -> dict:
                     "start": info["start"] or int(st.st_mtime * 1000),
                     "last": max(int(st.st_mtime * 1000), (r or {}).get("updatedAt") or 0),
                     "reply": info.get("reply"),
+                    "tool": info.get("tool"),
                     "agents": [],
                 }
                 for sf, sst in sub_files:
@@ -419,6 +468,7 @@ def scan(sources: list[dict], hours: float) -> dict:
                         "start": si["start"] or int(sst.st_mtime * 1000),
                         "last": int(sst.st_mtime * 1000),
                         "reply": si.get("reply"),
+                        "tool": si.get("tool"),
                     }
                     lead["agents"].append(a)
                     base = {"src": src["id"], "lid": sid, "aid": aid, "who": a["name"], "job": a["type"], "task": a["task"]}
@@ -567,14 +617,14 @@ def sanitize(state: dict) -> dict:
                 agents.append({"id": _id(a.get("id")), "name": _s(a.get("name"), 32) or "?", "type": _s(a.get("type"), 40) or "agent",
                                "task": _s(a.get("task")), "model": _s(a.get("model"), 60), "bg": bool(a.get("bg")),
                                "status": a["status"], "start": _i(a["start"]), "last": _i(a["last"]),
-                               "reply": _s(a.get("reply"), 400)})
+                               "reply": _s(a.get("reply"), 400), "tool": _s(a.get("tool"), 40)})
         if not (_i(l.get("start")) and _i(l.get("last"))):
             continue
         budget -= len(agents)
         leads.append({"id": _id(l.get("id")), "src": l["src"], "name": _s(l.get("name"), 32) or "?", "face": _s(l.get("face"), 32),
                       "title": _s(l.get("title")), "project": _s(l.get("project"), 80), "branch": _s(l.get("branch"), 80),
                       "model": _s(l.get("model"), 60), "status": l["status"], "start": _i(l["start"]), "last": _i(l["last"]),
-                      "reply": _s(l.get("reply"), 400),
+                      "reply": _s(l.get("reply"), 400), "tool": _s(l.get("tool"), 40),
                       "agents": agents})
     events = []
     for e in _list(state.get("events"), 400):
