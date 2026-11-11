@@ -54,7 +54,7 @@ h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-
 .stat .sub{color:var(--dim);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .stat .col{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
 .bar{height:5px;background:var(--line);border-radius:3px;overflow:hidden;width:100%}
-.bar i{display:block;height:100%;background:var(--work)}
+.bar i{display:block;height:100%;background:var(--work);transition:width .8s ease}
 
 /* sources */
 .sources{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
@@ -107,6 +107,10 @@ h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-
 .child .av{margin-left:40px}
 .av{width:34px;height:34px;border-radius:8px;flex:none;border:1.5px solid var(--line2);background:#1d1f25;position:relative}
 .av img{width:100%;height:100%;display:block;border-radius:6px;object-fit:cover}
+.avi{display:block;width:100%;height:100%;overflow:hidden;border-radius:6px}
+.avi img{transform:scale(1.15);transform-origin:50% 50%}   /* 头像框不变，内部画面放大 15% */
+.enter{animation:enter .45s ease-out}
+@keyframes enter{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .av svg{width:100%;height:100%;display:block;border-radius:6px;image-rendering:pixelated}
 .row.lead .av{width:40px;height:40px}
 .av .sb{position:absolute;right:-4px;bottom:-4px;width:12px;height:12px;border-radius:4px;border:2px solid var(--panel2)}
@@ -131,7 +135,7 @@ h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-
 .pill{font-size:11px;border:1px solid var(--line2);border-radius:5px;padding:1px 7px;color:var(--dim);flex:none}
 .pill.hot{border-color:color-mix(in srgb,var(--work) 55%,transparent);color:var(--work)}
 .tl{position:relative;height:100%;min-height:30px;margin:0 6px}
-.tl .seg-b{position:absolute;top:50%;height:12px;transform:translateY(-50%);border-radius:3px;min-width:3px;background:var(--c);opacity:.85}
+.tl .seg-b{transition:left .8s ease,width .8s ease;position:absolute;top:50%;height:12px;transform:translateY(-50%);border-radius:3px;min-width:3px;background:var(--c);opacity:.85}
 .tl .seg-b.ghost{opacity:.35}
 .tl .nowl{position:absolute;top:-8px;bottom:-8px;width:1.5px;background:color-mix(in srgb,var(--work) 70%,transparent)}
 .tl .orb{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,#fff 0 25%,var(--work) 55%,transparent 72%);box-shadow:0 0 18px 4px color-mix(in srgb,var(--work) 55%,transparent);animation:pulse 1.6s infinite}
@@ -218,6 +222,37 @@ function localSet(k,v){try{localStorage.setItem("deck."+k,v)}catch{}}
 function srcBase(id){return String(id||"").split("@")[0]}
 function sCol(id){return SRC_COLOR[srcBase(id)]||"#9a958c"}
 function sHex(id){return SRC_HEX[srcBase(id)]||"#9a958c"}
+/* ---------- 增量更新：把新 HTML 与现有 DOM 对比，只改有变化的文字/属性，元素尽量复用
+   （图片不重新加载、动画不中断）；带 data-key 的元素按 key 匹配，新出现的条目淡入。 */
+function patch(el, html){
+  const tpl=document.createElement("template"); tpl.innerHTML=html;
+  morphChildren(el, tpl.content, el.hasChildNodes());
+}
+function sameKind(a,b){
+  if(a.nodeType!==b.nodeType||a.nodeName!==b.nodeName) return false;
+  return a.nodeType!==1 || (a.getAttribute("data-key")===b.getAttribute("data-key"));
+}
+function morphChildren(oldP, newP, animate){
+  const keyed=new Map();
+  for(const c of oldP.childNodes) if(c.nodeType===1&&c.hasAttribute("data-key")) keyed.set(c.getAttribute("data-key"),c);
+  let ref=oldP.firstChild;
+  for(const n of [...newP.childNodes]){
+    let m=null;
+    const k=n.nodeType===1?n.getAttribute("data-key"):null;
+    if(k!==null){ m=keyed.get(k)||null; if(m&&m.nodeName!==n.nodeName) m=null; if(m) keyed.delete(k); }
+    else if(ref&&sameKind(ref,n)) m=ref;
+    if(m){ if(m===ref) ref=ref.nextSibling; else oldP.insertBefore(m, ref); morph(m,n,animate); }
+    else { oldP.insertBefore(n, ref); if(animate&&k!==null) n.classList.add("enter"); }
+  }
+  while(ref){ const nx=ref.nextSibling; oldP.removeChild(ref); ref=nx; }
+}
+function morph(a,b,animate){
+  if(a.nodeType===3||a.nodeType===8){ if(a.nodeValue!==b.nodeValue) a.nodeValue=b.nodeValue; return; }
+  for(const at of [...a.attributes]) if(!b.hasAttribute(at.name)) a.removeAttribute(at.name);
+  for(const at of b.attributes) if(a.getAttribute(at.name)!==at.value) a.setAttribute(at.name, at.value);
+  morphChildren(a,b,animate);
+}
+
 function h(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 function hash(s){let x=2166136261;for(const c of String(s)){x^=c.charCodeAt(0);x=Math.imul(x,16777619)}return x>>>0}
 function jobColor(j){return j==="lead"?"#ebe7df":JOB_PALETTE[hash(j)%JOB_PALETTE.length]}
@@ -230,7 +265,7 @@ function shortModel(m){return m?m.replace(/^claude-/,"").replace(/-(\d+)-(\d+)$/
 /* 像素头像：按 id 生成 8x8 左右对称小人，颜色由哈希决定 */
 const AV_CACHE = new Map();
 function avatar(id, kind, name){
-  if(name && S.data && S.data.avatars && S.data.avatars.includes(name.toLowerCase())) return `<img src="/avatars/${name.toLowerCase()}.png" alt="" decoding="sync">`;
+  if(name && S.data && S.data.avatars && S.data.avatars.includes(name.toLowerCase())) return `<span class="avi"><img src="/avatars/${name.toLowerCase()}.png" alt="" decoding="sync"></span>`;
   const key=id+kind; if(AV_CACHE.has(key)) return AV_CACHE.get(key);
   let r=hash(id); const rnd=()=>{r^=r<<13;r^=r>>>17;r^=r<<5;return (r>>>0)/4294967296};
   const hue=Math.floor(rnd()*360), hue2=(hue+140+Math.floor(rnd()*80))%360;
@@ -277,29 +312,29 @@ function renderStats(){
   const online=leads.filter(l=>l.status==="working"||l.status==="idle");
   const nf=bad.filter(a=>a.status==="failed").length, ns=bad.length-nf;
   const stat=(k,v,vc,sub,extra="")=>`<div class="stat"><div class="k">${k}</div><div class="row2"><div class="v" style="color:${vc}">${v}</div><div class="col">${extra}<div class="sub">${sub}</div></div></div></div>`;
-  $("stats").innerHTML=
+  patch($("stats"),
     stat(`<b style="background:var(--work);border-radius:50%"></b>WORKING`, working.length, working.length?"var(--work)":"var(--text)",
       h(working.length? working.slice(0,2).join(", ")+(working.length>2?` +${working.length-2}`:"") : "都在待命"))+
     stat(`<b style="background:var(--done)"></b>FINISHED`, fin.length, "var(--text)", fin[0]?`最近 ${h(fin[0].name)} · ${ago(fin[0].last)}`:"—")+
     stat(`<b style="border:1.5px solid var(--stop)"></b>STOPPED · FAILED`, bad.length, nf?"var(--fail)":bad.length?"var(--text)":"var(--faint)", bad.length?`失败 ${nf} · 中止 ${ns}`:"一切正常")+
-    stat(`ONLINE`, online.length, "var(--text)", `共 ${leads.length} 会话 · 近 ${Number(d.hours)||12}h`, `<div class="bar"><i style="width:${leads.length?online.length/leads.length*100:0}%"></i></div>`);
+    stat(`ONLINE`, online.length, "var(--text)", `共 ${leads.length} 会话 · 近 ${Number(d.hours)||12}h`, `<div class="bar"><i style="width:${leads.length?online.length/leads.length*100:0}%"></i></div>`));
 }
 
 function renderSources(){
-  $("sources").innerHTML=`<span class="lab">SOURCES</span>`+S.data.sources.filter(s=>s.sessions||srcBase(s.id)!=="cli").map(s=>`
+  patch($("sources"),`<span class="lab">SOURCES</span>`+S.data.sources.filter(s=>s.sessions||srcBase(s.id)!=="cli").map(s=>`
     <button class="src ${S.off.has(s.id)?"off":""}" data-src="${h(s.id)}" title="${h(s.dir)} · 点击显示/隐藏">
       <span class="dot" style="background:${sCol(s.id)}"></span>
       <span class="nm">${h(s.label)}</span>
       <span class="meta">${s.working?`<em>${s.working} 工作</em> · `:""}${s.online}/${s.sessions} 在线${s.agents?` · ${s.agents} 子`:""}</span>
-    </button>`).join("");
+    </button>`).join(""));
 }
 
 function renderJobs(){
   const counts=Object.create(null);
   for(const l of S.data.leads) if(!S.off.has(l.src)) for(const a of l.agents) counts[a.type]=(counts[a.type]||0)+1;
   const keys=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
-  $("jobs").innerHTML=keys.map(k=>`<button class="chip has ${S.job===k?"sel":""}" style="--c:${jobColor(k)}" data-job="${h(k)}">${h(k)}<span class="n">${counts[k]}</span></button>`).join("")
-    || `<span class="chip">暂无子 agent</span>`;
+  patch($("jobs"),keys.map(k=>`<button class="chip has ${S.job===k?"sel":""}" style="--c:${jobColor(k)}" data-job="${h(k)}">${h(k)}<span class="n">${counts[k]}</span></button>`).join("")
+    || `<span class="chip">暂无子 agent</span>`);
 }
 
 function axisRange(){const t=now(); return [t-S.win*3600e3, t]}
@@ -312,8 +347,8 @@ function renderAxis(){
   const first=Math.ceil(a/(step*60e3))*step*60e3; let out="";
   for(let t=first;t<b-(b-a)*0.16;t+=step*60e3) out+=`<span style="left:${pct(t)}%">${hm(t)}</span>`;
   out+=`<span class="now" style="left:auto;right:0;transform:none">NOW ▾</span>`;
-  $("axis").innerHTML=out;
-  $("win").innerHTML=[1,3,6,12].map(w=>`<button class="${S.win===w?"on":""}" data-win="${w}">${w}h</button>`).join("");
+  patch($("axis"),out);
+  patch($("win"),[1,3,6,12].map(w=>`<button class="${S.win===w?"on":""}" data-win="${w}">${w}h</button>`).join(""));
 }
 
 function bar(item, isLead){
@@ -351,7 +386,7 @@ function leadRow(l, live, hasKids){
 }
 
 function childRow(a, mid){
-  return `<div class="row child ${mid?"mid":""} ${a.status==="working"?"isw":""}">
+  return `<div class="row child ${mid?"mid":""} ${a.status==="working"?"isw":""}" data-key="a:${h(a.id)}">
     <div class="who">
       <div class="av">${avatar(a.id,"agent",a.name)}</div>
       <div class="txt">
@@ -375,7 +410,7 @@ function leadBlock(l, live){
     s+=`<div class="more">+ ${rest} more · ${fin} 完成 · ${rest-fin} 其他 · <button data-all="${h(l.id)}">▾ 全部展开</button></div>`}
   else if(all && l.agents.length>LIMIT) s+=`<div class="more"><button data-all="${h(l.id)}">▴ 收起</button></div>`;
   const hot = l.status==="working" || l.agents.some(a=>a.status==="working");
-  return `<div class="blk ${hot?"w":""}" style="--sc:${sHex(l.src)}">${s}</div>`;
+  return `<div class="blk ${hot?"w":""}" style="--sc:${sHex(l.src)}" data-key="l:${h(l.src)}:${h(l.id)}">${s}</div>`;
 }
 
 function renderLanes(){
@@ -388,7 +423,7 @@ function renderLanes(){
     ${live.length? live.map(l=>leadBlock(l,true)).join("") : `<div class="empty">当前没有在线会话</div>`}</div>`;
   html+=`<div class="group"><div class="gh"><span>RECENT · ${recent.length} 会话</span><span>用时</span></div>
     ${recent.length? recent.map(l=>leadBlock(l,false)).join("") : `<div class="empty">近 ${Number(S.data.hours)||12}h 没有已结束的会话</div>`}</div>`;
-  $("lanes").innerHTML=html;
+  patch($("lanes"),html);
 }
 
 function evLine(e){
@@ -399,15 +434,15 @@ function evLine(e){
 function renderLog(){
   const ev=S.data.events.filter(e=>!S.off.has(e.src) && (!S.job||e.job===S.job));
   $("logn").textContent=`${ev.length} 条 · 最新在前`;
-  $("log").innerHTML=ev.slice(0,250).map(e=>`<div class="ev ${now()-e.at<120e3?"hl":""}"><span class="t">${hm(e.at,true)}</span><span class="k ${KIND_LABEL[e.kind]?e.kind:""}">${h(KIND_LABEL[e.kind]||e.kind)}</span><span class="w" title="${h(e.task||"")}">${evLine(e)}</span></div>`).join("")
-    || `<div class="empty">暂无事件</div>`;
+  patch($("log"),ev.slice(0,250).map(e=>`<div class="ev ${now()-e.at<120e3?"hl":""}" data-key="${h(e.src+"|"+e.lid+"|"+(e.aid||"")+"|"+e.kind+"|"+e.at)}"><span class="t">${hm(e.at,true)}</span><span class="k ${KIND_LABEL[e.kind]?e.kind:""}">${h(KIND_LABEL[e.kind]||e.kind)}</span><span class="w" title="${h(e.task||"")}">${evLine(e)}</span></div>`).join("")
+    || `<div class="empty">暂无事件</div>`);
   const tk=ev.slice(0,14).map(e=>`<span class="tk"><span class="t">${hm(e.at,true)}</span><b style="color:${e.job==="lead"?sHex(e.src):jobColor(e.job)}">${h(e.who)}</b> ${h(VERB[e.kind]||e.kind)} · <span class="dim">${h(e.job==="lead"?"会话":e.job)}</span></span>`).join("");
-  $("ticker").innerHTML = tk ? tk + tk : `<span class="dim">等待事件…</span>`;
+  patch($("ticker"), tk ? tk + tk : `<span class="dim">等待事件…</span>`);
 }
 
 function render(){
   if(!S.data) return;
-  $("eyebrow").innerHTML=`AGENT DECK · <span style="text-transform:none;color:var(--text)">${h(S.data.host)}</span> · 值班台`;
+  patch($("eyebrow"),`AGENT DECK · <span style="text-transform:none;color:var(--text)">${h(S.data.host)}</span> · 值班台`);
   renderStats(); renderSources(); renderJobs(); renderAxis(); renderLanes(); renderLog();
 }
 
