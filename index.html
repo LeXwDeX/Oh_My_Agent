@@ -124,6 +124,7 @@ h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-
 .l2 .task{color:var(--dim);overflow:hidden;text-overflow:ellipsis}
 .l3{font-size:11px;color:var(--faint);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-width:100%}
 .l3::before{content:"↳ ";color:var(--line2)}
+.l3 .tool{display:inline-block;font-size:10px;letter-spacing:.04em;color:var(--work);border:1px solid color-mix(in srgb,var(--work) 40%,transparent);border-radius:4px;padding:0 5px;margin-right:6px;line-height:15px;vertical-align:1px}
 .l3.open{white-space:normal;color:var(--dim);line-height:1.5;background:color-mix(in srgb,var(--line) 40%,transparent);border-radius:5px;padding:4px 6px;margin-top:4px}
 .row.hasreply{min-height:60px}
 .st{font-size:10.5px;letter-spacing:.12em;flex:none}
@@ -369,9 +370,11 @@ function bar(item, isLead){
 }
 
 function replyLine(item){
-  if(!item.reply) return "";
+  // 工具只显示名字（仅在工作中显示，结束后的工具名已过时）；回复只显示文字
+  const tool = item.status==="working" && item.tool ? `<span class="tool">⚙ ${h(item.tool)}</span>` : "";
+  if(!item.reply && !tool) return "";
   const k=item.id||"";
-  return `<div class="l3 ${S.openReply.has(k)?"open":""}" data-reply="${h(k)}" title="${h(item.reply)}">${h(item.reply)}</div>`;
+  return `<div class="l3 ${S.openReply.has(k)?"open":""}" data-reply="${h(k)}" title="${h(item.reply||"")}">${tool}${h(item.reply||"")}</div>`;
 }
 function stLabel(st){st=ST_LABEL[st]?st:"stopped";return `<span class="st ${st}">${st==="working"?'<span class="spin" aria-hidden="true"></span> ':""}${ST_LABEL[st]}</span>`}
 

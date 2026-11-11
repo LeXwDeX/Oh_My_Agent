@@ -21,9 +21,9 @@ def lead(src, name, model, status, project, title, start_min, last_min, reply, a
             "last": NOW - last_min * MIN, "reply": reply, "agents": agents}
 
 
-def agent(name, typ, model, status, task, start_min, last_min, reply=None, bg=False):
+def agent(name, typ, model, status, task, start_min, last_min, reply=None, bg=False, tool=None):
     return {"id": f"demo-{name.lower()}-{typ}", "name": name, "type": typ, "task": task, "model": model, "bg": bg,
-            "status": status, "start": NOW - start_min * MIN, "last": NOW - last_min * MIN, "reply": reply}
+            "status": status, "start": NOW - start_min * MIN, "last": NOW - last_min * MIN, "reply": reply, "tool": tool}
 
 
 def events(src, leads):
@@ -62,7 +62,7 @@ MAC = state(
         lead("app", "Aurora", OPUS, "working", "shop-api", "订单服务库存锁重构", 52, 0,
              "库存扣减改为乐观锁 + 重试，压测 P99 从 420ms 降到 95ms；正在等 Hazel 补完回滚路径的单测。", [
                  agent("Hazel", "implementer", OPUS, "working", "补齐库存回滚路径单测", 14, 0,
-                       "已覆盖超卖、重复回调两种场景，还剩并发取消订单的用例。"),
+                       "已覆盖超卖、重复回调两种场景，还剩并发取消订单的用例。", tool="Edit"),
                  agent("Sage", "researcher", OPUS, "finished", "调研分布式锁方案取舍", 41, 33,
                        "结论：库存场景用数据库乐观锁足够，Redis 锁只在跨库编排时考虑。"),
                  agent("Nadia", "advisor", OPUS, "finished", "评审锁粒度与重试上限", 31, 26,
@@ -102,7 +102,7 @@ LINUX = state(
     [
         lead("cli", "Lumen", DS, "working", "infra", "CI 镜像缓存升级", 44, 0,
              "构建缓存改为按锁文件哈希分层，冷启动从 9 分钟降到 3 分钟。", [
-                 agent("Greta", "implementer", DS, "working", "改写 CI 缓存分层", 18, 0, "正在调整依赖层的缓存键。"),
+                 agent("Greta", "implementer", DS, "working", "改写 CI 缓存分层", 18, 0, "正在调整依赖层的缓存键。", tool="Bash"),
                  agent("Ivy", "researcher", DS, "finished", "对比各缓存后端", 40, 31, "本地 registry 缓存最稳，命中率最高。"),
              ]),
         lead("cli", "Comet", DS, "done", "infra", "清理过期构建产物", 320, 300,

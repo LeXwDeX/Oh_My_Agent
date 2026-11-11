@@ -4,7 +4,7 @@
 //! 全设备 agents ≤2000（working 优先，再按 last 倒序）、events ≤400。
 //! 字段：去掉控制/Cf 字符后按 Unicode 字符截断（同 hub 的 _s 上限）。
 //! 体积超限时依次：删 RECENT lead（连同事件）→ 从旧到新删非 working 的 agents（连同事件）
-//! → 清空 reply → 清空 task → events 减半 → 只发 sources + working/idle lead 骨架。
+//! → 清空 reply → 清空 task → events 减半 → 只发 sources + working/idle lead 骨架（保留 tool）。
 
 use std::collections::HashSet;
 
@@ -53,6 +53,7 @@ fn clamp_fields(st: &mut State) {
         cv(&mut l.branch, 80);
         cv(&mut l.model, 60);
         cv(&mut l.reply, 400);
+        cv(&mut l.tool, 40);
         for a in &mut l.agents {
             cs(&mut a.id, 64);
             cs(&mut a.name, 32);
@@ -60,6 +61,7 @@ fn clamp_fields(st: &mut State) {
             cv(&mut a.task, 160);
             cv(&mut a.model, 60);
             cv(&mut a.reply, 400);
+            cv(&mut a.tool, 40);
         }
     }
     for e in &mut st.events {
@@ -244,6 +246,7 @@ mod tests {
             start: 1_700_000_000_000 + i as i64,
             last: 1_700_000_000_000 + i as i64,
             reply: Value::String(reply.into()),
+            tool: Value::String("Bash".into()),
         }
     }
 
@@ -261,6 +264,7 @@ mod tests {
             start: 1,
             last: Num::I(1_700_000_000_000 + i as i64),
             reply: Value::String("回".repeat(1000)),
+            tool: Value::String("t".repeat(100)),
             agents,
             face: "Nova".into(),
         }
