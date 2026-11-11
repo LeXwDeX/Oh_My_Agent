@@ -1,0 +1,984 @@
+//! 只读扫描本机 Claude Code 各档位目录，逐条复刻 server.py 的 scan() 语义。
+//!
+//! 输出 JSON 的字段名、字段顺序与取值规则与 Python 版一致；
+//! 区别仅在容错：单个文件/目录读取失败只跳过该项，不会让整轮扫描失败。
+
+use std::collections::{HashMap, HashSet};
+use std::fs::{self, File};
+use std::io::{self, Read, Seek, SeekFrom};
+use std::os::unix::fs::MetadataExt;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde::{Serialize, Serializer};
+use serde_json::{Map, Value};
+
+use crate::timefmt::iso_ms;
+
+type Obj = Map<String, Value>;
+
+/// 扫描中因 stat/open/read/解析失败而跳过的文件/目录数（不逐条打日志，由心跳汇总后清零）
+pub static SKIPPED: AtomicU64 = AtomicU64::new(0);
+
+fn skip() {
+    SKIPPED.fetch_add(1, Ordering::Relaxed);
+}
+
+pub const LIVE_SECS: f64 = 90.0; // 记录文件在这段时间内有写入，视为仍在工作
+const HEAD_BYTES: u64 = 96 * 1024;
+const TAIL_BYTES: u64 = 256 * 1024;
+const SMALL_JSON_MAX: u64 = 64 * 1024;
+
+// ---------------------------------------------------------------- 名字池
+
+const NAMES_FALLBACK: &str = "Ada Alma Amber Arlo Basil Bea Bram Bruno Cass Cleo Clyde Cora Dax Dora Eli Elsa Emmet Esme \
+Ezra Faye Finn Flora Freya Gus Greta Hazel Hugo Ida Ines Ivan Ivy Jade Juno Kai Kit Lars Leo \
+Levi Lina Lou Mabel Mae Milo Mira Nadia Nell Nico Noor Olive Omar Otto Pearl Pip Quinn Rex \
+Rhea Rory Ruby Sage Sol Suki Tess Theo Toby Uma Vera Wren Yara Zane Zora";
+const LEAD_FALLBACK: &str = "Atlas Beacon Comet Delta Echo Falcon Gemini Halo Ion Jet Kestrel Lumen Nova Orion Pulsar Quasar Rook \
+Sirius Tango Vega Aurora Boreal Cobalt Dune Ember Fjord Granite Harbor Indigo Juniper Kite Lynx \
+Meteor Nimbus Onyx Pike Raven Summit Tundra Umber Vortex Willow Zenith";
+/// 编译期内嵌角色表（名字与头像一一对应）
+const ROSTER: &str = include_str!("../../avatars/roster.json");
+
+/// 取角色表中某组的名字；任一项缺 name 视为整组失败（同 Python 的异常分支）。
+fn roster_names(r: &Value, key: &str) -> Option<Vec<String>> {
+    let arr = r.get(key)?.as_array()?;
+    arr.iter().map(|p| p.get("name").and_then(Value::as_str).map(str::to_owned)).collect()
+}
+
+/// 返回 (NAMES, LEAD_NAMES)。顺序同 Python：先 crew 再 captains，前者失败则后者不再读取。
+pub fn name_pools() -> (Vec<String>, Vec<String>) {
+    let split = |s: &str| s.split_whitespace().map(str::to_owned).collect::<Vec<_>>();
+    let mut names = split(NAMES_FALLBACK);
+    let mut leads = split(LEAD_FALLBACK);
+    if let Ok(r) = serde_json::from_str::<Value>(ROSTER) {
+        if let Some(c) = roster_names(&r, "crew") {
+            if !c.is_empty() {
+                names = c;
+            }
+            if let Some(l) = roster_names(&r, "captains") {
+                if !l.is_empty() {
+                    leads = l;
+                }
+            }
+        }
+    }
+    (names, leads)
+}
+
+/// 同 Python pick()：sha1 十六进制前 8 位转整数取模。
+pub fn pick<'a>(seq: &'a [String], key: &str) -> &'a str {
+    if seq.is_empty() {
+        return "?";
+    }
+    let d = sha1_smol::Sha1::from(key.as_bytes()).digest().bytes();
+    let h = u32::from_be_bytes([d[0], d[1], d[2], d[3]]) as usize;
+    &seq[h % seq.len()]
+}
+
+// ---------------------------------------------------------------- 通用小工具
+
+/// Python 真值判断
+pub fn truthy(v: &Value) -> bool {
+    match v {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => n.as_f64().map(|f| f != 0.0).unwrap_or(true),
+        Value::String(s) => !s.is_empty(),
+        Value::Array(a) => !a.is_empty(),
+        Value::Object(o) => !o.is_empty(),
+    }
+}
+
+/// `o.get(k)` 且为真
+fn tget<'a>(o: &'a Obj, k: &str) -> Option<&'a Value> {
+    o.get(k).filter(|v| truthy(v))
+}
+
+/// `o.get(k) == s`
+fn is_str(o: &Obj, k: &str, s: &str) -> bool {
+    o.get(k).and_then(Value::as_str) == Some(s)
+}
+
+/// Python `a or b` 链：返回第一个为真的值
+fn or_chain(vals: &[Option<&Value>]) -> Option<Value> {
+    vals.iter().flatten().find(|v| truthy(v)).map(|v| (*v).clone())
+}
+
+fn now_f() -> f64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0)
+}
+
+/// 同 Python st_mtime：sec + nsec * 1e-9（双精度）
+fn mtime_f(m: &fs::Metadata) -> f64 {
+    m.mtime() as f64 + m.mtime_nsec() as f64 * 1e-9
+}
+
+/// int(st_mtime * 1000)
+fn mtime_ms(m: &fs::Metadata) -> i64 {
+    (mtime_f(m) * 1000.0) as i64
+}
+
+fn is_dir(p: &Path) -> bool {
+    fs::metadata(p).map(|m| m.is_dir()).unwrap_or(false)
+}
+
+/// 列目录（readdir 顺序，同 Python iterdir/glob），读失败返回空；非 UTF-8 文件名跳过。
+fn list_dir(p: &Path) -> Vec<(String, PathBuf)> {
+    let Ok(rd) = fs::read_dir(p) else {
+        skip();
+        return Vec::new();
+    };
+    rd.flatten()
+        .filter_map(|e| {
+            let name = e.file_name().into_string().ok()?;
+            Some((name, e.path()))
+        })
+        .collect()
+}
+
+/// Python Path.stem：去掉最后一个后缀（名字以点开头且无其他点时不算后缀）
+fn stem(name: &str) -> &str {
+    match name.rfind('.') {
+        Some(i) if i > 0 && i < name.len() - 1 => &name[..i],
+        _ => name,
+    }
+}
+
+/// Python PurePosixPath(p).name
+fn path_name(p: &str) -> String {
+    p.split('/').rfind(|c| !c.is_empty() && *c != ".").unwrap_or("").to_owned()
+}
+
+/// os.path.expanduser：只展开 "~" 与 "~/..."
+pub fn expand_user(dir: &str) -> PathBuf {
+    if dir == "~" || dir.starts_with("~/") {
+        if let Some(home) = std::env::var_os("HOME") {
+            let mut p = PathBuf::from(home);
+            if dir.len() > 2 {
+                p.push(&dir[2..]);
+            }
+            return p;
+        }
+    }
+    PathBuf::from(dir)
+}
+
+// ---------------------------------------------------------------- 数值：int 或 float（Python max(int, float) 的结果）
+
+#[derive(Clone, Copy, Debug)]
+pub enum Num {
+    I(i64),
+    F(f64),
+}
+
+impl Num {
+    pub fn f(self) -> f64 {
+        match self {
+            Num::I(i) => i as f64,
+            Num::F(f) => f,
+        }
+    }
+    /// JSON 数字 → Num；非数字视为 0（updatedAt 非数字时当 0）
+    fn from_value(v: Option<&Value>) -> Num {
+        match v {
+            Some(Value::Number(n)) => {
+                if let Some(i) = n.as_i64() {
+                    Num::I(i)
+                } else {
+                    Num::F(n.as_f64().unwrap_or(0.0))
+                }
+            }
+            _ => Num::I(0),
+        }
+    }
+    /// Python max(a, b)：b 严格大于 a 才取 b
+    fn max(a: Num, b: Num) -> Num {
+        if b.f() > a.f() {
+            b
+        } else {
+            a
+        }
+    }
+}
+
+impl Serialize for Num {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        match *self {
+            Num::I(i) => s.serialize_i64(i),
+            Num::F(f) => s.serialize_f64(f),
+        }
+    }
+}
+
+// ---------------------------------------------------------------- jsonl 读取与摘要
+
+/// 读文件头尾若干行 JSON（大文件不全读）。只接受 object 行，坏行/半行跳过。
+fn read_head_tail(path: &Path, size: u64) -> io::Result<(Vec<Obj>, Vec<Obj>)> {
+    let mut f = File::open(path)?;
+    let mut head = Vec::new();
+    (&mut f).take(HEAD_BYTES).read_to_end(&mut head)?;
+    let tail;
+    if size > HEAD_BYTES + TAIL_BYTES {
+        f.seek(SeekFrom::Start(size - TAIL_BYTES))?;
+        let mut t = Vec::new();
+        // 上限防止文件在 stat 之后暴涨导致读入过多
+        (&mut f).take(HEAD_BYTES + TAIL_BYTES).read_to_end(&mut t)?;
+        let cut = t.iter().position(|&b| b == b'\n').map(|i| i + 1).unwrap_or(0);
+        tail = t.split_off(cut);
+    } else if size > HEAD_BYTES {
+        let mut t = head;
+        (&mut f).take(HEAD_BYTES + TAIL_BYTES).read_to_end(&mut t)?;
+        head = t.clone();
+        tail = t;
+    } else {
+        tail = head.clone();
+    }
+    Ok((parse_lines(&head, size > HEAD_BYTES), parse_lines(&tail, false)))
+}
+
+fn parse_lines(buf: &[u8], drop_last_partial: bool) -> Vec<Obj> {
+    let mut lines: Vec<&[u8]> = buf.split(|&b| b == b'\n').collect();
+    if drop_last_partial && !buf.ends_with(b"\n") {
+        lines.pop();
+    }
+    let mut out = Vec::new();
+    for ln in lines {
+        // bytes.strip() 的空白集合
+        if ln.iter().all(|b| matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c)) {
+            continue;
+        }
+        if let Ok(Value::Object(m)) = serde_json::from_slice::<Value>(ln) {
+            out.push(m);
+        }
+    }
+    out
+}
+
+/// assistant 消息里的 message 对象（不是对象则视为空）
+/// 小 JSON 文件（registry / meta）：必须是普通文件，最多读 64KiB
+fn read_small(p: &Path) -> Option<String> {
+    let m = fs::metadata(p).ok()?;
+    if !m.is_file() {
+        return None;
+    }
+    let mut buf = Vec::new();
+    File::open(p).ok()?.take(SMALL_JSON_MAX).read_to_end(&mut buf).ok()?;
+    String::from_utf8(buf).ok()
+}
+
+fn message_of(o: &Obj) -> Option<&Obj> {
+    tget(o, "message").and_then(Value::as_object)
+}
+
+fn models_in(lines: &[Obj]) -> Vec<Value> {
+    let mut out = Vec::new();
+    for o in lines {
+        if is_str(o, "type", "assistant") {
+            if let Some(m) = message_of(o).and_then(|m| tget(m, "model")) {
+                if m.as_str() != Some("<synthetic>") {
+                    out.push(m.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// 最后一条 assistant 的结束方式；子 agent 以 SubagentHandback/StructuredOutput 工具交回结果视为正常完成。
+fn last_assistant_stop(lines: &[Obj]) -> Value {
+    for o in lines.iter().rev() {
+        if is_str(o, "type", "assistant") {
+            let Some(m) = message_of(o) else { return Value::Null };
+            if let Some(Value::Array(content)) = tget(m, "content") {
+                for c in content {
+                    if let Value::Object(c) = c {
+                        if is_str(c, "type", "tool_use")
+                            && matches!(c.get("name").and_then(Value::as_str), Some("SubagentHandback" | "StructuredOutput"))
+                        {
+                            return Value::String("end_turn".into());
+                        }
+                    }
+                }
+            }
+            return m.get("stop_reason").cloned().unwrap_or(Value::Null);
+        }
+    }
+    Value::Null
+}
+
+/// Python str.isspace()（比 Rust 的 Unicode White_Space 多 \x1c-\x1f）
+fn py_space(c: char) -> bool {
+    c.is_whitespace() || ('\x1c'..='\x1f').contains(&c)
+}
+
+/// 同 Python last_reply()：从后往前找最后一条回复。
+/// 子 agent 交回结果（SubagentHandback/StructuredOutput 的 input.message，取该条中最后一个非空的）优先，
+/// 否则取该消息最后一段非空 text；连续空白压成单个空格，截断到 400 个字符。
+fn last_reply(lines: &[Obj]) -> Value {
+    for o in lines.iter().rev() {
+        if !is_str(o, "type", "assistant") {
+            continue;
+        }
+        let Some(Value::Array(content)) = message_of(o).and_then(|m| m.get("content")) else { continue };
+        let mut text: Option<&str> = None;
+        for c in content.iter().filter_map(Value::as_object) {
+            if is_str(c, "type", "tool_use")
+                && matches!(c.get("name").and_then(Value::as_str), Some("SubagentHandback" | "StructuredOutput"))
+            {
+                if let Some(m) = c.get("input").and_then(Value::as_object).and_then(|i| i.get("message")).and_then(Value::as_str) {
+                    if !m.chars().all(py_space) {
+                        text = Some(m);
+                    }
+                }
+            }
+        }
+        if text.is_none() {
+            text = content.iter().rev().filter_map(Value::as_object).find_map(|c| {
+                if !is_str(c, "type", "text") {
+                    return None;
+                }
+                c.get("text").and_then(Value::as_str).filter(|t| !t.chars().all(py_space))
+            });
+        }
+        if let Some(t) = text.filter(|t| !t.is_empty()) {
+            let joined = t.split(py_space).filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ");
+            return Value::String(joined.chars().take(400).collect());
+        }
+    }
+    Value::Null
+}
+
+fn last_model(tail: &[Obj], head: &[Obj]) -> Option<Value> {
+    let ms = models_in(tail);
+    let ms = if ms.is_empty() { models_in(head) } else { ms };
+    ms.last().cloned()
+}
+
+#[derive(Clone)]
+struct SessInfo {
+    start: Option<i64>,
+    entry: Value,
+    cwd: Value,
+    title: Value,
+    model: Value,
+    branch: Value,
+    stop: Value,
+    reply: Value,
+}
+
+fn summarize_session(path: &Path, size: u64) -> io::Result<SessInfo> {
+    let (head, tail) = read_head_tail(path, size)?;
+    let start = iso_ms(head.iter().find_map(|o| tget(o, "timestamp")));
+    let entry = head.iter().chain(tail.iter()).find_map(|o| tget(o, "entrypoint")).cloned().unwrap_or(Value::Null);
+    let cwd = tail
+        .iter()
+        .rev()
+        .find_map(|o| tget(o, "cwd"))
+        .or_else(|| head.iter().find_map(|o| tget(o, "cwd")))
+        .cloned()
+        .unwrap_or(Value::Null);
+    // 标题：custom-title 优先，其次 agent-name（不再回退到 lastPrompt）
+    let mut title = Value::Null;
+    for o in tail.iter().rev() {
+        if is_str(o, "type", "custom-title") {
+            if let Some(t) = tget(o, "customTitle") {
+                title = t.clone();
+                break;
+            }
+        }
+        if is_str(o, "type", "agent-name") && !truthy(&title) {
+            if let Some(t) = tget(o, "agentName") {
+                title = t.clone();
+            }
+        }
+    }
+    let branch = tail.iter().rev().find_map(|o| tget(o, "gitBranch")).cloned().unwrap_or(Value::Null);
+    Ok(SessInfo {
+        start,
+        entry,
+        cwd,
+        title,
+        model: last_model(&tail, &head).unwrap_or(Value::Null),
+        branch,
+        stop: last_assistant_stop(&tail),
+        reply: last_reply(&tail),
+    })
+}
+
+#[derive(Clone)]
+struct SubInfo {
+    start: Option<i64>,
+    model: Value,
+    typ: Value,
+    desc: Value,
+    bg: bool,
+    stop: Value,
+    msgs: usize,
+    reply: Value,
+}
+
+fn summarize_sub(path: &Path, size: u64) -> io::Result<SubInfo> {
+    let (head, tail) = read_head_tail(path, size)?;
+    let start = iso_ms(head.iter().find_map(|o| tget(o, "timestamp")));
+    let meta: Obj = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .and_then(|n| n.strip_suffix(".jsonl"))
+        .and_then(|base| read_small(&path.with_file_name(format!("{base}.meta.json"))))
+        .and_then(|s| match serde_json::from_str::<Value>(&s) {
+            Ok(Value::Object(m)) => Some(m),
+            _ => None,
+        })
+        .unwrap_or_default();
+    let model = last_model(&tail, &head).unwrap_or_else(|| meta.get("pickedEffortModel").cloned().unwrap_or(Value::Null));
+    Ok(SubInfo {
+        start,
+        model,
+        typ: tget(&meta, "agentType").cloned().unwrap_or_else(|| Value::String("agent".into())),
+        desc: meta.get("description").cloned().unwrap_or(Value::Null),
+        bg: is_str(&meta, "requestShape", "background"),
+        stop: last_assistant_stop(&tail),
+        msgs: tail.iter().filter(|o| is_str(o, "type", "assistant")).count(),
+        reply: last_reply(&tail),
+    })
+}
+
+/// 按 (mtime_ns, size) 缓存单个 jsonl 的解析摘要；每轮结束清理本轮未访问的项。
+struct FileCache<T: Clone> {
+    d: HashMap<PathBuf, ((i64, i64, u64), T)>,
+    seen: HashSet<PathBuf>,
+}
+
+impl<T: Clone> FileCache<T> {
+    fn new() -> Self {
+        FileCache { d: HashMap::new(), seen: HashSet::new() }
+    }
+    fn get(&mut self, path: &Path, m: &fs::Metadata, f: fn(&Path, u64) -> io::Result<T>) -> Option<T> {
+        let sig = (m.mtime(), m.mtime_nsec(), m.size());
+        self.seen.insert(path.to_path_buf());
+        if let Some((s, v)) = self.d.get(path) {
+            if *s == sig {
+                return Some(v.clone());
+            }
+        }
+        match f(path, m.size()) {
+            Ok(v) => {
+                self.d.insert(path.to_path_buf(), (sig, v.clone()));
+                Some(v)
+            }
+            Err(_) => {
+                skip();
+                self.d.remove(path);
+                None
+            }
+        }
+    }
+    fn sweep(&mut self) {
+        let seen = std::mem::take(&mut self.seen);
+        self.d.retain(|k, _| seen.contains(k));
+    }
+}
+
+// ---------------------------------------------------------------- 档位与登记表
+
+#[derive(Clone, Debug)]
+pub struct Source {
+    pub id: String,
+    pub label: Value,
+    pub dir: String,
+    pub entry: Value, // null = 不过滤；"x" = 等于；"!x" = 不等于
+    /// 设置后该档位下 lead 与 agents 的 model 一律替换为此值
+    pub model_label: Option<String>,
+}
+
+pub fn default_sources() -> Vec<Source> {
+    let mk = |id: &str, label: &str, dir: &str, entry: Option<&str>, model_label: Option<&str>| Source {
+        id: id.into(),
+        label: Value::String(label.into()),
+        dir: dir.into(),
+        entry: entry.map(|e| Value::String(e.into())).unwrap_or(Value::Null),
+        model_label: model_label.map(str::to_owned),
+    };
+    vec![
+        mk("app", "Claude App", "~/.claude", Some("claude-desktop"), None),
+        mk("cli", "claude", "~/.claude", Some("!claude-desktop"), None),
+        mk("ds", "claude-ds", "~/.claude-deepseek", None, Some("DeepSeek")),
+        mk("qwen", "claude-qwen", "~/.claude-qwen", None, Some("Qwen4")),
+    ]
+}
+
+/// 解析档位 JSON（格式同 DEFAULT_SOURCES）
+pub fn parse_sources(s: &str) -> Result<Vec<Source>, String> {
+    let v: Value = serde_json::from_str(s).map_err(|e| format!("档位 JSON 解析失败: {e}"))?;
+    let arr = v.as_array().ok_or("档位 JSON 必须是数组")?;
+    arr.iter()
+        .map(|x| {
+            let o = x.as_object().ok_or("档位项必须是对象")?;
+            let id = o.get("id").and_then(Value::as_str).ok_or("档位项缺少字符串 id")?;
+            let dir = o.get("dir").and_then(Value::as_str).ok_or("档位项缺少字符串 dir")?;
+            Ok(Source {
+                id: id.into(),
+                label: o.get("label").cloned().unwrap_or(Value::Null),
+                dir: dir.into(),
+                entry: o.get("entry").cloned().unwrap_or(Value::Null),
+                model_label: o.get("model_label").and_then(Value::as_str).filter(|s| !s.is_empty()).map(str::to_owned),
+            })
+        })
+        .collect()
+}
+
+fn entry_match(rule: &Value, entry: &Value) -> bool {
+    match rule {
+        Value::Null => true,
+        Value::String(r) => match r.strip_prefix('!') {
+            Some(neg) => entry.as_str() != Some(neg),
+            None => entry.as_str() == Some(r.as_str()),
+        },
+        other => other == entry,
+    }
+}
+
+fn pid_alive(pid: i64) -> bool {
+    let Ok(p) = libc::pid_t::try_from(pid) else { return false };
+    // SAFETY: kill(pid, 0) 只做存在性/权限检查，不发送信号
+    if unsafe { libc::kill(p, 0) } == 0 {
+        return true;
+    }
+    // ESRCH = 进程不存在；EPERM 等其他错误视为存活
+    io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH)
+}
+
+pub struct Config {
+    pub pid_check: bool,
+    pub registry_ttl: f64, // 秒
+    pub host: String,
+    pub redact: bool,
+}
+
+fn load_registry(cfg: &Path, conf: &Config) -> HashMap<String, Obj> {
+    let mut reg = HashMap::new();
+    let d = cfg.join("sessions");
+    if !is_dir(&d) {
+        return reg;
+    }
+    for (name, f) in list_dir(&d) {
+        if !name.ends_with(".json") {
+            continue;
+        }
+        let Some(text) = read_small(&f) else {
+            skip();
+            continue;
+        };
+        let Ok(Value::Object(r)) = serde_json::from_str::<Value>(&text) else {
+            skip();
+            continue;
+        };
+        let Some(sid) = tget(&r, "sessionId").and_then(Value::as_str).map(str::to_owned) else { continue };
+        // pid 必须是正整数（布尔不算）
+        let Some(pid) = r.get("pid").and_then(Value::as_i64).filter(|&p| p > 0) else { continue };
+        if conf.pid_check {
+            if !pid_alive(pid) {
+                continue;
+            }
+        } else {
+            let Ok(m) = fs::metadata(&f) else { continue };
+            let upd = match r.get("updatedAt") {
+                Some(v @ Value::Number(_)) if truthy(v) => v.as_f64().unwrap_or(0.0),
+                _ => 0.0,
+            };
+            let fresh = mtime_f(&m).max(upd / 1000.0);
+            if now_f() - fresh > conf.registry_ttl {
+                continue;
+            }
+        }
+        reg.insert(sid, r);
+    }
+    reg
+}
+
+// ---------------------------------------------------------------- 输出结构（字段顺序同 Python）
+
+#[derive(Serialize, Clone)]
+pub struct SrcStat {
+    pub id: String,
+    pub label: Value,
+    pub dir: String,
+    pub online: u64,
+    pub working: u64,
+    pub sessions: u64,
+    pub agents: u64,
+}
+
+#[derive(Serialize, Clone)]
+pub struct Agent {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub typ: Value,
+    pub task: Value,
+    pub model: Value,
+    pub bg: bool,
+    pub status: &'static str,
+    pub start: i64,
+    pub last: i64,
+    pub reply: Value,
+}
+
+#[derive(Serialize, Clone)]
+pub struct Lead {
+    pub id: String,
+    pub src: String,
+    pub name: String,
+    pub title: Value,
+    pub project: String,
+    pub branch: Value,
+    pub model: Value,
+    pub pid: Value,
+    pub status: &'static str,
+    pub start: i64,
+    pub last: Num,
+    pub reply: Value,
+    pub agents: Vec<Agent>,
+    pub face: String,
+}
+
+#[derive(Serialize, Clone)]
+pub struct Event {
+    pub src: String,
+    pub lid: String,
+    pub aid: Option<String>,
+    pub who: Option<String>,
+    pub job: Value,
+    pub task: Value,
+    pub at: Num,
+    pub kind: &'static str,
+    pub lead: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+pub struct State {
+    pub now: i64,
+    pub hours: f64,
+    pub host: String,
+    pub sources: Vec<SrcStat>,
+    pub leads: Vec<Lead>,
+    pub events: Vec<Event>,
+}
+
+pub fn status_order(s: &str) -> u8 {
+    match s {
+        "working" => 0,
+        "idle" => 1,
+        "stopped" => 2,
+        "done" => 3,
+        _ => 9,
+    }
+}
+
+// ---------------------------------------------------------------- 扫描器
+
+pub struct Scanner {
+    pub conf: Config,
+    names: Vec<String>,
+    lead_names: Vec<String>,
+    sess_cache: FileCache<SessInfo>,
+    sub_cache: FileCache<SubInfo>,
+}
+
+impl Scanner {
+    pub fn new(conf: Config) -> Self {
+        let (names, lead_names) = name_pools();
+        Scanner { conf, names, lead_names, sess_cache: FileCache::new(), sub_cache: FileCache::new() }
+    }
+
+    pub fn scan(&mut self, sources: &[Source], hours: f64) -> State {
+        let now = (now_f() * 1000.0) as i64;
+        let horizon = now_f() - hours * 3600.0;
+        let mut leads: Vec<Lead> = Vec::new();
+        let mut events: Vec<Event> = Vec::new();
+        let mut src_stats: Vec<SrcStat> = Vec::new();
+
+        // 按 dir 原样分组，保持首次出现顺序
+        let mut by_dir: Vec<(String, Vec<&Source>)> = Vec::new();
+        for s in sources {
+            match by_dir.iter_mut().find(|(d, _)| *d == s.dir) {
+                Some((_, v)) => v.push(s),
+                None => by_dir.push((s.dir.clone(), vec![s])),
+            }
+        }
+
+        for (dir_, srcs) in &by_dir {
+            let cfg = expand_user(dir_);
+            let reg = load_registry(&cfg, &self.conf);
+            let proj = cfg.join("projects");
+            for s in srcs {
+                let st = SrcStat {
+                    id: s.id.clone(),
+                    label: s.label.clone(),
+                    dir: dir_.clone(),
+                    online: 0,
+                    working: 0,
+                    sessions: 0,
+                    agents: 0,
+                };
+                // 同 Python dict 赋值：同 id 覆盖值但保留原位置
+                match src_stats.iter_mut().find(|x| x.id == s.id) {
+                    Some(x) => *x = st,
+                    None => src_stats.push(st),
+                }
+            }
+            if !is_dir(&proj) {
+                continue;
+            }
+            for (_, pdir) in list_dir(&proj) {
+                if !is_dir(&pdir) {
+                    continue;
+                }
+                let pdir_name = pdir.file_name().and_then(|n| n.to_str()).unwrap_or("").to_owned();
+                for (jname, jf) in list_dir(&pdir) {
+                    if !jname.ends_with(".jsonl") {
+                        continue;
+                    }
+                    let Ok(st) = fs::metadata(&jf) else {
+                        skip();
+                        continue;
+                    };
+                    if !st.is_file() {
+                        continue;
+                    }
+                    let sid = stem(&jname).to_owned();
+                    let subdir = pdir.join(&sid).join("subagents");
+                    let mut sub_files: Vec<(String, PathBuf, fs::Metadata)> = Vec::new();
+                    if is_dir(&subdir) {
+                        for (sname, sf) in list_dir(&subdir) {
+                            if !(sname.len() >= 12 && sname.starts_with("agent-") && sname.ends_with(".jsonl")) {
+                                continue;
+                            }
+                            let Ok(sst) = fs::metadata(&sf) else {
+                                skip();
+                                continue;
+                            };
+                            if sst.is_file() && mtime_f(&sst) >= horizon {
+                                sub_files.push((sname, sf, sst));
+                            }
+                        }
+                    }
+                    let r = reg.get(&sid);
+                    if mtime_f(&st) < horizon && sub_files.is_empty() && r.is_none() {
+                        continue;
+                    }
+                    let Some(info) = self.sess_cache.get(&jf, &st, summarize_session) else { continue };
+                    let rget = |k: &str| r.and_then(|r| r.get(k));
+                    let entry = or_chain(&[rget("entrypoint"), Some(&info.entry)]).unwrap_or(Value::Null);
+                    let Some(src) = srcs.iter().find(|s| entry_match(&s.entry, &entry)) else { continue };
+
+                    let age = now_f() - mtime_f(&st);
+                    let mut status: &'static str = if let Some(r) = r {
+                        if is_str(r, "status", "busy") {
+                            "working"
+                        } else {
+                            "idle"
+                        }
+                    } else if age < LIVE_SECS {
+                        "working"
+                    } else if matches!(info.stop.as_str(), Some("end_turn" | "stop_sequence")) || info.stop.is_null() {
+                        "done"
+                    } else {
+                        "stopped"
+                    };
+
+                    let cwd = or_chain(&[rget("cwd"), Some(&info.cwd)]);
+                    let cwd_s = cwd.as_ref().and_then(Value::as_str).unwrap_or("");
+                    let mut project = if cwd.is_some() { path_name(cwd_s) } else { pdir_name.clone() };
+                    if cwd_s.contains("scratch-workspaces") {
+                        project = "scratch".into();
+                    }
+                    // 标题链：registry.name → custom-title → agent-name → project；脱敏时只用 project
+                    let title = if self.conf.redact {
+                        Value::String(project.clone())
+                    } else {
+                        or_chain(&[rget("name"), Some(&info.title)]).unwrap_or_else(|| Value::String(project.clone()))
+                    };
+                    let lead_name = pick(&self.lead_names, &format!("{}{}", src.id, sid)).to_owned();
+                    let st_ms = mtime_ms(&st);
+                    // 档位设了 model_label 时统一显示该值
+                    let fixed_model = src.model_label.as_ref().map(|m| Value::String(m.clone()));
+                    let start = match info.start {
+                        Some(v) if v != 0 => v,
+                        _ => st_ms,
+                    };
+                    let upd = match rget("updatedAt") {
+                        Some(v) if truthy(v) => Num::from_value(Some(v)),
+                        _ => Num::I(0),
+                    };
+                    let mut lead = Lead {
+                        id: sid.clone(),
+                        src: src.id.clone(),
+                        name: lead_name.clone(),
+                        title: title.clone(),
+                        project,
+                        branch: if self.conf.redact { Value::Null } else { info.branch.clone() },
+                        model: fixed_model.clone().unwrap_or_else(|| info.model.clone()),
+                        pid: rget("pid").cloned().unwrap_or(Value::Null),
+                        status,
+                        start,
+                        last: Num::max(Num::I(st_ms), upd),
+                        reply: if self.conf.redact { Value::Null } else { info.reply.clone() },
+                        agents: Vec::new(),
+                        face: lead_name,
+                    };
+                    for (sname, sf, sst) in &sub_files {
+                        let Some(si) = self.sub_cache.get(sf, sst, summarize_sub) else { continue };
+                        let aid = stem(sname).replace("agent-", "");
+                        let sage = now_f() - mtime_f(sst);
+                        let sstatus: &'static str = if sage < LIVE_SECS {
+                            "working"
+                        } else if matches!(si.stop.as_str(), Some("end_turn" | "stop_sequence")) {
+                            "finished"
+                        } else if si.msgs == 0 {
+                            "failed"
+                        } else {
+                            "stopped"
+                        };
+                        // 任一子 agent 在工作，主会话 idle/done/stopped 都提升为 working
+                        if sstatus == "working" && matches!(status, "idle" | "done" | "stopped") {
+                            status = "working";
+                            lead.status = status;
+                        }
+                        let a_last = mtime_ms(sst);
+                        let a = Agent {
+                            id: aid.clone(),
+                            name: pick(&self.names, &aid).to_owned(),
+                            typ: si.typ.clone(),
+                            task: if self.conf.redact { Value::Null } else { si.desc.clone() },
+                            model: fixed_model.clone().unwrap_or_else(|| si.model.clone()),
+                            bg: si.bg,
+                            status: sstatus,
+                            start: match si.start {
+                                Some(v) if v != 0 => v,
+                                _ => a_last,
+                            },
+                            last: a_last,
+                            reply: if self.conf.redact { Value::Null } else { si.reply.clone() },
+                        };
+                        let ev = |at: Num, kind: &'static str| Event {
+                            src: src.id.clone(),
+                            lid: sid.clone(),
+                            aid: Some(aid.clone()),
+                            who: Some(a.name.clone()),
+                            job: a.typ.clone(),
+                            task: a.task.clone(),
+                            at,
+                            kind,
+                            lead: None,
+                        };
+                        events.push(ev(Num::I(a.start), "on"));
+                        if sstatus != "working" {
+                            events.push(ev(Num::I(a.last), sstatus));
+                        }
+                        lead.agents.push(a);
+                    }
+                    lead.agents.sort_by(|a, b| (a.status != "working").cmp(&(b.status != "working")).then(b.last.cmp(&a.last)));
+                    let lev = |at: Num, kind: &'static str| Event {
+                        src: src.id.clone(),
+                        lid: sid.clone(),
+                        aid: None,
+                        who: None,
+                        job: Value::String("lead".into()),
+                        task: if self.conf.redact { Value::Null } else { title.clone() },
+                        at,
+                        kind,
+                        lead: None,
+                    };
+                    events.push(lev(Num::I(lead.start), "on"));
+                    if matches!(lead.status, "done" | "stopped") {
+                        events.push(lev(lead.last, lead.status));
+                    }
+
+                    if let Some(ss) = src_stats.iter_mut().find(|x| x.id == src.id) {
+                        ss.sessions += 1;
+                        ss.agents += lead.agents.len() as u64;
+                        if matches!(lead.status, "working" | "idle") {
+                            ss.online += 1;
+                        }
+                        if lead.status == "working" || lead.agents.iter().any(|x| x.status == "working") {
+                            ss.working += 1;
+                        }
+                    }
+                    leads.push(lead);
+                }
+            }
+        }
+        self.sess_cache.sweep();
+        self.sub_cache.sweep();
+
+        // 主会话代号去重：按开始时间先到先得，撞名则顺延
+        let ln = &self.lead_names;
+        let mut idx: Vec<usize> = (0..leads.len()).collect();
+        idx.sort_by_key(|&i| leads[i].start); // 稳定排序，同 Python sorted
+        let mut used: HashSet<String> = HashSet::new();
+        for i in idx {
+            let l = &mut leads[i];
+            let base = l.name.clone();
+            let bi = ln.iter().position(|x| *x == base).unwrap_or(0);
+            let mut n = 0;
+            l.face = base.clone();
+            while used.contains(&l.name) && n < ln.len() {
+                n += 1;
+                if let Some(nm) = ln.get((bi + n) % ln.len()) {
+                    l.name = nm.clone();
+                    l.face = nm.clone();
+                }
+            }
+            if used.contains(&l.name) {
+                // 名字池用完：同脸加序号
+                let mut k = 2;
+                while used.contains(&format!("{base} {k}")) {
+                    k += 1;
+                }
+                l.name = format!("{base} {k}");
+                l.face = base.clone();
+            }
+            used.insert(l.name.clone());
+        }
+        let names: HashMap<&str, &str> = leads.iter().map(|l| (l.id.as_str(), l.name.as_str())).collect();
+        for e in &mut events {
+            e.lead = names.get(e.lid.as_str()).map(|s| (*s).to_owned());
+            if e.who.is_none() {
+                e.who = e.lead.clone();
+            }
+        }
+        leads.sort_by(|a, b| {
+            status_order(a.status).cmp(&status_order(b.status)).then(b.last.f().total_cmp(&a.last.f()))
+        });
+        events.sort_by(|a, b| b.at.f().total_cmp(&a.at.f()));
+        events.truncate(400);
+        State { now, hours, host: self.conf.host.clone(), sources: src_stats, leads, events }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pick_matches_python() {
+        // python3 -c 'import hashlib;print(int(hashlib.sha1(b"abc").hexdigest()[:8],16))' → 2845392438
+        let seq: Vec<String> = (0..7).map(|i| i.to_string()).collect();
+        assert_eq!(pick(&seq, "abc"), (2845392438u64 % 7).to_string());
+    }
+
+    #[test]
+    fn helpers() {
+        assert_eq!(stem("abc.jsonl"), "abc");
+        assert_eq!(stem(".jsonl"), ".jsonl");
+        assert_eq!(path_name("/a/b/"), "b");
+        assert_eq!(path_name("/a/./"), "a");
+        assert_eq!(path_name("/"), "");
+        assert_eq!(parse_lines(b"{\"a\":1}\n[1]\n{bad\n{\"b\":", true).len(), 1);
+        assert_eq!(parse_lines(b"{\"a\":1}\n{\"b\":2}", false).len(), 2);
+    }
+}

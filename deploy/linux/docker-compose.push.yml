@@ -1,0 +1,41 @@
+# Agent Deck 推送采集器 · Linux 主机（读取本机 root 的 Claude Code 会话并推送到 hub）
+#   在仓库根目录执行：docker compose -f deploy/linux/docker-compose.push.yml up -d --build
+# 全部配置写在本文件 environment 中，不使用 .env；推送不需要任何密钥。
+name: agent-deck-push
+services:
+  deck-push:
+    build:
+      context: ../..
+      dockerfile: deploy/collector.Dockerfile
+    image: agent-deck-push:latest
+    container_name: agent-deck-push
+    restart: unless-stopped
+    init: true                 # 让 SIGTERM 能及时送达采集器
+    stop_grace_period: 20s
+    environment:
+      DECK_PUSH_URL: "https://agent-deck.example.com"   # 换成你的 hub 地址
+      DECK_NAME: "Linux-Box🐧"                          # 面板上显示的设备名，按需修改
+      DECK_PUSH_INTERVAL: "3"
+      DECK_HOURS: "12"
+      DECK_PID_CHECK: "0"              # 容器看不到宿主机进程，改用登记文件新鲜度判断在线
+      DECK_REGISTRY_TTL_HOURS: "12"
+      TZ: "CST-8"                      # alpine 无时区库，用 POSIX 写法表示 UTC+8（日志时间用）
+      DECK_SOURCES: >-
+        [{"id": "cli", "label": "claude", "dir": "/data/claude", "entry": null, "model_label": "DeepSeek"}]
+      # model_label：该档位统一显示的模型名（本机 claude 走的是 DeepSeek 时这样写；不设则显示真实模型名）
+    volumes:   # 只读挂载会话记录与在线登记，不挂整个 ~/.claude，避免把凭据暴露给容器
+      - /root/.claude/projects:/data/claude/projects:ro
+      - /root/.claude/sessions:/data/claude/sessions:ro
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 64m
+    pids_limit: 32
+    cpus: 0.25
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

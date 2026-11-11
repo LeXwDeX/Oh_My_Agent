@@ -1,0 +1,127 @@
+{
+  "style": "Cute anime sticker avatar, flat vector illustration with a thick white die-cut outline around the character, chibi head-and-shoulders proportions, all characters are girls. Art direction: warm cheerful medieval-fantasy adventure anime look, delicate clean thin lineart, soft pastel palette, European fantasy costume details kept simple. GENKI energetic, hardworking and happy mood: bright wide-open sparkling eyes with big glossy highlights looking directly at the viewer, warm open smile, light blush on cheeks, a small fist-pump or thumbs-up near the face, tiny sparkle effort marks around the head. Original character, not any existing franchise character. Bold simple shapes, readable at 32x32 pixels. Solid dark navy (#14161c) background, centered, no text, no watermark",
+  "captains": [
+    {
+      "name": "Aurora",
+      "look": "elf archmage girl with very long pale-gold hair in a loose low braid, long pointed elf ears, white and teal mage cloak, crescent moon hair ornament"
+    },
+    {
+      "name": "Nova",
+      "look": "hero swordswoman with magenta high ponytail, light silver breastplate, red scarf, star-shaped hilt peeking over shoulder"
+    },
+    {
+      "name": "Vega",
+      "look": "astronomer sage girl with short platinum bob and round glasses, navy star-pattern robe collar, small brass telescope"
+    },
+    {
+      "name": "Lumen",
+      "look": "holy priestess with wavy lavender hair, white and gold robe, glowing star hairpin"
+    },
+    {
+      "name": "Ember",
+      "look": "fire mage girl with short flame-red hair, black and orange witch cloak, tiny flame floating by her hand"
+    },
+    {
+      "name": "Juniper",
+      "look": "forest ranger girl with forest-green braid, leaf brooch, hooded khaki cloak, bow string over shoulder"
+    },
+    {
+      "name": "Zenith",
+      "look": "young knight-captain girl with white-gold hair in an updo, silver circlet, royal blue cape with gold trim"
+    },
+    {
+      "name": "Comet",
+      "look": "cheeky wind mage girl with twin blue buns, sky-blue short cape, feather charm"
+    }
+  ],
+  "crew": [
+    {
+      "name": "Ada",
+      "look": "scholar mage girl with black braid and big round glasses, brown cardigan robe, quill pen behind ear"
+    },
+    {
+      "name": "Cleo",
+      "look": "elegant alchemist girl with sleek black bob, gold earrings, emerald vest, small potion flask"
+    },
+    {
+      "name": "Esme",
+      "look": "flower druid girl with long pink wavy hair, flower crown, pastel green shawl"
+    },
+    {
+      "name": "Freya",
+      "look": "brave shield maiden with red braided hair, light armor shoulder plate, round wooden shield edge"
+    },
+    {
+      "name": "Hazel",
+      "look": "elf apprentice mage with chestnut ponytail, pointed ears, beige travel cloak, magnifying lens charm"
+    },
+    {
+      "name": "Ivy",
+      "look": "mischievous thief girl with green hair and leaf hairclip, dark green hood, small dagger charm"
+    },
+    {
+      "name": "Juno",
+      "look": "martial monk girl with short purple hair, white headband, sleeveless training top"
+    },
+    {
+      "name": "Mira",
+      "look": "little witch with long black hair and a small pointed hat, star wand"
+    },
+    {
+      "name": "Nadia",
+      "look": "apprentice mage girl with long straight dark plum hair and blunt bangs, black and white high-collar robe, amethyst earring"
+    },
+    {
+      "name": "Olive",
+      "look": "herbalist girl with olive-green short hair, gardener apron, sprig of herbs"
+    },
+    {
+      "name": "Sage",
+      "look": "librarian mage with long mint hair, scholar vest, floating open spellbook"
+    },
+    {
+      "name": "Wren",
+      "look": "small explorer girl with brown pixie cut, bird feather hairpin, map scroll"
+    },
+    {
+      "name": "Alma",
+      "look": "snow mage girl with long silver hair, white fur-trimmed hood, snowflake staff tip"
+    },
+    {
+      "name": "Faye",
+      "look": "fairy-blooded girl with pale blue hair and glittering wing hairclips, light blue dress collar"
+    },
+    {
+      "name": "Greta",
+      "look": "dwarf blacksmith girl with blonde twin braids, leather apron, small hammer, soot on cheek"
+    },
+    {
+      "name": "Ida",
+      "look": "shrine maiden girl with black hime-cut hair, red and white robes, paper talisman"
+    },
+    {
+      "name": "Jade",
+      "look": "spear dancer girl with long jade-green hair, jade hairpin, flowing green sash"
+    },
+    {
+      "name": "Mae",
+      "look": "bard girl with strawberry blonde pigtails, feathered cap, small lute"
+    },
+    {
+      "name": "Nell",
+      "look": "healer girl with ash-brown hair in a low bun, white nurse-cleric cap, small healing satchel"
+    },
+    {
+      "name": "Pearl",
+      "look": "sea mage girl with pearl-white wavy hair, pearl earrings, ocean blue cape, seashell clasp"
+    },
+    {
+      "name": "Tess",
+      "look": "detective adventurer girl with auburn bob, deerstalker-style cap, magnifying glass"
+    },
+    {
+      "name": "Yara",
+      "look": "sky pirate girl with wavy teal hair, tricorn hat, brass compass necklace"
+    }
+  ]
+}

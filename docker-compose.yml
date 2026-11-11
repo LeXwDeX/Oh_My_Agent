@@ -1,0 +1,37 @@
+# Agent Deck · hub（服务端）：只接收各设备推送的状态并提供页面，不读宿主机任何文件。
+#   启动：docker compose up -d
+#   各设备用 push 模式推送：python3 server.py --mode push --push-url https://<你的域名> --name <设备名>
+# 全部配置写在本文件 environment 中，不使用 .env；运行时不需要任何密钥。
+services:
+  agent-deck:
+    build: .
+    image: agent-deck:latest
+    container_name: agent-deck
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7788:7788"   # 本机回环，供宿主机 nginx 反代（域名访问）
+      # 需要在内网用 http://<内网IP>:7788 直接打开时，再加一行（只绑内网网卡 IP，不要用 0.0.0.0）：
+      # - "<内网IP>:7788:7788"
+    environment:
+      DECK_MODE: "hub"
+      DECK_HOST: "0.0.0.0"
+      DECK_PORT: "7788"
+      DECK_NAME: "CatWork🐱"    # 还没有设备推送时页面上显示的名字
+      DECK_DEVICE_TTL: "90"     # 设备超过多少秒没推送就从面板上移除
+      DECK_INGEST_ALLOW: "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"  # 允许推送的来源网段；直连端口时由它把关
+      TZ: "Asia/Shanghai"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 256m
+    pids_limit: 128
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
