@@ -1,11 +1,13 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" style="background:#0c0d10;color-scheme:dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0c0d10">
 <title>Agent Deck · 值班台</title>
 <style>
-:root{
+:root{color-scheme:dark;
   --bg:#0c0d10; --panel:#131418; --panel2:#17181d; --line:#22242b; --line2:#2c2f37;
   --text:#ebe7df; --dim:#8b877f; --faint:#5b5852;
   --work:#ff9a3c; --idle:#e8c46a; --done:#6fcf8a; --stop:#8c93a3; --fail:#ff6b6b;
@@ -122,8 +124,10 @@ h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-
 .row.hasreply{min-height:60px}
 .st{font-size:10.5px;letter-spacing:.12em;flex:none}
 .st.working{color:var(--work)} .st.idle{color:var(--idle)} .st.finished,.st.done{color:var(--done)} .st.stopped{color:var(--stop)} .st.failed{color:var(--fail)}
-.spin{display:inline-block;animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+/* 加载动画：盲文点阵逐帧切换（不旋转字形，避免字形重心不在中心时偏心转动） */
+.spin{display:inline-block;width:1ch;text-align:center}
+.spin::before{content:"⠋";animation:dots-spin .8s steps(1,end) infinite}
+@keyframes dots-spin{0%{content:"⠋"}10%{content:"⠙"}20%{content:"⠹"}30%{content:"⠸"}40%{content:"⠼"}50%{content:"⠴"}60%{content:"⠦"}70%{content:"⠧"}80%{content:"⠇"}90%{content:"⠏"}}
 .pill{font-size:11px;border:1px solid var(--line2);border-radius:5px;padding:1px 7px;color:var(--dim);flex:none}
 .pill.hot{border-color:color-mix(in srgb,var(--work) 55%,transparent);color:var(--work)}
 .tl{position:relative;height:100%;min-height:30px;margin:0 6px}
@@ -226,7 +230,7 @@ function shortModel(m){return m?m.replace(/^claude-/,"").replace(/-(\d+)-(\d+)$/
 /* 像素头像：按 id 生成 8x8 左右对称小人，颜色由哈希决定 */
 const AV_CACHE = new Map();
 function avatar(id, kind, name){
-  if(name && S.data && S.data.avatars && S.data.avatars.includes(name.toLowerCase())) return `<img src="/avatars/${name.toLowerCase()}.png" alt="" loading="lazy">`;
+  if(name && S.data && S.data.avatars && S.data.avatars.includes(name.toLowerCase())) return `<img src="/avatars/${name.toLowerCase()}.png" alt="" decoding="sync">`;
   const key=id+kind; if(AV_CACHE.has(key)) return AV_CACHE.get(key);
   let r=hash(id); const rnd=()=>{r^=r<<13;r^=r>>>17;r^=r<<5;return (r>>>0)/4294967296};
   const hue=Math.floor(rnd()*360), hue2=(hue+140+Math.floor(rnd()*80))%360;
@@ -326,7 +330,7 @@ function replyLine(item){
   const k=item.id||"";
   return `<div class="l3 ${S.openReply.has(k)?"open":""}" data-reply="${h(k)}" title="${h(item.reply)}">${h(item.reply)}</div>`;
 }
-function stLabel(st){st=ST_LABEL[st]?st:"stopped";return `<span class="st ${st}">${st==="working"?'<span class="spin">◐</span> ':""}${ST_LABEL[st]}</span>`}
+function stLabel(st){st=ST_LABEL[st]?st:"stopped";return `<span class="st ${st}">${st==="working"?'<span class="spin" aria-hidden="true"></span> ':""}${ST_LABEL[st]}</span>`}
 
 function leadRow(l, live, hasKids){
   const n=l.agents.length, w=l.agents.filter(a=>a.status==="working").length;
