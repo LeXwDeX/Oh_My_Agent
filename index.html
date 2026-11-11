@@ -215,7 +215,7 @@ const KIND_LABEL = {on:"ON DUTY", finished:"FINISHED", done:"DONE", stopped:"STO
 const ST_LABEL = {working:"WORKING", idle:"IDLE", finished:"✓ FINISHED", done:"✓ DONE", stopped:"■ STOPPED", failed:"✕ FAILED"};
 const VERB = {on:"上岗", finished:"完成", done:"收工", stopped:"中止", failed:"失败"};
 
-const S = {openReply:new Set(), data:null, ok:true, win:+(localGet("win")||3), job:null, off:new Set(JSON.parse(localGet("off")||"[]")), open:new Set(), showAll:new Set(), skew:0};
+const S = {openReply:new Set(), data:null, ok:true, win:+(localGet("win")||1), job:null, off:new Set(JSON.parse(localGet("off")||"[]")), open:new Set(), showAll:new Set(), skew:0};
 function localGet(k){try{return localStorage.getItem("deck."+k)}catch{return null}}
 function localSet(k,v){try{localStorage.setItem("deck."+k,v)}catch{}}
 
@@ -295,12 +295,20 @@ function avatar(id, kind, name){
   AV_CACHE.set(key,svg); return svg;
 }
 
+/* 排序吸附：进行中的会话首次出现时定下位置，之后不因“最后活动时间”变化而跳动；
+   新出现的排在最上面。已结束的按结束时间排（不再变化）。子 agent 按开始时间、最新在上。 */
+const RANK=new Map(); let rankSeq=0;
 function visibleLeads(){
   const d=S.data; if(!d) return [];
+  const first=RANK.size===0;
+  d.leads.forEach((l,i)=>{ const k=l.src+"|"+l.id; if(!RANK.has(k)) RANK.set(k, first? i : --rankSeq); });
+  const isLive=l=>l.status==="working"||l.status==="idle";
   return d.leads.filter(l=>!S.off.has(l.src)).map(l=>{
-    const agents = S.job ? l.agents.filter(a=>a.type===S.job) : l.agents;
+    const agents = (S.job ? l.agents.filter(a=>a.type===S.job) : l.agents).slice().sort((a,b)=>b.start-a.start);
     return {...l, agents};
-  }).filter(l=>!S.job || l.agents.length || S.job==="lead");
+  }).filter(l=>!S.job || l.agents.length || S.job==="lead")
+    .sort((a,b)=> isLive(a)!==isLive(b) ? (isLive(a)?-1:1)
+      : isLive(a) ? RANK.get(a.src+"|"+a.id)-RANK.get(b.src+"|"+b.id) : b.last-a.last);
 }
 
 function renderStats(){
@@ -437,7 +445,12 @@ function renderLog(){
   patch($("log"),ev.slice(0,250).map(e=>`<div class="ev ${now()-e.at<120e3?"hl":""}" data-key="${h(e.src+"|"+e.lid+"|"+(e.aid||"")+"|"+e.kind+"|"+e.at)}"><span class="t">${hm(e.at,true)}</span><span class="k ${KIND_LABEL[e.kind]?e.kind:""}">${h(KIND_LABEL[e.kind]||e.kind)}</span><span class="w" title="${h(e.task||"")}">${evLine(e)}</span></div>`).join("")
     || `<div class="empty">暂无事件</div>`);
   const tk=ev.slice(0,14).map(e=>`<span class="tk"><span class="t">${hm(e.at,true)}</span><b style="color:${e.job==="lead"?sHex(e.src):jobColor(e.job)}">${h(e.who)}</b> ${h(VERB[e.kind]||e.kind)} · <span class="dim">${h(e.job==="lead"?"会话":e.job)}</span></span>`).join("");
-  patch($("ticker"), tk ? tk + tk : `<span class="dim">等待事件…</span>`);
+  // 鼠标悬停时冻结跑马灯内容；只有事件真的变了才更新，避免停住时内容跳动
+  const tkKey=ev.slice(0,14).map(e=>e.src+e.lid+(e.aid||"")+e.kind+e.at).join("|");
+  if(!document.querySelector(".ticker").matches(":hover") && tkKey!==S.tkKey){
+    S.tkKey=tkKey;
+    patch($("ticker"), tk ? tk + tk : `<span class="dim">等待事件…</span>`);
+  }
 }
 
 function render(){
