@@ -282,7 +282,7 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
 #sky{position:absolute;inset:0;z-index:0;pointer-events:none}
 #stars{position:absolute;inset:0 0 35% 0;z-index:0;pointer-events:none;opacity:0}
 /* 龙之圣堂：背景换成地底的暗红余烬，不显示日月星辰 */
-.office.sanctum #sky{background:radial-gradient(120% 90% at 50% 56%,#74202f 0%,#451338 30%,#1b0b26 60%,#07040d 100%)!important}
+.office.sanctum #sky{background:radial-gradient(120% 90% at 50% 56%,#4a1526 0%,#2a0d2a 32%,#110818 62%,#040308 100%)!important}
 .office.sanctum .celes,.office.sanctum #stars{display:none!important}
 #stars i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;animation:tw 3s ease-in-out infinite}
 @keyframes tw{50%{opacity:.25}}
@@ -501,12 +501,12 @@ const LAYOUTS = {
   magic:  {name: "龙之圣堂", icon: "🐉", planks: ["#544f65", "#4b4759", "#5d586e"], aisle: ["#7d1f33", "#6e1a2c"], wall: "#5d586e", brick: false, frame: "#2a2831", pillar: "#666078", desk: "magic", boss: "magic", sign: "banner", third: "alchemy", sofa: "#7d1f33", magic: true, glow: 1, tint: [.98, .93, 1.04], vox: 1, hour: 21.6, words: ["正在开凿地下圣堂…", "正在摆放书案与祭台…", "魔法师就位…", "完成"]}
 };
 let LY = LAYOUTS.jp;
-/* 魔法学院配色：暗底 + 少数高饱和发光点——紫 = 魔法，橙黄 = 火，青 = 水晶；饰色是紫红挂旗配金 */
+/* 圣堂里的发光色：紫 = 魔法，橙黄 = 火，青 = 水晶 */
 const MAGIC_COL = {arcane: "#c77dff", core: "#f5e6ff", halo: "#8a3ffc", dim: "#5a3a8c", flame: ["#fff4c2", "#ffd166", "#ff9a3c", "#e5484d"], smoke: "#4a3f4f", crystal: "#6fe3ff",
-                   banner: "#6d2e6b", drape: "#4a1f4f", gold: "#d9a441", wood: "#3f2a1f", woodDk: "#2f1f17", cloth: "#6d2e6b", page: "#efe6d2", cover: "#4a1f5a", ink: "#1d2548", potions: ["#6fe3ff", "#c77dff", "#ff6b9a", "#7dff9a", "#ffd166"]};
+                   gold: "#d9a441", page: "#efe6d2"};
 /* 龙之圣堂配色：灰紫石材 + 深色木头 + 猩红长毯配金，彩窗用宝石色 */
-const SANC = {st: ["#7a7496", "#6f698b", "#8680a3"], stDk: "#474261", stLt: "#9d97b8", floor: ["#655e82", "#5b5577", "#6f688d"], moss: "#4e5c4c", carpet: ["#7d1f33", "#6e1a2c"], gold: "#d2a542",
-              wood: "#6a4329", woodDk: "#452a19", iron: "#2a2831", bone: "#e6dcc6", rock: ["#4c4763", "#403b55", "#353148", "#2b273a"], glass: ["#c0334f", "#3d5bd0", "#8a45d8", "#2fa594", "#d0662f"]};
+const SANC = {st: ["#666377", "#5c596c", "#716e83"], stDk: "#3c3a4a", stLt: "#858299", floor: ["#55526a", "#4c495f", "#5e5b74"], moss: "#46563f", carpet: ["#7d1f33", "#6e1a2c"], gold: "#d2a542",
+              wood: "#6a4329", woodDk: "#452a19", iron: "#2a2831", bone: "#e6dcc6", rock: ["#3f3c50", "#353244", "#2c2a39", "#24222f"], glass: ["#c0334f", "#3d5bd0", "#8a45d8", "#2fa594", "#d0662f"]};
 const SWH = 3.0;                                              // 圣堂后墙 / 左墙的高度
 const subSeat = s => { const k = Math.floor(s / 2), b = s % 2; return {x: b ? 2.7 : .7, y: 2.85 + 1.2 * k, dir: b ? 2 : 0, k, b} };   // 以岛（顶排朝向）左上角为原点
 const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
@@ -930,6 +930,26 @@ function buildOffice(off, oi, X0, opt, W0){
       W0.zoneLabels.push({x: lp[0], y: lp[1], z: 1.85, t: tl + .1, ...(Z.part ? {amen: "第 " + (Z.part + 1) + " 组"} : {Z}), oi, cx: lead[0], cy: lead[1]});
     });
     for (const sx of [-1, 1]) for (const sy of [-1, 1]){ const ox = cx + sx * Math.min((x1 - x0) / 2 - .7, Rmax + 1.7), oy = cy + sy * (BD1 / 2 - .8); obelisk(ox, oy, T0(ox, oy, .4)) }
+    // 大厅两侧（法阵外圈以外）的破败陈设：左边两具石棺，一具棺盖滑开；右边一根倒塌的石柱和吊着骷髅的铁笼
+    const st = sc.st, iron = sc.iron;
+    [[x0 + .55, cy - 2.4, false], [x0 + .55, cy + .5, true]].forEach(([sx, sy, open]) => {
+      const t = T0(sx, sy, .4);
+      add(sx - .0625, sy - .0625, 0, .875, 1.75, .125, sc.stDk, t); add(sx, sy, .125, .75, 1.625, .375, st[1], t + .03, EM, 0, .06);
+      if (open){ add(sx + .0625, sy + .0625, .5, .625, 1.5, .01, "#0d0b12", t + .05); add(sx + .3125, sy - .125, .5, .75, 1.625, .125, sc.stLt, t + .06); add(sx + .25, sy + .6, .51, .12, .5, .1, sc.bone, t + .08) }
+      else { add(sx - .0625, sy - .0625, .5, .875, 1.75, .125, sc.stLt, t + .06); add(sx + .3125, sy + .25, .625, .125, 1.125, .03, sc.stDk, t + .08); add(sx + .125, sy + .5, .625, .5, .125, .03, sc.stDk, t + .08) }
+    });
+    { const px = x1 - 2.3, py = cy + 1.9, t = T0(px, py, .4);
+      add(px - .0625, py - .0625, 0, .75, .75, .25, sc.stDk, t); add(px, py, .25, .625, .625, .5, st[2], t + .03, EM, 0, .06); add(px + .125, py + .125, .75, .375, .25, .125, st[0], t + .05);   // 断柱的残桩
+      [[.9, .1, .625, .5], [1.6, .2, .5, .5], [2.15, .05, .375, .375]].forEach(([a, b, len, w], q) => { if (px + a + len < x1) add(px + a, py + b, 0, len, w, w, st[q % 3], t + .06 + q * .03, EM, 0, .06) });   // 倒在地上的柱身，一节比一节碎
+      const gx = x1 - 1.3, gy = cy - 2.2, tg = T0(gx, gy, .4);
+      add(gx, gy, 0, .125, .125, 2.375, iron, tg); add(gx - .125, gy - .125, 0, .375, .375, .125, iron, tg); add(gx - .75, gy, 2.25, .875, .125, .125, iron, tg + .04); add(gx - .66, gy + .035, 1.9, .05, .05, .35, iron, tg + .06);
+      for (const z of [1.1, 1.85]) add(gx - .875, gy - .1875, z, .5, .5, .05, iron, tg + .08);
+      for (const [a, b] of [[0, 0], [.45, 0], [0, .45], [.45, .45], [.225, 0], [.225, .45], [0, .225], [.45, .225]]) add(gx - .875 + a, gy - .1875 + b, 1.15, .05, .05, .7, iron, tg + .1);
+      add(gx - .72, gy - .04, 1.15, .1875, .1875, .1875, sc.bone, tg + .12); add(gx - .7, gy + .15, 1.2, .05, .01, .06, "#1b1216", tg + .13); add(gx - .61, gy + .15, 1.2, .05, .01, .06, "#1b1216", tg + .13);
+    }
+    // 法阵周围的旧血迹和地面裂缝
+    for (let q = 0; q < 7; q++){ const an = q * .9 + RND(), rr = R + .7 + RND() * 1.6, bx0 = cx + Math.cos(an) * rr, by0 = cy + Math.sin(an) * rr, t = T0(bx0, by0, .5); add(bx0, by0, .0005, .375, .25, .004, "#4a0f18", t); add(bx0 + .25, by0 + .125, .0005, .25, .25, .004, "#3d0c14", t); if (RND() < .5) add(bx0 - .125, by0 + .25, .0005, .125, .125, .004, "#4a0f18", t) }
+    for (let q = 0; q < 16; q++){ const px = x0 + .3 + RND() * (x1 - x0 - 1.6), py = .4 + RND() * (BD1 - 1), len = .5 + RND(), t = T0(px, py, .4); if (Math.hypot(px - cx, py - cy) < R + .5) continue; if (RND() < .5){ add(px, py, .0005, len, .04, .004, "#221f2c", t); add(px + len * .6, py + .04, .0005, .04, .3, .004, "#221f2c", t) } else { add(px, py, .0005, .04, len, .004, "#221f2c", t); add(px + .04, py + len * .4, .0005, .3, .04, .004, "#221f2c", t) } }
   }
   function sanctumShell(){
     const sc = SANC, mc = MAGIC_COL, pick = a => a[Math.floor(RND() * a.length)];
@@ -964,14 +984,24 @@ function buildOffice(off, oi, X0, opt, W0){
 
     // ---- 地面：圣堂大厅铺石板（偶有苔痕），主通道是镶金边的猩红长毯；核心筒各室各自的地面
     EM = .3;
+    // 引擎没有点光源，就把光直接染进地砖：离火把近的偏暖，离法阵近的偏紫；按四档取整，光斑边缘是一圈圈台阶
+    const warm = [[X0 + CORE, entY - .8], [X0 + CORE, entY + .8]], ccx = (X0 + TX0 - .4 + X0 + W - .3) / 2, ccy = BD1 / 2 + .05;
+    for (let i = CORE + 1; i < W; i += 3) warm.push([X0 + i + .5, .5]);
+    const lit = (col, x, y) => {
+      let k = 0; for (const [lx, ly] of warm) k = Math.max(k, 1 - Math.hypot(x - lx, y - ly) / 2.8);
+      const kp = x > X0 + CORE ? Math.round(clamp(1 - (Math.hypot(x - ccx, y - ccy) - 2.6) / 2.4, 0, 1) * 4) / 4 : 0;
+      k = Math.round(k * 4) / 4;
+      if (k > 0) col = mixHex(col, "#d08a48", k * .36);
+      return kp > 0 ? mixHex(col, "#7a3fb8", kp * .3) : col;
+    };
     for (let j = 0; j < D; j++) for (let i = 0; i < W; i++){
       const c = (i + j) & 1, x = i + .5, y = j + .5;
       let col;
       if (x < CORE){ const r = coreAt(y); col = r === "pan" ? (c ? "#5c4a3b" : "#534336") : r === "wc" ? (c ? "#423e4d" : "#3a3745") : r === "ev" ? (c ? "#4c4167" : "#43395c") : r === "st" ? "#4a4659" : (c ? "#30405e" : "#2a3854") }
       else if (y > BD1 && y < BD1 + MAIN) col = RND() < .1 ? sc.floor[i % 3] : sc.carpet[i & 1];                 // 长毯破了几处，露出底下的石板
-      else if (x < TX0 - .4) col = c ? "#716a8e" : "#676084";
-      else { const r = RND(); col = r < .06 ? sc.moss : r < .13 ? "#3d394e" : sc.floor[(i * 2 + j * 3 + (r < .5 ? 1 : 0)) % 3] }
-      add(X0 + i, j, -.3, 1, 1, .3, col, T0(X0 + i, j), EM, 0, .035);
+      else if (x < TX0 - .4) col = c ? "#605d76" : "#575470";
+      else { const r = RND(); col = r < .06 ? sc.moss : r < .13 ? "#33303f" : sc.floor[(i * 2 + j * 3 + (r < .5 ? 1 : 0)) % 3] }
+      add(X0 + i, j, -.3, 1, 1, .3, lit(col, X0 + x, y), T0(X0 + i, j), EM, 0, .035);
     }
     // 碎石和散落的骨头：堆在墙根和大厅角落
     for (let q = 0; q < W * 1.6; q++){
@@ -998,7 +1028,7 @@ function buildOffice(off, oi, X0, opt, W0){
           const n = Math.max(1, Math.round((a1 - a0) / .235)), cw = (a1 - a0) / n;
           for (let q = 0; q < n; q++){
             const a = a0 + q * cw, xa = half ? 1 - a - cw : a, core = q === n - 1 && (r === 1 || r === 2);              // 靠窗心的两格用金色，拼成一道竖纹
-            if (RND() < .16) add(x + xa, -.2, z, cw, .12, hh, "#15121c", t + .1, 0, 0); else add(x + xa, -.2, z, cw, .12, hh, core ? "#e8b84a" : sc.glass[hash3(i - half, r, q) % sc.glass.length], t + .1, .85, 1);   // 碎掉的窗格只剩黑洞
+            if (RND() < .26) add(x + xa, -.2, z, cw, .12, hh, "#15121c", t + .1, 0, 0); else add(x + xa, -.2, z, cw, .12, hh, core ? "#e8b84a" : sc.glass[hash3(i - half, r, q) % sc.glass.length], t + .1, .55, 1);   // 碎掉的窗格只剩黑洞
           }
           add(x, -.215, z - .012, 1, .15, .024, sc.iron, t + .11);
         });
