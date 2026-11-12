@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent City</title>
+<style>
+:root{--ink:#2b2f3a;--muted:#6b7280;--card:#ffffffd9;--line:#e6e0d4}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;color:var(--ink);
+  font:13px/1.4 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  background:linear-gradient(180deg,#74c0ff 0%,#def2ff 100%)}
+#sky{position:fixed;inset:0;z-index:0;pointer-events:none}
+#stars{position:fixed;inset:0 0 35% 0;z-index:0;pointer-events:none;opacity:0}
+#stars i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;animation:tw 3s ease-in-out infinite}
+@keyframes tw{50%{opacity:.25}}
+.orb{position:fixed;z-index:0;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;pointer-events:none}
+#sun{background:radial-gradient(circle,#fffbe6 0 45%,#ffe58a 46% 60%,#ffd34d00 72%);filter:drop-shadow(0 0 22px #ffe28a)}
+#moon{width:40px;height:40px;margin:-20px 0 0 -20px;background:radial-gradient(circle at 35% 35%,#ffffff,#dfe6ff 60%,#c4cdea);box-shadow:0 0 24px #c9d6ff99}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;z-index:1}
+#gl.drag{cursor:grabbing}
+header{position:fixed;left:16px;right:16px;top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;z-index:4}
+header>*{pointer-events:auto}
+.pill{background:var(--card);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid #fff;border-radius:14px;box-shadow:0 4px 14px #1a2a4a22}
+.brand{display:flex;align-items:center;gap:8px;padding:7px 12px;font-weight:700}
+.brand .dot{width:8px;height:8px;border-radius:50%;background:#2f9e6f;box-shadow:0 0 0 3px #2f9e6f33}
+.brand.off .dot{background:#e5484d;box-shadow:0 0 0 3px #e5484d33}
+.brand .host{font-weight:500;color:var(--muted)}
+.brand a{font-weight:500;color:var(--muted);text-decoration:none;font-size:12px;border-left:1px solid var(--line);padding-left:10px}
+.brand a:hover{color:var(--ink)}
+.stats{display:flex;align-items:center;gap:12px;padding:6px 12px;font-size:12px;color:var(--muted)}
+.stats b{color:var(--ink);font-size:15px;margin-right:2px}
+.stats i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.time{display:flex;align-items:center;gap:4px;padding:4px 5px 4px 11px;font-size:12px}
+.time b{font-size:13px;margin-right:6px;min-width:92px}
+.time button{border:0;background:transparent;font:inherit;font-size:12px;padding:4px 8px;border-radius:9px;cursor:pointer;color:var(--muted)}
+.time button.on{background:#2b2f3a;color:#fff}
+#labels{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.bl{position:absolute;left:0;top:0;transform:translate(-50%,-100%);display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:10px;
+  background:#fff;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 4px 12px #1a2a4a30;opacity:0;transition:opacity .5s}
+.bl i{width:8px;height:8px;border-radius:50%}
+.bl small{font-weight:500;color:var(--muted)}
+.fl{position:absolute;left:0;top:0;transform:translate(-100%,-50%);display:flex;align-items:center;gap:5px;padding:2px 7px;border-radius:7px;
+  background:#ffffffe6;font-size:10.5px;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 8px #1a2a4a26;opacity:0;transition:opacity .4s}
+.fl b{font-weight:700}
+.fl i{flex:none;width:7px;height:7px;border-radius:50%}
+.on{opacity:1!important}
+#loader{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:10px;padding:8px 14px;font-size:12px;transition:opacity .6s}
+#loader .bar{width:180px;height:6px;border-radius:3px;background:#e5e7eb;overflow:hidden}
+#loader .bar b{display:block;height:100%;width:0;background:linear-gradient(90deg,#5b9dff,#4fbf7a)}
+#loader.done{opacity:0;pointer-events:none}
+.ctl{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:6px;z-index:4}
+.ctl button{width:36px;height:36px;border-radius:11px;border:1px solid #fff;background:var(--card);box-shadow:0 4px 12px #1a2a4a26;font:inherit;font-size:15px;cursor:pointer;color:var(--ink)}
+.ctl button:hover{background:#fff}
+#tip{position:fixed;z-index:5;max-width:300px;padding:9px 12px;border-radius:12px;background:#fffffff5;border:1px solid var(--line);box-shadow:0 10px 30px #1a2a4a33;font-size:12px;pointer-events:none;display:none}
+#tip h4{margin:0 0 4px;font-size:13px;display:flex;gap:6px;align-items:center}
+#tip h4 i{width:8px;height:8px;border-radius:50%}
+#tip .row{color:var(--muted)} #tip .row b{color:var(--ink);font-weight:500}
+#tip .hint{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);color:var(--muted)}
+#hint{position:fixed;left:16px;bottom:16px;z-index:4;padding:6px 11px;font-size:12px;color:var(--muted)}
+.fl.on{pointer-events:auto;cursor:pointer}
+.fl.cur{background:#2b2f3a;color:#fff}
+#gl.pick{cursor:pointer}
+#nogl{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 18px;display:none;z-index:5;text-align:center}
+@media (max-width:640px){.time b{min-width:0}.fl{display:none}}
+</style>
+</head>
+<body>
+<div id="sky"></div>
+<div id="stars"></div>
+<div class="orb" id="sun"></div>
+<div class="orb" id="moon"></div>
+<canvas id="gl"></canvas>
+<div id="labels"></div>
+<header>
+  <div class="pill brand" id="brand"><span class="dot"></span>Agent City <span class="host" id="host"></span><a href="/office">办公室视图</a><a href="/">泳道视图</a></div>
+  <div class="pill stats" id="stats"></div>
+  <div class="pill time" id="timebar"><b id="clock">—</b>
+    <button data-h="auto" class="on">自动</button><button data-h="8">早上</button><button data-h="13">中午</button><button data-h="17.9">黄昏</button><button data-h="21.5">夜晚</button>
+  </div>
+</header>
+<div class="pill" id="loader"><span id="ltext">正在铺设道路…</span><div class="bar"><b id="lbar"></b></div><span id="lpct">0%</span></div>
+<div class="ctl">
+  <button id="replay" title="重新铺设">↻</button>
+  <button id="zin" title="放大">＋</button>
+  <button id="zout" title="缩小">－</button>
+  <button id="zfit" title="适配全部">⤢</button>
+</div>
+<div id="tip"></div>
+<div class="pill" id="hint">点击楼层剖开查看 · Esc 收起 · 拖动平移 · 滚轮缩放</div>
+<div class="pill" id="nogl">当前浏览器不支持 WebGL2，无法显示体素城市。</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Agent City —— 手写 WebGL2 实例化体素渲染（零依赖，全部程序化生成）
+   单位：1 = 大体素（一格地块）；微体素 M = 1/8。
+   每个体素 12 个 float：位置(最小角 xyz) 尺寸(xyz) 颜色(rgb) 出现时间 t0 自发光 em 模式 mode
+   mode：0 普通（em>0 时夜里透出暖色室内光） 1 自身颜色发光（灯、屏幕） 2 窗玻璃（映出天空）
+         3 云（em 存漂移种子） 4 闪烁信号灯
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const h = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const SRC_HEX = {app:"#e08a5f", cli:"#8f8a80", ds:"#5b9dff", qwen:"#a884ff"};
+const srcHex = id => SRC_HEX[String(id || "").split("@")[0]] || "#5b9dff";
+function hashStr(s){ let x = 2166136261; for (const ch of String(s)) x = Math.imul(x ^ ch.charCodeAt(0), 16777619); return x >>> 0 }
+function hash3(a, b, c){ let x = Math.imul(a | 0, 374761393) ^ Math.imul(b | 0, 668265263) ^ Math.imul(c | 0, 1274126177); x = Math.imul(x ^ (x >>> 13), 1103515245); return (x ^ (x >>> 16)) >>> 0 }
+function rng32(seed){ let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296 } }
+const RGBC = new Map();
+function rgbOf(hx){ let c = RGBC.get(hx); if (!c){ c = [1, 3, 5].map(i => parseInt(hx.slice(i, i + 2), 16) / 255); RGBC.set(hx, c) } return c }
+const toHex = c => "#" + c.map(v => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, "0")).join("");
+const tint = (hx, t) => toHex(rgbOf(hx).map(v => v + (1 - v) * t));
+const shade = (hx, f) => toHex(rgbOf(hx).map(v => v * f));
+const mixHex = (a, b, t) => { const x = rgbOf(a), y = rgbOf(b); return toHex(x.map((v, i) => lerp(v, y[i], t))) };
+
+/* ---------------- 体素写入 ---------------- */
+/* TAG：楼宇体素的归属 = 楼号×1000 + 层号×10 + 是否外立面(1)；-1 表示不属于楼宇。
+   层号 0 = 大堂，1..n = 任务楼层，n+1 = 楼顶。选中某层时，层号更大的整体抬起，本层外立面收起。 */
+let OUT = [], RND = Math.random, EM = 0, TAG = -1;
+const STRIDE = 13;
+function add(x, y, z, sx, sy, sz, hx, t0, e = EM, m = 0, j = 0){
+  const c = rgbOf(hx), f = j ? 1 + (RND() * 2 - 1) * j : 1;
+  OUT.push(x, y, z, sx, sy, sz, c[0] * f, c[1] * f, c[2] * f, t0, e, m, TAG);
+}
+
+/* ---------------- 调色板 ---------------- */
+const C = {
+  road: "#656c79", road2: "#5f6673", paint: "#f8f6ef", yellow: "#ffd166", manhole: "#4a505b",
+  walk: "#f1ebe0", walk2: "#e6dfd0",
+  grass: "#94d66f", grass2: "#89cd65", dirt: "#b08356", stone: "#8f949c",
+  water: "#62bff0", water2: "#7fd0f7", lily: "#5fbf62",
+  plaza: "#efe2cf", plaza2: "#e4d3bc", path: "#f8f0e3", concrete: "#d9dde2",
+  trunk: "#9b6b43", leaf: "#5fbf62", leaf2: "#80d87e", leaf3: "#4aa856", hedge: "#4fae57", apple: "#ff6b6b",
+  pole: "#4b5563", metal: "#9aa3ad", lamp: "#fff1b8", cone: "#ff8a3d", white: "#ffffff",
+  wall: "#f7f3ec", pier: "#f4f1ec", frame: "#5b6573", glass: "#b9e3f7", rail: "#cdeef8",
+  wood: "#c58b55", wood2: "#a8733f", floorWood: "#ecd2ad", floorWood2: "#e2c69f", deskTop: "#f8f6f1",
+  chairs: ["#5b9dff", "#ff9a3c", "#4fbf7a", "#a884ff", "#ff7aa8", "#3cc3b8"],
+  screenOff: "#323b4a", screenOn: "#6fe3ff", gravel: "#c9cdd3", gravel2: "#bec3ca", solar: "#2c4d80",
+  flower: ["#ff8fab", "#ffd166", "#ffffff", "#b388ff", "#7cc7ff"], tuft: "#6fbf4f", rock: "#a3a8b0",
+  bench: "#b5794a", bin: "#5b7d5e", hydrant: "#e5484d", books: ["#e5484d", "#5b9dff", "#ffd166", "#4fbf7a", "#a884ff", "#ff9a3c", "#3b4252"],
+  cars: ["#ff6b6b", "#5b9dff", "#ffd166", "#4fbf7a", "#ffffff", "#a884ff", "#ff9a3c", "#3cc3b8"]
+};
+
+/* ---------------- 城市布局常量 ---------------- */
+const M = 1 / 8;
+const T = {GRASS: 0, ROAD_H: 1, ROAD_V: 2, CROSS: 3, WALK: 4, PLOT: 5, PARK: 6, WATER: 7};
+const PW = 12, PD = 10, WALK = 2, ROAD = 4, MARGIN = 6;     // 地块 12×10，人行道 2，马路 4，外圈草地 6
+const CW = PW + 2 * WALK, CD = PD + 2 * WALK, PX = CW + ROAD, PY = CD + ROAD;
+const TOP = [0, 0, 0, 0, M, 2 * M, 0, -M];                  // 各类地块顶面高度
+const COST = [3.4, 1, 1, 1, 2.4, 2.8, 3.4, 3.4];            // 铺设扩散代价：马路最便宜 → 先沿路网铺开
+const BW = 7, BD = 7, LH = 2.25, FH = 2.0, ST = .25, RISE = .12;   // 楼体 7×7，大堂层高 2.25，标准层高 2，楼板厚 .25
+const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+
+/* ============================================================
+   场景生成
+   ============================================================ */
+function buildCity(groups, opt){
+  OUT = []; TAG = -1;
+  const n = Math.max(1, groups.length);
+  const cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols);
+  const W = ROAD + cols * PX, D = ROAD + rows * PY;
+  const MW = W + 2 * MARGIN, MD = D + 2 * MARGIN, N = MW * MD;
+  const type = new Uint8Array(N), zone = new Uint8Array(N);   // zone：地块内分区（广场/草坪/楼基/电梯基座）
+  const cellOf = (x, y) => Math.floor(y / PY) * cols + Math.floor(x / PX);
+  for (let j = 0; j < MD; j++) for (let i = 0; i < MW; i++){
+    const x = i - MARGIN, y = j - MARGIN, k = j * MW + i;
+    if (x < 0 || y < 0 || x >= W || y >= D){ type[k] = T.GRASS; continue }
+    const ux = x % PX, uy = y % PY, rx = ux < ROAD, ry = uy < ROAD;
+    if (rx && ry) type[k] = T.CROSS;
+    else if (rx) type[k] = T.ROAD_V;
+    else if (ry) type[k] = T.ROAD_H;
+    else {
+      const cx = ux - ROAD, cy = uy - ROAD, lx = cx - WALK, ly = cy - WALK;
+      if (cx < WALK || cx >= CW - WALK || cy < WALK || cy >= CD - WALK) type[k] = T.WALK;
+      else if (cellOf(x, y) < groups.length){
+        type[k] = T.PLOT;
+        zone[k] = lx >= 8 ? 1 : ly >= 8 ? (lx >= 2 && lx < 4 ? 4 : 2) : (lx === 0 || ly === 0) ? 2 : 3;
+      } else type[k] = (lx >= 3 && lx <= 8 && ly >= 3 && ly <= 6) ? T.WATER : T.PARK;
+    }
+  }
+  const inb = (a, b) => a >= 0 && b >= 0 && a < MW && b < MD;
+  const isRoad = k => type[k] >= T.ROAD_H && type[k] <= T.CROSS;
+
+  // ---- 铺设顺序：从城市左角路口做 Dijkstra
+  const dist = new Float64Array(N).fill(1e9), heap = [];      // 必须用 64 位：32 位舍入会让出堆比较误判、扩散中断
+  const hpush = (d, k) => { heap.push([d, k]); let i = heap.length - 1; while (i > 0){ const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p } };
+  const hpop = () => { const top = heap[0], last = heap.pop(); if (heap.length){ heap[0] = last; let i = 0; for (;;){ const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m } } return top };
+  const o = (MARGIN + 1) * MW + (MARGIN + W - 2);
+  dist[o] = 0; hpush(0, o);
+  while (heap.length){
+    const [d, k] = hpop(); if (d > dist[k]) continue;
+    const i = k % MW, j = (k - i) / MW;
+    for (const [di, dj] of DIRS){ const a = i + di, b = j + dj; if (!inb(a, b)) continue; const q = b * MW + a, nd = d + COST[type[q]]; if (nd < dist[q]){ dist[q] = nd; hpush(nd, q) } }
+  }
+  const instant = !opt.animate;
+  const tileT = (k, r) => instant ? -1 : .35 + dist[k] * .03 + r * .05;
+  let maxT = 0;
+
+  // ---- 立体沙盘底座：土层 + 石层，侧面嵌几块石头
+  EM = 0; RND = rng32(99);
+  add(0, 0, -2.2, MW, MD, 1.95, C.dirt, -1);
+  add(0, 0, -3.0, MW, MD, .8, C.stone, -1);
+  for (let s = 0; s < 60; s++){
+    const onX = s & 1, a = RND() * (onX ? MD : MW), z = -2.9 + RND() * 2.4, w = M * (1 + Math.floor(RND() * 3));
+    if (onX) add(MW, a, z, M, w, w, RND() < .5 ? C.stone : "#7e848d", -1); else add(a, MD, z, w, M, w, RND() < .5 ? C.stone : "#7e848d", -1);
+  }
+
+  // ---- 地块与街道细节
+  const trees = new Set();
+  for (let j = 0; j < MD; j++) for (let i = 0; i < MW; i++){
+    const k = j * MW + i, ty = type[k], top = TOP[ty], chk = (i + j) & 1;
+    RND = rng32(hash3(i, j, 7));
+    const t = tileT(k, RND()); maxT = Math.max(maxT, t);
+    const x = i - MARGIN, y = j - MARGIN, ux = ((x % PX) + PX) % PX, uy = ((y % PY) + PY) % PY;
+    let col;
+    if (ty === T.GRASS || ty === T.PARK) col = chk ? C.grass : C.grass2;
+    else if (ty === T.WATER) col = chk ? C.water : C.water2;
+    else if (ty === T.WALK) col = chk ? C.walk : C.walk2;
+    else if (ty === T.PLOT){
+      const zn = zone[k], ly = uy - ROAD - WALK;
+      col = zn === 1 ? ((ly === 4 || ly === 5) ? C.path : (chk ? C.plaza : C.plaza2)) : zn === 2 ? (chk ? C.grass : C.grass2) : C.concrete;
+    } else col = RND() < .5 ? C.road : C.road2;
+    add(i, j, -.25, 1, 1, .25 + top, col, t, 0, 0, .025);
+
+    if (ty === T.ROAD_H){
+      if (ux === ROAD || ux === PX - 1){ add(i + .1, j + .12, 0, .8, .26, .02, C.paint, t + .12); add(i + .1, j + .62, 0, .8, .26, .02, C.paint, t + .14) }
+      else if (uy === 1 && ux % 2 === 0) add(i + .15, j + 1 - .06, 0, .7, .12, .02, C.yellow, t + .15);
+      else if (RND() < .02) add(i + .3, j + .3, 0, .4, .4, .02, C.manhole, t + .1);
+    } else if (ty === T.ROAD_V){
+      if (uy === ROAD || uy === PY - 1){ add(i + .12, j + .1, 0, .26, .8, .02, C.paint, t + .12); add(i + .62, j + .1, 0, .26, .8, .02, C.paint, t + .14) }
+      else if (ux === 1 && uy % 2 === 0) add(i + 1 - .06, j + .15, 0, .12, .7, .02, C.yellow, t + .15);
+      else if (RND() < .02) add(i + .3, j + .3, 0, .4, .4, .02, C.manhole, t + .1);
+    } else if (ty === T.WALK){
+      let rd = null, corner = false;
+      for (const [di, dj] of DIRS){ const a = i + di, b = j + dj; if (inb(a, b) && isRoad(b * MW + a)){ rd = rd || [di, dj] } }
+      for (const [di, dj] of [[1,1],[1,-1],[-1,1],[-1,-1]]){ const a = i + di, b = j + dj; if (inb(a, b) && type[b * MW + a] === T.CROSS && isRoad(j * MW + a) && isRoad(b * MW + i)) corner = true }
+      if (corner) trafficLight(i, j, top, t + .3);
+      else if (rd && (i + 2 * j) % 7 === 0) lamp(i, j, top, rd, t + .3);
+      else if (rd){
+        const v = RND();
+        if (v < .1) planterTree(i, j, top, t + .3);
+        else if (v < .15) bench(i, j, top, rd, t + .3);
+        else if (v < .18) add(i + .4, j + .4, top, .22, .22, .32, C.bin, t + .3);
+        else if (v < .2){ add(i + .42, j + .42, top, .16, .16, .26, C.hydrant, t + .3); add(i + .45, j + .45, top + .26, .1, .1, .06, C.hydrant, t + .33); add(i + .38, j + .46, top + .14, .24, .08, .06, C.hydrant, t + .33) }
+      }
+    } else if (ty === T.WATER){
+      if (RND() < .3) add(i + .2 + RND() * .5, j + .2 + RND() * .5, -M + .002, M * 2, M / 2, .01, C.white, t + .2);
+      if (RND() < .12) add(i + .3, j + .3, -M + .002, M * 3, M * 3, .02, C.lily, t + .25);
+    } else if (ty === T.GRASS || ty === T.PARK){
+      // 外圈白色围栏（沙盘边界）
+      if (i === 0 || j === 0 || i === MW - 1 || j === MD - 1){
+        const fx = i === 0 ? i + .05 : i === MW - 1 ? i + .82 : null, fy = j === 0 ? j + .05 : j === MD - 1 ? j + .82 : null;
+        if (fx !== null){ add(fx, j + .45, 0, M, M, .45, C.white, t + .2); add(fx + .02, j, .3, M * .7, 1, M * .6, C.white, t + .22); add(fx + .02, j, .12, M * .7, 1, M * .6, C.white, t + .22) }
+        if (fy !== null){ add(i + .45, fy, 0, M, M, .45, C.white, t + .2); add(i, fy + .02, .3, 1, M * .7, M * .6, C.white, t + .22); add(i, fy + .02, .12, 1, M * .7, M * .6, C.white, t + .22) }
+        continue;
+      }
+      let near = false, nearTree = false;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++){
+        const a = i + di, b = j + dj; if (!inb(a, b)) continue; const q = b * MW + a;
+        if (type[q] !== T.GRASS && type[q] !== T.PARK) near = true; if (trees.has(q)) nearTree = true;
+      }
+      const pTree = ty === T.PARK ? .2 : .09;
+      if (!near && !nearTree && RND() < pTree){ trees.add(k); tree(i, j, 0, t + .25) }
+      else if (!near && RND() < .05) bush(i, j, 0, t + .2);
+      else if (RND() < .03) add(i + .2, j + .3, 0, .375, .25, .2, C.rock, t + .2, 0, 0, .06);
+      else {
+        if (RND() < .09) add(i + .125 + Math.floor(RND() * 6) * M, j + .125 + Math.floor(RND() * 6) * M, 0, M, M, M, C.flower[Math.floor(RND() * 5)], t + .2 + RND() * .2);
+        if (RND() < .14){ const a = i + .125 + Math.floor(RND() * 6) * M, b = j + .125 + Math.floor(RND() * 6) * M; add(a, b, 0, M, M, M, C.tuft, t + .2); add(a + M, b, 0, M, M, M * 1.6, C.tuft, t + .24) }
+      }
+    } else if (ty === T.PLOT){
+      const zn = zone[k], lx = ux - ROAD - WALK, ly = uy - ROAD - WALK, z = TOP[T.PLOT];
+      if (zn === 1){                                         // 广场：花坛树、长椅、路桩
+        if ((lx === 10 && (ly === 1 || ly === 8))) planterTree(i, j, z, t + .3, true);
+        else if (lx === 9 && (ly === 2 || ly === 7)) bench(i, j, z, [0, ly === 2 ? -1 : 1], t + .3);
+        else if (lx === 11 && ly % 2 === 0 && ly !== 4) add(i + .7, j + .45, z, M, M, .3, C.metal, t + .3);
+      } else if (zn === 2){                                  // 楼边草坪：树篱、花
+        if (ly === 9 && lx >= 4) add(i, j + .25, z, 1, .6, .42, C.hedge, t + .3, 0, 0, .05);
+        else if (ly === 0 && lx >= 2 && RND() < .5) bush(i, j, z, t + .3);
+        else if (RND() < .4) add(i + .125 + Math.floor(RND() * 6) * M, j + .125 + Math.floor(RND() * 6) * M, z, M, M, M, C.flower[Math.floor(RND() * 5)], t + .3);
+      }
+    }
+  }
+
+  // ---- 楼宇
+  const labels = [], floorLabels = [], elevators = [], boxes = [];
+  let topZ = 2;
+  for (let g = 0; g < groups.length; g++){
+    const col = g % cols, row = Math.floor(g / cols);
+    const px = MARGIN + col * PX + ROAD + WALK, py = MARGIN + row * PY + ROAD + WALK;
+    RND = rng32(hashStr(groups[g].id));
+    const tb = instant ? -1 : tileT(Math.floor(py + PD / 2) * MW + Math.floor(px + PW / 2), 0) + .4;
+    const r = building(groups[g], g, px, py, tb);
+    labels.push(r.label); floorLabels.push(...r.floors); elevators.push(r.elevator); boxes.push(...r.boxes);
+    maxT = Math.max(maxT, r.tEnd); topZ = Math.max(topZ, r.top);
+  }
+  TAG = -1; EM = 0;
+
+  // ---- 云（顶点着色器里漂移）
+  RND = rng32(2026);
+  const nc = Math.round((MW + MD) / 14);
+  for (let c = 0; c < nc; c++){
+    const cx = RND() * MW, cy = RND() * MD, cz = topZ + 3 + RND() * 4, seed = RND(), t = instant ? -1 : maxT * .55 + c * .12;
+    const parts = 3 + Math.floor(RND() * 3);
+    for (let p = 0; p < parts; p++){
+      const sx = 1.5 + RND() * 2, sy = 1.2 + RND() * 1.8, sz = .75 + RND() * .75;
+      add(cx + (RND() - .5) * 3, cy + (RND() - .5) * 2.4, cz + (p === 0 ? .4 : 0), sx, sy, sz, C.white, t, seed, 3);
+    }
+  }
+
+  // ---- 车流环线（外圈车道顺时针，内圈逆时针）
+  const G = MARGIN;
+  const loops = [
+    [[G + 1, G + 1], [G + W - 1, G + 1], [G + W - 1, G + D - 1], [G + 1, G + D - 1]],
+    [[G + 3, G + 3], [G + 3, G + D - 3], [G + W - 3, G + D - 3], [G + W - 3, G + 3]]
+  ];
+  for (let c = 1; c < cols; c++) loops.push([[G + c * PX + 1, G + 1], [G + c * PX + 1, G + D - 1], [G + c * PX + 3, G + D - 1], [G + c * PX + 3, G + 1]]);
+
+  return {data: new Float32Array(OUT), count: OUT.length / STRIDE, MW, MD, topZ, labels, floorLabels, elevators, boxes, loops, maxT: maxT + .6};
+
+  /* ---------- 小物件 ---------- */
+  function tree(i, j, z0, t){
+    const cx = i + .5 - M / 2, cy = j + .5 - M / 2;
+    for (let z = 0; z < 5; z++) add(cx, cy, z0 + z * M, M, M, M, C.trunk, t + z * .03);
+    if (RND() < .6){
+      add(i + .05, j + .05, z0 + .62, .9, .9, .9, C.leaf, t + .18, 0, 0, .04);
+      for (let s = 0; s < 7; s++) add(i + .05 + Math.floor(RND() * 7) * M, j + .05 + Math.floor(RND() * 7) * M, z0 + 1.52, M, M, M, RND() < .1 ? C.apple : C.leaf2, t + .3 + RND() * .15);
+      for (let s = 0; s < 4; s++) add(i + .95, j + .1 + Math.floor(RND() * 6) * M, z0 + .7 + Math.floor(RND() * 5) * M, M, M, M, C.leaf2, t + .3 + RND() * .15);
+      for (let s = 0; s < 4; s++) add(i + .1 + Math.floor(RND() * 6) * M, j + .95, z0 + .7 + Math.floor(RND() * 5) * M, M, M, M, C.leaf2, t + .3 + RND() * .15);
+    } else {
+      add(i + .125, j + .125, z0 + .62, .75, .75, .5, C.leaf3, t + .18, 0, 0, .04);
+      add(i + .25, j + .25, z0 + 1.12, .5, .5, .375, C.leaf3, t + .24, 0, 0, .04);
+      add(i + .375, j + .375, z0 + 1.495, .25, .25, .25, C.leaf3, t + .3, 0, 0, .04);
+    }
+  }
+  function bush(i, j, z0, t){
+    const n = 4 + Math.floor(RND() * 4);
+    for (let s = 0; s < n; s++) add(i + .2 + Math.floor(RND() * 4) * M, j + .2 + Math.floor(RND() * 4) * M, z0 + Math.floor(RND() * 2) * M, M * 2, M * 2, M * 2, RND() < .5 ? C.hedge : C.leaf, t + s * .02);
+  }
+  function planterTree(i, j, z0, t, big){
+    add(i + .15, j + .15, z0, .7, .7, .2, C.pier, t);
+    add(i + .22, j + .22, z0 + .2, .56, .56, .02, "#7a5a3c", t + .05);
+    const cx = i + .5 - M / 2, cy = j + .5 - M / 2;
+    for (let z = 0; z < 4; z++) add(cx, cy, z0 + .2 + z * M, M, M, M, C.trunk, t + .08 + z * .02);
+    add(i + .15, j + .15, z0 + .7, .7, .7, big ? .75 : .6, C.leaf, t + .18, 0, 0, .05);
+    for (let s = 0; s < 5; s++) add(i + .15 + Math.floor(RND() * 5) * M, j + .15 + Math.floor(RND() * 5) * M, z0 + (big ? 1.45 : 1.3), M, M, M, C.leaf2, t + .25);
+  }
+  function lamp(i, j, z0, [di, dj], t){
+    const cx = i + .5 - M / 2, cy = j + .5 - M / 2;
+    add(cx - M / 2, cy - M / 2, z0, 2 * M, 2 * M, M, C.pole, t);
+    add(cx, cy, z0 + M, M, M, 14 * M, C.pole, t + .05);
+    for (let s = 1; s <= 2; s++) add(cx + di * s * M, cy + dj * s * M, z0 + 14 * M, M, M, M, C.pole, t + .08);
+    add(cx + di * 3 * M - M / 2, cy + dj * 3 * M - M / 2, z0 + 13 * M, 2 * M, 2 * M, M, C.lamp, t + .14, 1, 1);
+    add(cx + di * 3 * M - M, cy + dj * 3 * M - M, z0 + 14 * M, 3 * M, 3 * M, M / 2, C.pole, t + .14);
+  }
+  function trafficLight(i, j, z0, t){
+    const x = i + .44, y = j + .44;
+    add(x, y, z0, M, M, 2.0, C.pole, t);
+    add(x - .06, y - .06, z0 + 1.6, .26, .26, .6, "#2b2f3a", t + .08);
+    const lit = RND() < .5 ? 0 : 2, cols = ["#ff4d4d", "#ffd166", "#4fd17a"];
+    for (let s = 0; s < 3; s++){
+      const z = z0 + 2.07 - s * .18, on = s === lit;
+      add(x + .2, y - .01, z, .03, .14, .13, on ? cols[s] : shade(cols[s], .45), t + .1, on ? 1 : 0, on ? 1 : 0);
+      add(x - .01, y + .2, z, .14, .03, .13, on ? cols[s] : shade(cols[s], .45), t + .1, on ? 1 : 0, on ? 1 : 0);
+    }
+  }
+  function bench(i, j, z0, [di, dj], t){
+    const alongX = di === 0;                                  // 马路在 ±y 方向 → 长椅沿 x 摆
+    if (alongX){
+      add(i + .15, j + .4, z0 + .18, .7, .22, .05, C.bench, t);
+      add(i + .15, j + (dj > 0 ? .62 : .36), z0 + .23, .7, .04, .2, C.bench, t + .04);
+      add(i + .18, j + .42, z0, .05, .18, .18, C.pole, t); add(i + .77, j + .42, z0, .05, .18, .18, C.pole, t);
+    } else {
+      add(i + .4, j + .15, z0 + .18, .22, .7, .05, C.bench, t);
+      add(i + (di > 0 ? .62 : .36), j + .15, z0 + .23, .04, .7, .2, C.bench, t + .04);
+      add(i + .42, j + .18, z0, .18, .05, .18, C.pole, t); add(i + .42, j + .77, z0, .18, .05, .18, C.pole, t);
+    }
+  }
+  function plant(x, y, z0, t){
+    add(x, y, z0, .375, .375, .3, "#e58f65", t);
+    add(x + .03, y + .03, z0 + .3, .315, .315, .02, "#6b4a33", t + .02);
+    for (let s = 0; s < 9; s++){ const a = Math.floor(RND() * 3), b = Math.floor(RND() * 3), c = Math.floor(RND() * 4); add(x + .0 + a * M, y + .0 + b * M, z0 + .32 + c * M, M, M, M, RND() < .5 ? C.leaf : C.leaf2, t + .05 + s * .01) }
+  }
+
+  /* ---------- 楼宇 ---------- */
+  function building(grp, b, px, py, tb){
+    const hx = grp.hex, bx = px + 1, by = py + 1, z0 = TOP[T.PLOT];
+    const fl = grp.floors, nF = fl.length, zr = z0 + LH + nF * FH, RF = nF + 1;
+    const tz = (z, d = 0) => tb < 0 ? -1 : tb + (z - z0) * RISE + d;
+    const tag = (f, facade = 0) => b * 1000 + f * 10 + facade;
+    const band = hx, glassE = .75;
+    const out = {floors: [], boxes: [], top: zr + 2.4};
+
+    // 大堂（层号 0）：两面玻璃幕墙 + 正门雨棚
+    TAG = tag(0); EM = 0;
+    add(bx + BW - .25, by + BD - .25, z0, .25, .25, LH, C.pier, tz(z0));
+    out.boxes.push({b, f: 0, x0: bx, y0: by, z0, x1: bx + BW + .05, y1: by + BD + .05, z1: z0 + LH - ST, sel: false});
+    for (let s = 0; s < BD; s++){
+      const y = by + s, door = s === 3 || s === 4;
+      add(bx + BW - .22, y, z0, .2, .07, LH, C.frame, tz(z0));
+      add(bx + BW - .22, y, z0, .2, 1, .12, C.frame, tz(z0));
+      if (door){
+        add(bx + BW - .16, y + .05, z0 + .12, .1, .9, LH - .62, tint(C.glass, .35), tz(z0, .05), glassE, 2);
+        add(bx + BW - .05, y + (s === 3 ? .82 : .1), z0 + .7, .05, .08, .4, C.metal, tz(z0, .1));
+      } else add(bx + BW - .18, y + .06, z0 + .12, .12, .88, LH - .37, C.glass, tz(z0, .05), glassE, 2);
+    }
+    add(bx + BW - .22, by + 3, z0 + LH - .5, .22, 2, .25, C.frame, tz(z0 + 1));
+    for (let s = 0; s < BW; s++){
+      const x = bx + s, elev = s === 1 || s === 2;
+      add(x, by + BD - .22, z0, .07, .2, LH, C.frame, tz(z0));
+      add(x, by + BD - .22, z0, 1, .2, .12, C.frame, tz(z0));
+      if (elev) add(x + .04, by + BD - .16, z0 + .12, .92, .1, LH - .62, "#c9d1da", tz(z0, .05));
+      else add(x + .06, by + BD - .18, z0 + .12, .88, .12, LH - .37, C.glass, tz(z0, .05), glassE, 2);
+    }
+    add(bx + 2, by + BD - .1, z0 + .12, .03, .1, LH - .62, C.frame, tz(z0, .08));
+    add(bx, by + BD - .22, z0 + LH - .25, BW, .2, .25, C.pier, tz(z0 + 1.5));
+    add(bx + BW - .22, by, z0 + LH - .25, .2, BD, .25, C.pier, tz(z0 + 1.5));
+    // 雨棚 + 门垫 + 支柱
+    add(bx + BW, by + 2.5, z0 + LH - .55, 1.5, 3, .16, hx, tz(z0 + 1.6));
+    add(bx + BW + 1.4, by + 2.5, z0 + LH - .55, .1, 3, .2, C.white, tz(z0 + 1.6));
+    for (const yy of [by + 2.65, by + 5.25]) add(bx + BW + 1.3, yy, z0, M, M, LH - .55, C.metal, tz(z0 + .5));
+    for (let s = 0; s < 3; s++) add(bx + BW + .3 + s * .4, by + 3.9, z0 + LH - .58, .15, .2, .03, C.lamp, tz(z0 + 1.6), 1, 1);
+    add(bx + BW, by + 3, z0, .9, 2, .02, "#8b5e3c", tz(z0));
+
+    // 楼层
+    for (let f = 0; f < nF; f++){
+      const F = fl[f], fi = f + 1, zb = z0 + LH + f * FH, H = FH - ST, t = tz(zb);
+      TAG = tag(fi);
+      EM = F.lit ? .42 : 0;
+      const wood = f % 2 === 1, fh = F.hex || hx;      // 地毯用该任务所属档位的颜色
+      for (let a = 0; a < BW; a++) for (let b = 0; b < BD; b++){
+        const c = (a + b) & 1;
+        add(bx + a, by + b, zb - ST, 1, 1, ST, wood ? (c ? C.floorWood : C.floorWood2) : (c ? tint(fh, .8) : tint(fh, .74)), t + (a + b) * .012, EM, 0, .02);
+      }
+      EM = 0;
+      add(bx + BW, by, zb - ST, .0625, BD + .0625, ST, band, t + .05);
+      add(bx, by + BD, zb - ST, BW, .0625, ST, band, t + .05);
+      // 人数灯：一灯一人。金 = 主 agent；绿 = 子 agent 工作中（夜里发光）；蓝白 = 已完成；红 = 失败；灰 = 中止
+      if (!F.vacant){
+        const LED = {working: "#4fd17a", finished: "#d6e8ff", failed: "#ff5a5a", stopped: "#9aa3ad"};
+        const dots = [F.status === "working" || F.status === "idle" ? "#ffcf3f" : "#c9b98a", ...F.subs.map(st => LED[st] || "#9aa3ad")];
+        dots.forEach((c, i) => {
+          const on = i === 0 ? F.status === "working" : F.subs[i - 1] === "working";
+          add(bx + BW + .06, by + 1.0 + i * .42, zb - ST - .02, .14, .3, .26, c, t + .2 + i * .03, on || i === 0 ? 1 : .35, 1);
+        });
+      }
+      EM = F.lit ? .42 : 0;
+      // 背墙（-x、-y 两面，内侧可见）：窗、白板、书架
+      for (let s = 0; s < BD; s++){
+        const y = by + s, win = s < 4;
+        if (win){
+          add(bx, y, zb, .25, 1, .5, C.wall, t + .05);
+          add(bx + .04, y + .07, zb + .5, .16, .86, 1.0, C.glass, t + .08, 0, 2);
+          add(bx, y, zb + .5, .25, .07, 1.0, C.frame, t + .08);
+          add(bx + .25, y + .05, zb + .44, .07, .9, .06, C.white, t + .1);
+          add(bx, y, zb + 1.5, .25, 1, H - 1.5, C.wall, t + .1);
+        } else add(bx, y, zb, .25, 1, H, C.wall, t + .05);
+      }
+      for (let s = 0; s < BW; s++){
+        const x = bx + s, win = s >= 4;
+        if (win){
+          add(x, by, zb, 1, .25, .5, C.wall, t + .05);
+          add(x + .07, by + .04, zb + .5, .86, .16, 1.0, C.glass, t + .08, 0, 2);
+          add(x, by, zb + .5, .07, .25, 1.0, C.frame, t + .08);
+          add(x + .05, by + .25, zb + .44, .9, .07, .06, C.white, t + .1);
+          add(x, by, zb + 1.5, 1, .25, H - 1.5, C.wall, t + .1);
+        } else add(x, by, zb, 1, .25, H, C.wall, t + .05);
+      }
+      // 前角立柱（随本层一起抬升）
+      EM = 0;
+      add(bx + BW - .25, by + BD - .25, zb - ST, .25, .25, FH, C.pier, t);
+      // 外立面：玻璃幕墙（竖梃 + 腰线 + 玻璃），两端是实墙板；选中本层时整片收起
+      TAG = tag(fi, 1);
+      for (let s = 0; s < BD; s++){
+        const y = by + s;
+        if (s === 0){ add(bx + BW - .2, y, zb, .2, 1, H, C.pier, t + .1); continue }
+        add(bx + BW - .16, y, zb, .16, .06, H, C.frame, t + .1);
+        add(bx + BW - .12, y + .06, zb, .08, .94, H, C.glass, t + .12, F.lit && RND() > .18 ? .85 : 0, 2);
+        add(bx + BW - .16, y, zb + 1.2, .16, 1, .04, C.frame, t + .12);
+      }
+      for (let s = 0; s < BW; s++){
+        const x = bx + s;
+        if (s === 0){ add(x, by + BD - .2, zb, 1, .2, H, C.pier, t + .1); continue }
+        add(x, by + BD - .16, zb, .06, .16, H, C.frame, t + .1);
+        add(x + .06, by + BD - .12, zb, .94, .08, H, C.glass, t + .12, F.lit && RND() > .18 ? .85 : 0, 2);
+        add(x, by + BD - .16, zb + 1.2, 1, .16, .04, C.frame, t + .12);
+      }
+      add(bx + BW - .16, by, zb + H - .06, .16, BD, .06, C.frame, t + .14);
+      add(bx, by + BD - .16, zb + H - .06, BW, .16, .06, C.frame, t + .14);
+      TAG = tag(fi);
+      EM = F.lit ? .42 : 0;
+      // 白板 + 便利贴 + 挂钟
+      add(bx + 1.15, by + .25, zb + .55, 2.5, .03, .95, "#c7ccd3", t + .2);
+      add(bx + 1.2, by + .28, zb + .6, 2.4, .04, .85, C.white, t + .22);
+      for (let s = 0; s < 4; s++) add(bx + 1.35 + RND() * .4, by + .32, zb + .75 + s * .17, .5 + RND() * 1.2, .01, .03, ["#5b9dff", "#e5484d", "#2f9e6f", "#3b4252"][s], t + .25);
+      for (let s = 0; s < 5; s++) add(bx + 3.0 + (s % 2) * .2, by + .32, zb + .7 + Math.floor(s / 2) * .2, .16, .01, .16, ["#ffe58a", "#ffb3c7", "#b8f0c8"][s % 3], t + .27);
+      add(bx + 3.95, by + .25, zb + 1.2, .3, .03, .3, C.white, t + .22); add(bx + 4.09, by + .28, zb + 1.27, .02, .01, .12, "#2b2f3a", t + .24); add(bx + 4.09, by + .28, zb + 1.34, .1, .01, .02, "#2b2f3a", t + .24);
+      // 书架（-x 墙）
+      const sy = by + 4.6;
+      add(bx + .25, sy, zb, .06, 1.6, 1.3, C.wood2, t + .2);
+      add(bx + .25, sy, zb, .4, .06, 1.3, C.wood, t + .2); add(bx + .25, sy + 1.54, zb, .4, .06, 1.3, C.wood, t + .2);
+      for (const hh of [0, .43, .86, 1.25]) add(bx + .25, sy, zb + hh, .4, 1.6, .05, C.wood, t + .22);
+      for (const hh of [.05, .48, .91]){ let yy = sy + .08; while (yy < sy + 1.46){ const w = .06 + RND() * .07, ht = .24 + RND() * .1; if (RND() < .85) add(bx + .33, yy, zb + hh, .28, w, ht, C.books[Math.floor(RND() * C.books.length)], t + .25 + RND() * .1); yy += w + .01 } }
+      // 饮水机、打印机、绿植
+      add(bx + .35, by + .4, zb, .3, .3, .62, C.white, t + .2); add(bx + .38, by + .43, zb + .62, .24, .24, .3, "#a8dcff", t + .23);
+      add(bx + 5.0, by + .35, zb, .55, .42, .45, "#e3e6ea", t + .2); add(bx + 5.05, by + .45, zb + .45, .4, .22, .03, C.white, t + .23);
+      plant(bx + 6.35, by + .35, zb, t + .2);
+      plant(bx + .4, by + 6.3, zb, t + .2);
+      // 主管位：木质大桌、地毯、皮椅、台灯、名牌
+      add(bx + .6, by + 2.0, zb, 2.1, 2.6, .02, tint(fh, .5), t + .2);
+      add(bx + .9, by + 2.4, zb + .6, .8, 1.8, .1, C.wood, t + .25);
+      add(bx + .9, by + 2.4, zb, .8, .1, .6, C.wood2, t + .23); add(bx + .9, by + 4.1, zb, .8, .1, .6, C.wood2, t + .23);
+      add(bx + 1.62, by + 2.5, zb + .1, .06, 1.6, .5, C.wood2, t + .23);
+      monitor(bx + 1.0, by + 3.0, zb + .7, F.boss, t + .3);
+      add(bx + 1.45, by + 2.55, zb + .7, .1, .3, .12, "#d4a017", t + .3);
+      add(bx + 1.1, by + 3.85, zb + .7, M / 2, M / 2, .3, C.pole, t + .3); add(bx + 1.05, by + 3.8, zb + .98, .15, .15, .08, C.lamp, t + .32, F.lit ? 1 : 0, 1);
+      add(bx + 2.1, by + 3.05, zb, M, M, .32, C.pole, t + .3); add(bx + 1.85, by + 2.8, zb + .32, .6, .6, .1, "#3a3f4b", t + .32); add(bx + 2.38, by + 2.8, zb + .42, .1, .6, .7, "#3a3f4b", t + .34);
+      // 员工工位
+      F.work.forEach((on, i) => desk(bx + 3.1 + Math.floor(i / 3) * 1.85, by + .9 + (i % 3) * 1.95, zb, on, i, t + .3 + i * .04));
+      EM = 0;
+      out.floors.push({x: bx + BW + .05, y: by + .5, z: zb + 1.1, t, n: fi, b, f: fi, F});
+      out.boxes.push({b, f: fi, x0: bx, y0: by, z0: zb - ST, x1: bx + BW, y1: by + BD, z1: zb + H, sel: true, F,
+                      cx: bx + BW / 2, cy: by + BD / 2, cz: zb + .6, label: grp.label});
+    }
+
+    // 楼顶（层号 n+1）
+    TAG = tag(RF); EM = 0;
+    const t = tz(zr);
+    out.boxes.push({b, f: RF, x0: bx, y0: by, z0: zr - ST, x1: bx + BW, y1: by + BD, z1: zr + 2.3, sel: false});
+    for (let a = 0; a < BW; a++) for (let b = 0; b < BD; b++) add(bx + a, by + b, zr - ST, 1, 1, ST, (a + b) & 1 ? C.gravel : C.gravel2, t + (a + b) * .01);
+    add(bx + BW, by, zr - ST, .0625, BD + .0625, ST, band, t); add(bx, by + BD, zr - ST, BW, .0625, ST, band, t);
+    add(bx, by, zr, BW, .125, .4, C.pier, t + .05); add(bx, by, zr, .125, BD, .4, C.pier, t + .05);
+    add(bx + BW - .125, by, zr, .125, BD, .4, C.pier, t + .05); add(bx, by + BD - .125, zr, BW, .125, .4, C.pier, t + .05);
+    add(bx + BW - .25, by + BD - .25, zr - ST, .25, .25, ST + .4, C.pier, t);
+    // 招牌（夜里自发光）
+    add(bx + 1.6, by + .45, zr, M, M, .6, C.metal, t + .2); add(bx + 5.3, by + .45, zr, M, M, .6, C.metal, t + .2);
+    add(bx + 1.5, by + .4, zr + .6, 4.0, .125, 1.1, hx, t + .3, .55, 1);
+    add(bx + 1.62, by + .53, zr + .7, 3.76, .02, .9, tint(hx, .82), t + .32, .7, 1);
+    // 空调外机
+    for (const yy of [by + 2.2, by + 3.5]){
+      add(bx + .5, yy, zr, .9, .9, .55, "#e3e6ea", t + .2);
+      add(bx + .62, yy + .12, zr + .55, .66, .66, .02, "#4b5563", t + .25);
+      add(bx + .93, yy + .15, zr + .57, .04, .6, .02, C.metal, t + .27); add(bx + .65, yy + .43, zr + .57, .6, .04, .02, C.metal, t + .27);
+      for (let s = 0; s < 4; s++) add(bx + 1.4, yy + .15 + s * .18, zr + .1, .02, .1, .35, "#c4c9cf", t + .27);
+    }
+    // 水箱
+    for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) add(bx + 4.9 + a * 1.0, by + 2.0 + b * 1.0, zr, M, M, .4, C.metal, t + .2);
+    add(bx + 4.8, by + 1.9, zr + .4, 1.25, 1.25, 1.1, "#8fb0c9", t + .25);
+    add(bx + 4.78, by + 1.88, zr + .75, 1.29, 1.29, .06, "#7895ad", t + .28); add(bx + 4.78, by + 1.88, zr + 1.15, 1.29, 1.29, .06, "#7895ad", t + .28);
+    for (let s = 0; s < 6; s++) add(bx + 6.06, by + 2.4, zr + .45 + s * .18, .04, .25, .03, C.pole, t + .3);
+    // 太阳能板
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++){
+      const x = bx + 2.0 + c * 1.15, y = by + 4.5 + r * 1.05;
+      add(x + .1, y + .1, zr, M / 2, M / 2, .25, C.metal, t + .2); add(x + .8, y + .6, zr, M / 2, M / 2, .25, C.metal, t + .2);
+      add(x, y, zr + .25, 1.0, .85, .05, C.solar, t + .3 + c * .03);
+      add(x + .48, y, zr + .3, .04, .85, .005, "#8fb0d9", t + .32);
+    }
+    // 天线（闪烁红灯）+ 屋顶花箱
+    add(bx + 6.3, by + .6, zr, M, M, 2.2, C.metal, t + .3);
+    add(bx + 6.15, by + .6, zr + 1.5, .45, M / 2, M / 2, C.metal, t + .33); add(bx + 6.15, by + .6, zr + 1.9, .45, M / 2, M / 2, C.metal, t + .33);
+    add(bx + 6.28, by + .58, zr + 2.2, .16, .16, .16, "#ff4d4d", t + .36, 1, 4);
+    add(bx + BW - 1.6, by + BD - 1.6, zr, 1.2, 1.2, .3, C.wood, t + .2);
+    for (let s = 0; s < 10; s++) add(bx + BW - 1.5 + Math.floor(RND() * 8) * M, by + BD - 1.5 + Math.floor(RND() * 8) * M, zr + .3, M, M, M * (1 + Math.floor(RND() * 2)), RND() < .45 ? C.leaf : C.flower[Math.floor(RND() * 5)], t + .3);
+
+    // 电梯井（外挂在 +y 立面）
+    // 电梯井：按楼层分段（抬升时跟着各自楼层走）
+    const ex = bx + 1.5, ey = by + BD;
+    const lv = [z0, ...fl.map((_, f) => z0 + LH + f * FH), zr];
+    for (let k = 0; k < lv.length - 1; k++){
+      TAG = tag(k);
+      const za = lv[k] - (k ? ST : 0), zz = lv[k + 1] - ST;
+      for (const [a, c] of [[0, 0], [1.5 - M, 0], [0, 1.5 - M], [1.5 - M, 1.5 - M]]) add(ex + a, ey + c, za, M, M, zz - za, C.white, tz(za));
+      if (k > 0){ add(ex, ey + 1.5 - M, za, 1.5, M, M, C.white, tz(za)); add(ex + 1.5 - M, ey, za, M, 1.5, M, C.white, tz(za)); add(ex, ey, za, M, 1.5, M, C.white, tz(za)) }
+    }
+    TAG = tag(0); add(ex, ey, z0 - .02, 1.5, 1.5, .04, "#9aa3ad", tz(z0));
+    TAG = tag(RF);
+    add(ex, ey + 1.5 - M, zr - ST, 1.5, M, M, C.white, t); add(ex + 1.5 - M, ey, zr - ST, M, 1.5, M, C.white, t);
+    for (const [a, c] of [[0, 0], [1.5 - M, 0], [0, 1.5 - M], [1.5 - M, 1.5 - M]]) add(ex + a, ey + c, zr - ST, M, M, ST, C.white, t);
+    add(ex - .05, ey - .05, zr, 1.6, 1.6, .9, C.pier, t + .3);
+    add(ex - .06, ey - .06, zr + .6, 1.62, 1.62, .12, hx, t + .33);
+    TAG = -1;
+    out.elevator = {b, x: ex + .125, y: ey + .125, levels: lv.slice(0, -1), zr, hx, t: tz(zr) + .6, z: z0, from: z0, to: z0, ts: 0, dur: 0, wait: 0, moving: false};
+
+    out.label = {x: bx + 3.5, y: by + .45, z: zr + 2.0, t: t + .4, g: grp, floors: nF, b};
+    out.tEnd = tb < 0 ? 0 : tz(zr) + 1.0;
+    return out;
+  }
+  function monitor(x, y, z, on, t){
+    add(x - .02, y - .1, z, .2, .2, M / 2, C.metal, t);
+    add(x + .04, y - .03, z, .05, .06, .16, C.metal, t + .02);
+    add(x, y - .3, z + .14, .07, .6, .38, "#2b3340", t + .04);
+    add(x + .07, y - .27, z + .17, .015, .54, .32, on ? C.screenOn : C.screenOff, t + .06, on ? 1 : 0, on ? 1 : 0);
+  }
+  function desk(x, y, z, on, i, t){
+    add(x, y, z + .55, .6, 1.2, .07, C.deskTop, t);
+    for (const [a, b] of [[0, 0], [.6 - M / 2, 0], [0, 1.2 - M / 2], [.6 - M / 2, 1.2 - M / 2]]) add(x + a, y + b, z, M / 2, M / 2, .55, C.metal, t);
+    monitor(x + .06, y + .6, z + .62, on, t + .05);
+    add(x + .3, y + .42, z + .62, .14, .36, .02, "#3b4252", t + .08);
+    add(x + .32, y + .86, z + .62, .1, .07, .02, "#3b4252", t + .08);
+    const v = RND(), ix = x + .38, iy = y + 1.0, iz = z + .62;
+    if (v < .3){ add(ix, iy, iz, M * .8, M * .8, M, C.white, t + .1); add(ix + .01, iy + .01, iz + M - .005, M * .65, M * .65, .01, "#6b4a33", t + .11) }
+    else if (v < .55){ add(ix, iy, iz, M, M, M * .8, "#e58f65", t + .1); add(ix, iy, iz + M * .8, M, M, M, C.leaf, t + .12); add(ix + M * .3, iy + M * .3, iz + M * 1.8, M * .5, M * .5, M * .6, C.leaf2, t + .13) }
+    else if (v < .75){ add(ix - .05, iy - .05, iz, .2, .14, .03, C.books[i % 7], t + .1); add(ix - .04, iy - .04, iz + .03, .18, .12, .03, C.books[(i + 3) % 7], t + .11) }
+    else { add(ix, iy, iz, M * .8, M * .8, M * 1.2, C.chairs[(i + 2) % 6], t + .1); add(ix + .005, iy + .005, iz + M * 1.2, M * .7, M * .7, M * .7, "#ffe0bd", t + .11) }
+    const cc = C.chairs[i % 6], cx = x + .72, cy = y + .38;
+    add(cx + .19, cy + .19, z, M, M, .3, C.pole, t + .1);
+    add(cx + .05, cy + .05, z, .35, .35, .03, C.pole, t + .1);
+    add(cx, cy, z + .3, .45, .45, .08, cc, t + .12);
+    add(cx + .38, cy, z + .38, .07, .45, .5, cc, t + .14);
+  }
+}
+
+/* ============================================================
+   车辆（动态实例，每帧重写）
+   ============================================================ */
+function carVoxels(cx, cy, dir, col){
+  const f = DIRS[dir], s = [-f[1], f[0]];
+  const box = (u0, u1, v0, v1, z0, z1, hx, e = 0, m = 0) => {
+    const xs = [cx + f[0] * u0 + s[0] * v0, cx + f[0] * u1 + s[0] * v1], ys = [cy + f[1] * u0 + s[1] * v0, cy + f[1] * u1 + s[1] * v1];
+    const x0 = Math.min(...xs), y0 = Math.min(...ys);
+    add(x0, y0, z0, Math.max(...xs) - x0, Math.max(...ys) - y0, z1 - z0, hx, -1, e, m);
+  };
+  box(-.95, .95, -.42, .42, .14, .48, col);
+  box(-.5, .4, -.38, .38, .48, .8, "#bfe6ff");
+  box(-.45, .35, -.36, .36, .8, .85, col);
+  for (const u of [-.6, .6]) for (const v of [-.46, .34]) box(u - .16, u + .16, v, v + .12, 0, .26, "#2b2f3a");
+  box(.94, .99, .24, .36, .3, .4, "#fff6c8", 1, 1); box(.94, .99, -.36, -.24, .3, .4, "#fff6c8", 1, 1);
+  box(-.99, -.94, .24, .36, .3, .4, "#ff4d4d", 1, 1); box(-.99, -.94, -.36, -.24, .3, .4, "#ff4d4d", 1, 1);
+}
+function loopPos(loop, s){
+  let L = 0; const seg = [];
+  for (let i = 0; i < loop.length; i++){ const a = loop[i], b = loop[(i + 1) % loop.length], l = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]); seg.push([a, b, l]); L += l }
+  s = ((s % L) + L) % L;
+  for (const [a, b, l] of seg){ if (s <= l){ const t = s / l, dx = Math.sign(b[0] - a[0]), dy = Math.sign(b[1] - a[1]); return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), dx > 0 ? 0 : dy > 0 ? 1 : dx < 0 ? 2 : 3] } s -= l }
+  return [loop[0][0], loop[0][1], 0];
+}
+
+/* ============================================================
+   WebGL2 渲染器
+   ============================================================ */
+const canvas = $("gl");
+const gl = canvas.getContext("webgl2", {antialias: true, alpha: true});
+if (!gl){ $("nogl").style.display = "block"; throw new Error("no webgl2") }
+canvas.addEventListener("webglcontextlost", e => { e.preventDefault() });
+canvas.addEventListener("webglcontextrestored", () => location.reload());
+
+const VS = `#version 300 es
+layout(location=0) in vec3 aC; layout(location=1) in vec3 aN; layout(location=2) in vec2 aUV;
+layout(location=3) in vec3 iP; layout(location=4) in vec3 iS; layout(location=5) in vec3 iCol; layout(location=6) in vec3 iX;
+layout(location=7) in float iF;
+uniform mat4 uVP; uniform float uTime; uniform float uDrift;
+uniform vec3 uSel; uniform vec2 uHov; uniform float uLiftH; uniform float uCloud;   // uSel = (楼号, 层号, 抬升进度 0..1)
+out vec3 vCol; out vec3 vN; out vec2 vE; out vec2 vD; out float vEm; out float vMode; out float vZ; out float vHL;
+void main(){
+  float t0 = iX.x, em = iX.y, mode = iX.z;
+  float s = 1.0, dz = 0.0;
+  if (t0 >= 0.0){
+    float p = clamp((uTime - t0) / 0.55, 0.0, 1.0);
+    float e = 1.0 - (1.0 - p) * (1.0 - p) * (1.0 - p);
+    float q = p - 1.0;
+    float back = 1.0 + 2.70158 * q * q * q + 1.70158 * q * q;
+    s = p <= 0.0 ? 0.0 : clamp(mix(0.3, 1.0, back), 0.0, 1.12);
+    dz = (1.0 - e) * clamp(iS.z * 2.0 + 0.9, 0.9, 3.0);
+  }
+  vec3 off = vec3(0.0, 0.0, dz);
+  if (mode > 2.5 && mode < 3.5){
+    s *= uCloud;                                                          // 剖开楼层/放大时云散开，不挡视线
+    float d = mod(uTime * 0.35 + em * uDrift, uDrift) - uDrift * 0.5;
+    off += vec3(-0.7071, 0.7071, 0.0) * d;
+    em = 0.0;
+  }
+  if (mode > 3.5) em *= step(0.5, fract(uTime * 0.7 + iP.x * 0.13));
+  vHL = 0.0;
+  if (iF >= 0.0){
+    float b = floor(iF / 1000.0 + 0.0001);
+    float r = iF - b * 1000.0;
+    float f = floor(r / 10.0 + 0.0001);
+    float kind = r - f * 10.0;
+    if (abs(b - uSel.x) < 0.5){
+      if (f > uSel.y + 0.5) off.z += uSel.z * uLiftH;                       // 上方楼层整体抬起
+      else if (abs(f - uSel.y) < 0.5 && kind > 0.5) s *= 1.0 - uSel.z;      // 本层幕墙收起
+    }
+    if (abs(b - uHov.x) < 0.5 && abs(f - uHov.y) < 0.5) vHL = 1.0;
+  }
+  vec3 p = iP + iS * 0.5 + (aC - 0.5) * iS * s + off;
+  gl_Position = uVP * vec4(p, 1.0);
+  vN = aN; vCol = iCol; vEm = em; vMode = mode; vZ = p.z;
+  vD = abs(aN.x) > 0.5 ? iS.yz : (abs(aN.y) > 0.5 ? iS.xz : iS.xy);
+  vE = aUV * vD;
+}`;
+const FS = `#version 300 es
+precision highp float;
+in vec3 vCol; in vec3 vN; in vec2 vE; in vec2 vD; in float vEm; in float vMode; in float vZ; in float vHL;
+uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uSky; uniform vec3 uGnd; uniform vec3 uWin; uniform float uNight;
+out vec4 o;
+void main(){
+  vec3 n = normalize(vN);
+  bool isWin = vMode > 1.5 && vMode < 2.5;
+  vec3 base = isWin ? mix(uWin, vCol, 0.18) : vCol;
+  float ndl = max(dot(n, uSun), 0.0);
+  vec3 amb = mix(uGnd, uSky, n.z * 0.5 + 0.5);
+  vec3 c = base * (amb + uSunCol * ndl);
+  if (n.z < 0.5) c *= mix(0.84, 1.0, smoothstep(-0.2, 0.7, vZ));
+  float w = min(0.035, 0.16 * min(vD.x, vD.y));
+  vec2 d = min(vE, vD - vE);
+  c *= 1.0 - 0.17 * (1.0 - smoothstep(0.0, w, min(d.x, d.y)));
+  if (vEm > 0.0){
+    bool selfLit = (vMode > 0.5 && vMode < 1.5) || vMode > 3.5;
+    vec3 glow = isWin ? vec3(1.0, 0.86, 0.58) : selfLit ? vCol * 1.3 : vCol * vec3(1.08, 0.97, 0.82) + vec3(0.14, 0.10, 0.04);
+    c = mix(c, glow, clamp(vEm * uNight, 0.0, 1.0));
+  }
+  c = mix(c, c * 1.1 + vec3(0.07, 0.08, 0.1), vHL * 0.85);              // 悬停楼层高亮
+  o = vec4(c, 1.0);
+}`;
+function shader(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s }
+const prog = gl.createProgram();
+gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+const U = {}; for (const n of ["uVP", "uTime", "uDrift", "uSun", "uSunCol", "uSky", "uGnd", "uWin", "uNight", "uSel", "uHov", "uLiftH", "uCloud"]) U[n] = gl.getUniformLocation(prog, n);
+
+// 单位立方体：6 面 × 4 顶点（角点、法线、面内 uv）
+const cube = [], idx = [];
+const FACES = [[[1,0,0], (u, v) => [1, u, v]], [[-1,0,0], (u, v) => [0, u, v]], [[0,1,0], (u, v) => [u, 1, v]], [[0,-1,0], (u, v) => [u, 0, v]], [[0,0,1], (u, v) => [u, v, 1]], [[0,0,-1], (u, v) => [u, v, 0]]];
+FACES.forEach(([nrm, fn], f) => { for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) cube.push(...fn(u, v), ...nrm, u, v); idx.push(f * 4, f * 4 + 1, f * 4 + 2, f * 4, f * 4 + 2, f * 4 + 3) });
+const cubeBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cubeBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cube), gl.STATIC_DRAW);
+const idxBuf = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), gl.STATIC_DRAW);
+function makeVAO(buf){
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, cubeBuf);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 32, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 32, 12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 32, 24);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  for (const [loc, off] of [[3, 0], [4, 12], [5, 24], [6, 36]]){ gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, STRIDE * 4, off); gl.vertexAttribDivisor(loc, 1) }
+  gl.enableVertexAttribArray(7); gl.vertexAttribPointer(7, 1, gl.FLOAT, false, STRIDE * 4, 48); gl.vertexAttribDivisor(7, 1);
+  gl.bindVertexArray(null); return vao;
+}
+const staticBuf = gl.createBuffer(), dynBuf = gl.createBuffer();
+const staticVAO = makeVAO(staticBuf), dynVAO = makeVAO(dynBuf);
+let staticCount = 0;
+
+/* ---------------- 相机：正交 2:1 等距 ---------------- */
+const PITCH = Math.PI / 6, YAW = Math.PI / 4;
+const DV = [Math.cos(PITCH) * Math.cos(YAW), Math.cos(PITCH) * Math.sin(YAW), Math.sin(PITCH)];
+const norm = v => { const l = Math.hypot(...v); return v.map(x => x / l) };
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const RV = norm(cross([0, 0, 1], DV)), UV = cross(DV, RV);
+const cam = {tx: 0, ty: 0, zoom: 12};
+let cssW = 1, cssH = 1, VP = new Float32Array(16);
+function updateVP(){
+  const eye = [cam.tx + DV[0] * 300, cam.ty + DV[1] * 300, DV[2] * 300];
+  const hw = cssW / (2 * cam.zoom), hh = cssH / (2 * cam.zoom), n = 1, f = 900;
+  const V = [RV[0], UV[0], DV[0], 0, RV[1], UV[1], DV[1], 0, RV[2], UV[2], DV[2], 0, -dot(RV, eye), -dot(UV, eye), -dot(DV, eye), 1];
+  const P = [1 / hw, 0, 0, 0, 0, 1 / hh, 0, 0, 0, 0, -2 / (f - n), 0, 0, 0, -(f + n) / (f - n), 1];
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++){ let s = 0; for (let k = 0; k < 4; k++) s += P[k * 4 + r] * V[c * 4 + k]; VP[c * 4 + r] = s }
+}
+function project(x, y, z){
+  const cx = VP[0] * x + VP[4] * y + VP[8] * z + VP[12], cy = VP[1] * x + VP[5] * y + VP[9] * z + VP[13];
+  return [(cx * .5 + .5) * cssW, (1 - (cy * .5 + .5)) * cssH];
+}
+function ground(sx, sy){
+  const nx = sx / cssW * 2 - 1, ny = 1 - sy / cssH * 2, hw = cssW / (2 * cam.zoom), hh = cssH / (2 * cam.zoom);
+  const p = [cam.tx + DV[0] * 300 + RV[0] * nx * hw + UV[0] * ny * hh, cam.ty + DV[1] * 300 + RV[1] * nx * hw + UV[1] * ny * hh, DV[2] * 300 + RV[2] * nx * hw + UV[2] * ny * hh];
+  const t = p[2] / DV[2];
+  return [p[0] - DV[0] * t, p[1] - DV[1] * t];
+}
+function fit(){
+  const c = S.city; if (!c) return;
+  const pts = []; for (const x of [0, c.MW]) for (const y of [0, c.MD]) for (const z of [-3, c.topZ]) pts.push([x, y, z]);
+  const xs = pts.map(p => dot(p, RV)), ys = pts.map(p => dot(p, UV));
+  const w = Math.max(...xs) - Math.min(...xs), hgt = Math.max(...ys) - Math.min(...ys);
+  const top = document.querySelector("header").getBoundingClientRect().bottom + 10, bot = 70;
+  cam.zoom = clamp(Math.min((cssW - 24) / w, (cssH - top - bot) / hgt), 3, 80);
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2 + (top - bot) / 2 / cam.zoom;
+  const p = [RV[0] * cx + UV[0] * cy, RV[1] * cx + UV[1] * cy, RV[2] * cx + UV[2] * cy];
+  const t = p[2] / DV[2];
+  cam.tx = p[0] - DV[0] * t; cam.ty = p[1] - DV[1] * t;
+  S.camDirty = true;
+}
+function resize(){
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  cssW = innerWidth; cssH = innerHeight;
+  canvas.width = Math.round(cssW * dpr); canvas.height = Math.round(cssH * dpr);
+  if (S.autoFit) fit();
+  S.camDirty = true;
+}
+
+/* ============================================================
+   昼夜：按服务器时间（浏览器时区）插值关键帧
+   ============================================================ */
+const KEYS = [
+  {h: 0,    top: "#0b1736", bot: "#26305e", sun: "#8ea3e6", si: .24, sky: "#2c3a66", gnd: "#151a2c", night: 1},
+  {h: 4.8,  top: "#0d1a3c", bot: "#2b3566", sun: "#8ea3e6", si: .24, sky: "#2c3a66", gnd: "#151a2c", night: 1},
+  {h: 6.2,  top: "#7090d8", bot: "#ffc4a3", sun: "#ffc49a", si: .42, sky: "#7a7f9e", gnd: "#4a4248", night: .3},
+  {h: 8,    top: "#8ccaf7", bot: "#eaf6ff", sun: "#fff1dc", si: .5,  sky: "#959fb0", gnd: "#5e5a58", night: 0},
+  {h: 12,   top: "#74c0ff", bot: "#def2ff", sun: "#ffffff", si: .55, sky: "#9aa4b4", gnd: "#625e5a", night: 0},
+  {h: 15.5, top: "#82c4f8", bot: "#fff0d6", sun: "#fff2dc", si: .52, sky: "#96a0ae", gnd: "#605a55", night: 0},
+  {h: 17.3, top: "#f0a160", bot: "#ffd79a", sun: "#ffb066", si: .5,  sky: "#8a7f86", gnd: "#5a4640", night: .12},
+  {h: 18.5, top: "#6a4e9c", bot: "#f2896b", sun: "#ff8a66", si: .3,  sky: "#5d5679", gnd: "#3a2f3c", night: .6},
+  {h: 19.6, top: "#162250", bot: "#3a3772", sun: "#8ea3e6", si: .24, sky: "#2c3a66", gnd: "#151a2c", night: 1},
+  {h: 24,   top: "#0b1736", bot: "#26305e", sun: "#8ea3e6", si: .24, sky: "#2c3a66", gnd: "#151a2c", night: 1}
+];
+function lightAt(hr){
+  let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1].h <= hr) i++;
+  const a = KEYS[i], b = KEYS[i + 1], t = clamp((hr - a.h) / (b.h - a.h), 0, 1), s = t * t * (3 - 2 * t);
+  const L = {night: lerp(a.night, b.night, s), si: lerp(a.si, b.si, s)};
+  for (const k of ["top", "bot", "sun", "sky", "gnd"]) L[k] = mixHex(a[k], b[k], s);
+  const f = clamp((hr - 6) / 13, 0, 1), az = lerp(-.25, 1.8, f), el = .45 + .95 * Math.sin(f * Math.PI);
+  const day = norm([Math.cos(az), Math.sin(az), el]), moon = norm([.55, .45, .9]);
+  L.dir = norm(day.map((v, i) => lerp(v, moon[i], L.night)));
+  return L;
+}
+const PHASES = [[5, 10, "早上", "🌅"], [10, 16, "中午", "☀️"], [16, 19.5, "黄昏", "🌇"]];
+const phaseOf = hr => { for (const [a, b, n, ic] of PHASES) if (hr >= a && hr < b) return [n, ic]; return ["夜晚", "🌙"] };
+(function makeStars(){ const st = $("stars"), r = rng32(7); let s = ""; for (let i = 0; i < 110; i++) s += `<i style="left:${(r() * 100).toFixed(2)}%;top:${(r() * 100).toFixed(2)}%;opacity:${(.4 + r() * .6).toFixed(2)};animation-delay:${(r() * 3).toFixed(2)}s;transform:scale(${(.5 + r()).toFixed(2)})"></i>`; st.innerHTML = s })();
+let lastSky = "";
+function applySky(hr, L){
+  const sky = `linear-gradient(180deg,${L.top} 0%,${L.bot} 78%)`;
+  if (sky !== lastSky){ $("sky").style.background = sky; lastSky = sky }
+  $("stars").style.opacity = L.night.toFixed(3);
+  const f = (hr - 6) / 13, sun = $("sun");
+  sun.style.opacity = (f > -.05 && f < 1.05 ? 1 - L.night : 0).toFixed(3);
+  sun.style.left = (8 + 84 * clamp(f, 0, 1)) + "%"; sun.style.top = (34 - 24 * Math.sin(clamp(f, 0, 1) * Math.PI)) + "%";
+  const g = (((hr - 19) % 24) + 24) % 24 / 11, moon = $("moon");
+  moon.style.opacity = (g <= 1 ? L.night : 0).toFixed(3);
+  moon.style.left = (8 + 84 * clamp(g, 0, 1)) + "%"; moon.style.top = (30 - 20 * Math.sin(clamp(g, 0, 1) * Math.PI)) + "%";
+}
+
+/* ============================================================
+   状态、数据、主循环
+   ============================================================ */
+const S = {city: null, start: performance.now(), autoFit: true, camDirty: true, skew: 0, data: null, sig: "", seen: new Set(),
+           hourMode: "auto", hourShown: null, cars: [], labelEls: [], floorEls: [], lastFrame: 0, raf: 0,
+           sel: null, selWant: null, lift: 0, liftE: 0, hover: null, tween: null, down: null};
+const LIFT = 5.5;                                   // 剖开时上方楼层抬起的高度（格）
+const liftOf = (b, f) => S.sel && S.sel.b === b && f > S.sel.f ? S.liftE * LIFT : 0;
+
+/* 楼宇 = 设备：hub 模式下档位 id 形如 "cli@设备名"；local 模式只有本机一台 */
+const DEV_HEX = ["#5b9dff", "#e08a5f", "#4fbf7a", "#a884ff", "#ff7aa8", "#3cc3b8", "#f0a35e", "#7aa2ff"];
+function groupsFrom(d){
+  const now = d.now, devOf = id => String(id || "").split("@")[1] || d.host || "本机";
+  const srcLabel = new Map((d.sources || []).map(s => [s.id, String(s.label).split(" · ")[0]]));
+  const devs = new Map();
+  const ensure = name => { if (!devs.has(name)) devs.set(name, []); return devs.get(name) };
+  for (const x of d.devices || []) ensure(x.name);
+  for (const s of d.sources || []) if (s.sessions > 0) ensure(devOf(s.id));
+  if (!devs.size && d.host) ensure(d.host);
+  for (const l of d.leads || []){
+    if (!(l.status === "working" || l.status === "idle" || now - l.last < 30 * 60e3)) continue;
+    ensure(devOf(l.src)).push(l);
+  }
+  const out = [...devs].map(([name, leads]) => {
+    const floors = leads.sort((a, b) => a.start - b.start).slice(-10).map(l => {
+      const ag = l.agents.filter(a => a.status === "working" || now - a.last < 15 * 60e3)
+        .sort((a, b) => (a.status !== "working") - (b.status !== "working") || b.last - a.last);
+      return {key: l.id, title: l.title || l.project || l.name, name: l.name, status: l.status, src: srcLabel.get(l.src) || "", hex: srcHex(l.src),
+              subs: ag.slice(0, 13).map(a => a.status), subTotal: l.agents.length,
+              lit: l.status === "working" || l.status === "idle", boss: l.status === "working",
+              work: Array.from({length: clamp(ag.length, 2, 6)}, (_, i) => !!(ag[i] && ag[i].status === "working"))};
+    });
+    if (!floors.length) floors.push({key: "vacant", vacant: true, title: "空置", name: "", status: "done", src: "", hex: "", subs: [], subTotal: 0, lit: false, boss: false, work: [false, false]});
+    return {id: name, label: name, hex: DEV_HEX[hashStr(name) % DEV_HEX.length], floors};
+  }).sort((a, b) => a.id < b.id ? -1 : 1);
+  return out.slice(0, 9);
+}
+const DEMO = [{id: "demo", label: "Agent Tower", hex: "#5b9dff", floors: [
+  {key: "d1", title: "示例任务 · 重构", name: "Aurora", status: "working", lit: true, boss: true, work: [true, false, true, true]},
+  {key: "d2", title: "示例任务 · 文档", name: "Nova", status: "idle", lit: true, boss: false, work: [false, false, true]},
+  {key: "d3", title: "示例任务 · 排查", name: "Vega", status: "working", lit: true, boss: true, work: [true, true, false, false, true, false]}]}];
+
+function build(groups, animate){
+  const c = buildCity(groups, {animate});
+  S.city = c;
+  gl.bindBuffer(gl.ARRAY_BUFFER, staticBuf); gl.bufferData(gl.ARRAY_BUFFER, c.data, gl.STATIC_DRAW);
+  staticCount = c.count;
+  // 标签
+  const lab = $("labels"); lab.replaceChildren(); S.labelEls = []; S.floorEls = [];
+  for (const L of c.labels){
+    const e = document.createElement("div"); e.className = "bl";
+    const fs = L.g.floors.filter(f => !f.vacant), subs = fs.reduce((n, f) => n + f.subs.length, 0);
+    const wk = fs.filter(f => f.status === "working").length + fs.reduce((n, f) => n + f.subs.filter(x => x === "working").length, 0);
+    e.innerHTML = `<i style="background:${L.g.hex}"></i>${h(L.g.label)}<small>${L.floors} 层 · 主 ${fs.length} · 子 ${subs}${wk ? ` · <b style="color:#2f9e6f">${wk} 在忙</b>` : ""}</small>`;
+    lab.appendChild(e); S.labelEls.push([e, L]);
+  }
+  const ST_C = {working: "#2fbf71", idle: "#f2b630", done: "#b6bec9", stopped: "#b6bec9"};
+  for (const F of c.floorLabels){
+    const e = document.createElement("div"); e.className = "fl";
+    e.innerHTML = `<i style="background:${ST_C[F.F.status] || "#b6bec9"}"></i><b>${F.n}F</b>${h(F.F.title)}${F.F.vacant ? "" : `<small>主1 · 子${F.F.subs.length}</small>`}${F.F.src ? `<small style="color:${F.F.hex}">· ${h(F.F.src)}</small>` : ""}`;
+    e.title = F.F.title; e.dataset.b = F.b; e.dataset.f = F.f; lab.appendChild(e); S.floorEls.push([e, F]);
+  }
+  // 顶部总览：主 / 子 agent 数量
+  const fs = groups.flatMap(g => g.floors.filter(f => !f.vacant)), subs = fs.flatMap(f => f.subs);
+  const wk = fs.filter(f => f.status === "working").length + subs.filter(x => x === "working").length;
+  $("stats").innerHTML = `<span><i style="background:#ffcf3f"></i><b>${fs.length}</b>主 agent</span><span><i style="background:#4fd17a"></i><b>${subs.length}</b>子 agent</span><span><b style="color:#2f9e6f">${wk}</b>在忙</span><span><b>${groups.length}</b>栋楼</span>`;
+  // 车流
+  const r = rng32(5); S.cars = [];
+  c.loops.forEach((lp, li) => { const k = li < 2 ? 4 : 2; for (let s = 0; s < k; s++) S.cars.push({lp, s: r() * 400, v: 2.2 + r() * 1.2, col: C.cars[Math.floor(r() * C.cars.length)]}) });
+  if (S.selWant && !c.boxes.some(x => x.sel && x.b === S.selWant.b && x.f === S.selWant.f)) S.selWant = null;
+  S.hover = null;
+  if (S.autoFit) fit();
+  S.camDirty = true;
+}
+
+function dynamic(t, dt){
+  OUT = []; RND = Math.random; TAG = -1; EM = 0;
+  const c = S.city;
+  if (t > c.maxT * .8){
+    for (const car of S.cars){ car.s += car.v * dt; const [x, y, d] = loopPos(car.lp, car.s); carVoxels(x, y, d, car.col) }
+  }
+  for (const e of c.elevators){
+    if (t < e.t) continue;
+    if (e.moving){
+      const p = clamp((t - e.ts) / e.dur, 0, 1), s = p * p * (3 - 2 * p);
+      e.z = lerp(e.from, e.to, s);
+      if (p >= 1){ e.moving = false; e.wait = t + 2 + Math.random() * 3 }
+    } else if (t > e.wait && e.levels.length > 1){
+      let k; do k = Math.floor(Math.random() * e.levels.length); while (e.levels[k] === e.to);
+      e.from = e.z; e.to = e.levels[k]; e.ts = t; e.dur = Math.abs(e.to - e.from) / 1.6 + .5; e.moving = true;
+    }
+    const x = e.x, y = e.y, z = e.z;
+    let k = 0; while (k + 1 < e.levels.length && e.levels[k + 1] <= z + .01) k++;
+    TAG = e.b * 1000 + k * 10;                                   // 轿厢在哪层就跟着哪层抬升
+    add(x, y, z, 1.25, 1.25, .1, C.metal, -1);
+    add(x, y, z, 1.25, .08, 1.4, e.hx, -1); add(x, y, z, .08, 1.25, 1.4, e.hx, -1);
+    add(x + 1.17, y + .08, z + .1, .08, 1.09, 1.2, C.glass, -1, .6);
+    add(x + .08, y + 1.17, z + .1, 1.09, .08, 1.2, C.glass, -1, .6);
+    add(x + 1.13, y + 1.13, z, .12, .12, 1.4, C.white, -1);
+    add(x, y, z + 1.3, 1.25, 1.25, .12, e.hx, -1);
+    add(x + .55, y + .55, z + 1.42, M / 2, M / 2, Math.max(0, e.zr - z - 1.42), C.pole, -1);
+    TAG = -1;
+  }
+  const arr = new Float32Array(OUT);
+  gl.bindBuffer(gl.ARRAY_BUFFER, dynBuf); gl.bufferData(gl.ARRAY_BUFFER, arr, gl.DYNAMIC_DRAW);
+  return arr.length / STRIDE;
+}
+
+function currentHour(){
+  const d = new Date(Date.now() + S.skew);
+  const real = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+  const target = S.hourMode === "auto" ? real : +S.hourMode;
+  if (S.hourShown === null) S.hourShown = target;
+  let diff = target - S.hourShown; if (diff > 12) diff -= 24; if (diff < -12) diff += 24;
+  S.hourShown = (((S.hourShown + diff * .06) % 24) + 24) % 24;     // 切换时段时平滑过渡
+  if (Math.abs(diff) < .002) S.hourShown = target;
+  return S.hourShown;
+}
+
+function frame(ts){
+  S.raf = 0;
+  if (document.hidden || !S.city) return;
+  const dt = S.lastFrame ? Math.min(.1, (ts - S.lastFrame) / 1000) : 0;
+  S.lastFrame = ts;
+  const t = (ts - S.start) / 1000;
+  // 剖开动画：换层时先收回再抬起
+  const w = S.selWant;
+  if (S.sel && (!w || w.b !== S.sel.b || w.f !== S.sel.f)){ S.lift = Math.max(0, S.lift - dt * 3.2); if (S.lift === 0) S.sel = null }
+  if (!S.sel && w) S.sel = w;
+  if (S.sel && w && w.b === S.sel.b && w.f === S.sel.f) S.lift = Math.min(1, S.lift + dt * 2.2);
+  S.liftE = S.lift * S.lift * (3 - 2 * S.lift);
+  if (S.tween){
+    const p = clamp((ts - S.tween.t0) / S.tween.dur, 0, 1), e = p * p * (3 - 2 * p);
+    for (const k of ["tx", "ty", "zoom"]) cam[k] = lerp(S.tween.a[k], S.tween.b[k], e);
+    if (p >= 1) S.tween = null;
+  }
+  const hr = currentHour(), L = lightAt(hr);
+  applySky(hr, L);
+  const [pn, pic] = phaseOf(hr), hh = Math.floor(hr), mm = Math.floor((hr - hh) * 60);
+  $("clock").textContent = `${pic} ${pn} ${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+
+  const nDyn = dynamic(t, dt);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+  gl.useProgram(prog);
+  updateVP();
+  gl.uniformMatrix4fv(U.uVP, false, VP);
+  gl.uniform1f(U.uTime, t); gl.uniform1f(U.uDrift, (S.city.MW + S.city.MD) * .8);
+  const sc = rgbOf(L.sun).map(v => v * L.si);
+  gl.uniform3fv(U.uSun, L.dir); gl.uniform3fv(U.uSunCol, sc);
+  gl.uniform3fv(U.uSky, rgbOf(L.sky)); gl.uniform3fv(U.uGnd, rgbOf(L.gnd));
+  gl.uniform3fv(U.uWin, rgbOf(mixHex(mixHex(L.bot, L.top, .4), "#ffffff", .25)));
+  gl.uniform1f(U.uNight, L.night);
+  gl.uniform3f(U.uSel, S.sel ? S.sel.b : -1, S.sel ? S.sel.f : -1, S.liftE);
+  gl.uniform2f(U.uHov, S.hover ? S.hover.b : -1, S.hover ? S.hover.f : -1);
+  gl.uniform1f(U.uLiftH, LIFT);
+  S.cloud = lerp(S.cloud ?? 1, S.selWant || cam.zoom > 24 ? 0 : 1, Math.min(1, dt * 3));
+  gl.uniform1f(U.uCloud, S.cloud);
+  gl.bindVertexArray(staticVAO); gl.drawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0, staticCount);
+  if (nDyn){ gl.bindVertexArray(dynVAO); gl.drawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0, nDyn) }
+  gl.bindVertexArray(null);
+
+  // 标签：建造完成后淡入；楼层标签放大到一定程度才显示
+  const showFloors = cam.zoom >= 15;
+  for (const [e, L2] of S.labelEls){ const [x, y] = project(L2.x, L2.y, L2.z + liftOf(L2.b, 99)); e.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`; e.classList.toggle("on", t > L2.t || L2.t < 0) }
+  for (const [e, F] of S.floorEls){ const [x, y] = project(F.x, F.y, F.z + liftOf(F.b, F.f)); e.classList.toggle("cur", !!(S.selWant && S.selWant.b === F.b && S.selWant.f === F.f)); e.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-100%,-50%)`; e.classList.toggle("on", showFloors && (t > F.t + .5 || F.t < 0)) }
+
+  // 加载进度
+  const p = clamp(t / S.city.maxT, 0, 1);
+  $("lbar").style.width = (p * 100).toFixed(1) + "%"; $("lpct").textContent = Math.round(p * 100) + "%";
+  $("ltext").textContent = p < .45 ? "正在铺设道路…" : p < .99 ? "正在建造大楼…" : "完成";
+  $("loader").classList.toggle("done", p >= 1);
+  schedule();
+}
+function schedule(){ if (!S.raf) S.raf = requestAnimationFrame(frame) }
+document.addEventListener("visibilitychange", () => { S.lastFrame = 0; schedule() });
+
+async function poll(first){
+  let d = null;
+  try { const r = await fetch("/api/state", {cache: "no-store"}); if (!r.ok) throw 0; d = await r.json(); $("brand").classList.remove("off") }
+  catch { $("brand").classList.add("off") }
+  if (d){ S.skew = d.now - Date.now(); S.data = d; $("host").textContent = d.host ? "· " + d.host : "" }
+  let groups = d ? groupsFrom(d) : [];
+  if (!groups.length) groups = DEMO;
+  const sig = JSON.stringify(groups);
+  if (first){ S.sig = sig; S.start = performance.now(); build(groups, true); S.animEnd = S.city.maxT; schedule() }
+  else if (sig !== S.sig){
+    // 数据变化：直接重建。铺设动画还没播完时保留动画（各块的出现时间是确定的，不会跳回开头）
+    S.sig = sig;
+    build(groups, (performance.now() - S.start) / 1000 < S.animEnd);
+  }
+}
+
+/* ---------------- 交互：拖动平移 / 滚轮缩放 / 双指缩放 ---------------- */
+const ptrs = new Map(); let pinch = null, dragG = null;
+canvas.addEventListener("pointerdown", e => {
+  canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (ptrs.size === 1){ dragG = ground(e.clientX, e.clientY); S.down = {x: e.clientX, y: e.clientY, moved: false} }
+  if (ptrs.size === 2){ const [a, b] = [...ptrs.values()]; pinch = {d: Math.hypot(a[0] - b[0], a[1] - b[1]), m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]}; dragG = null }
+});
+canvas.addEventListener("pointermove", e => {
+  if (!ptrs.has(e.pointerId)){ hoverAt(e.clientX, e.clientY); return }
+  ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (S.down && !S.down.moved){
+    if (ptrs.size === 1 && Math.hypot(e.clientX - S.down.x, e.clientY - S.down.y) <= 5) return;   // 小于 5px 不算拖动，留给点击
+    S.down.moved = true; canvas.classList.add("drag"); hideTip(); S.tween = null;
+  }
+  if (ptrs.size === 2 && pinch){
+    const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const g0 = ground(...pinch.m); zoomBy(d / pinch.d, m[0], m[1]); const g1 = ground(...m);
+    cam.tx += g0[0] - g1[0]; cam.ty += g0[1] - g1[1]; pinch = {d, m};
+  } else if (dragG){
+    const g = ground(e.clientX, e.clientY); cam.tx += dragG[0] - g[0]; cam.ty += dragG[1] - g[1];
+  }
+  S.autoFit = false; S.camDirty = true;
+});
+const endPtr = e => {
+  if (e.type === "pointerup" && ptrs.size === 1 && S.down && !S.down.moved) clickAt(e.clientX, e.clientY, e.pointerType === "touch");
+  if (ptrs.size <= 1) S.down = null;
+  ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; if (!ptrs.size){ dragG = null; canvas.classList.remove("drag") } else if (ptrs.size === 1){ const [p] = [...ptrs.values()]; dragG = ground(...p) } };
+canvas.addEventListener("pointerup", endPtr); canvas.addEventListener("pointercancel", endPtr);
+canvas.addEventListener("pointerleave", () => { if (!ptrs.size){ S.hover = null; hideTip(); canvas.classList.remove("pick") } });
+function zoomBy(f, sx, sy){
+  S.tween = null;
+  const g0 = ground(sx, sy); cam.zoom = clamp(cam.zoom * f, 3, 80); updateVP(); const g1 = ground(sx, sy);
+  cam.tx += g0[0] - g1[0]; cam.ty += g0[1] - g1[1]; S.autoFit = false; S.camDirty = true;
+}
+canvas.addEventListener("wheel", e => { e.preventDefault(); zoomBy(Math.exp(-e.deltaY * .0015), e.clientX, e.clientY) }, {passive: false});
+$("zin").onclick = () => zoomBy(1.25, cssW / 2, cssH / 2);
+$("zout").onclick = () => zoomBy(.8, cssW / 2, cssH / 2);
+$("zfit").onclick = () => { S.autoFit = true; fit() };
+$("replay").onclick = () => { const g = JSON.parse(S.sig); S.start = performance.now(); build(g, true); S.animEnd = S.city.maxT };
+$("timebar").addEventListener("click", e => {
+  const b = e.target.closest("button[data-h]"); if (!b) return;
+  S.hourMode = b.dataset.h;
+  for (const x of $("timebar").querySelectorAll("button")) x.classList.toggle("on", x === b);
+});
+addEventListener("resize", resize);
+addEventListener("keydown", e => { if (e.key === "Escape") closeFloor() });
+$("labels").addEventListener("click", e => {
+  const el = e.target.closest(".fl.on"); if (!el) return;
+  const bx = S.city.boxes.find(x => x.sel && x.b === +el.dataset.b && x.f === +el.dataset.f);
+  if (bx) toggleFloor(bx);
+});
+
+/* ---------------- 楼层拾取：屏幕射线 × 每层包围盒（考虑当前抬升） ---------------- */
+function pick(sx, sy){
+  if (!S.city) return null;
+  const nx = sx / cssW * 2 - 1, ny = 1 - sy / cssH * 2, hw = cssW / (2 * cam.zoom), hh = cssH / (2 * cam.zoom);
+  const base = [cam.tx, cam.ty, 0], O = [0, 1, 2].map(i => base[i] + DV[i] * 300 + RV[i] * nx * hw + UV[i] * ny * hh), Dr = DV.map(v => -v);
+  let best = null, bt = Infinity;
+  for (const bx of S.city.boxes){
+    const dz = liftOf(bx.b, bx.f), lo = [bx.x0, bx.y0, bx.z0 + dz], hi = [bx.x1, bx.y1, bx.z1 + dz];
+    let t0 = -Infinity, t1 = Infinity;
+    for (let i = 0; i < 3; i++){ const a = (lo[i] - O[i]) / Dr[i], c = (hi[i] - O[i]) / Dr[i]; t0 = Math.max(t0, Math.min(a, c)); t1 = Math.min(t1, Math.max(a, c)) }
+    if (t1 >= t0 && t0 < bt){ bt = t0; best = bx }
+  }
+  return best && best.sel ? best : null;      // 最前面挡着的是大堂/楼顶时不算选中
+}
+const tip = $("tip");
+function hideTip(){ tip.style.display = "none" }
+function showTip(bx, sx, sy){
+  const F = bx.F, ST = {working: "工作中", idle: "待命", done: "已结束", stopped: "已中止"}, SC = {working: "#2fbf71", idle: "#f2b630"};
+  const open = S.selWant && S.selWant.b === bx.b && S.selWant.f === bx.f, on = F.work.filter(Boolean).length;
+  const row = (k, v) => `<div class="row">${k}：<b>${h(v)}</b></div>`;
+  tip.innerHTML = `<h4><i style="background:${SC[F.status] || "#b6bec9"}"></i>${bx.f}F · ${h(F.title)}</h4>`
+    + row("设备", bx.label) + (F.src ? row("档位", F.src) : "") + row("主管", F.name || "—") + row("状态", ST[F.status] || F.status) + row("人数", F.vacant ? "—" : `主 agent 1 · 子 agent ${F.subs.length}（工作中 ${F.subs.filter(x => x === "working").length}）${F.subTotal > F.subs.length ? ` · 本任务累计 ${F.subTotal}` : ""}`)
+    + `<div class="hint">${open ? "再次点击收起这一层" : "点击剖开这一层"}</div>`;
+  tip.style.display = "block";
+  const r = tip.getBoundingClientRect();
+  let x = sx + 16, y = sy + 16;
+  if (x + r.width > innerWidth - 8) x = sx - r.width - 16;
+  if (y + r.height > innerHeight - 8) y = Math.max(8, sy - r.height - 16);
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function hoverAt(sx, sy){
+  const p = pick(sx, sy);
+  S.hover = p ? {b: p.b, f: p.f} : null;
+  canvas.classList.toggle("pick", !!p);
+  if (p) showTip(p, sx, sy); else hideTip();
+}
+function closeFloor(){ S.selWant = null }
+function toggleFloor(bx){
+  if (S.selWant && S.selWant.b === bx.b && S.selWant.f === bx.f){ closeFloor(); return }
+  S.selWant = {b: bx.b, f: bx.f};
+  // 镜头推近：把这一层放到画面中间略偏下（上方是抬起的楼层）
+  const zoom = cam.zoom < 20 ? 22 : cam.zoom;
+  const g = [bx.cx - DV[0] * bx.cz / DV[2], bx.cy - DV[1] * bx.cz / DV[2]];
+  const v = [UV[0] - DV[0] * UV[2] / DV[2], UV[1] - DV[1] * UV[2] / DV[2]], k = .12 * cssH / zoom;
+  S.tween = {a: {...cam}, b: {tx: g[0] + v[0] * k, ty: g[1] + v[1] * k, zoom}, t0: performance.now(), dur: 650};
+  S.autoFit = false;
+}
+function clickAt(sx, sy, touch){
+  const p = pick(sx, sy);
+  if (p){ toggleFloor(p); showTip(p, sx, sy) } else { closeFloor(); hideTip() }
+}
+
+resize();
+poll(true);
+setInterval(() => poll(false), 3000);
+</script>
+</body>
+</html>

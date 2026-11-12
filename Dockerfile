@@ -1,7 +1,7 @@
 FROM python:3.13-alpine
 
 WORKDIR /app
-COPY server.py index.html ./
+COPY server.py index.html classic.html office.html city.html ./
 COPY avatars ./avatars
 
 ENV PYTHONUNBUFFERED=1 \

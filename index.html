@@ -1,29 +1,44 @@
 <!doctype html>
-<html lang="zh-CN" style="background:#0c0d10;color-scheme:dark">
+<html lang="zh-CN" data-theme="night">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0c0d10">
 <title>Agent Deck · 值班台</title>
+<script>
+/* 首屏前先定主题，避免闪烁：手动档直接用；自动档先按浏览器时间猜，拿到服务器时间后再校正 */
+(function(){var m="auto";try{m=localStorage.getItem("deck.theme")||"auto"}catch(e){}
+var h=new Date().getHours(),t=m==="light"?"light":m==="night"?"night":(h>=6&&h<18?"light":"night");
+document.documentElement.setAttribute("data-theme",t)})();
+</script>
 <style>
+/* ============ 主题：夜晚（默认）/ 白天，两套色板共用同一组变量 ============ */
 :root{color-scheme:dark;
   --bg:#0c0d10; --panel:#131418; --panel2:#17181d; --line:#22242b; --line2:#2c2f37;
   --text:#ebe7df; --dim:#8b877f; --faint:#5b5852;
   --work:#ff9a3c; --idle:#e8c46a; --done:#6fcf8a; --stop:#8c93a3; --fail:#ff6b6b;
   --app:#e08a5f; --cli:#b8b3a8; --ds:#5b9dff; --qwen:#a884ff;
+  --accent:#ffd166; --av:#1d1f25;
   --mono:"JetBrains Mono","SF Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
 }
+:root[data-theme=light]{color-scheme:light;
+  --bg:#f2efe8; --panel:#ffffff; --panel2:#faf8f3; --line:#e6e1d6; --line2:#d5cfc2;
+  --text:#24221e; --dim:#6b665d; --faint:#9d978b;
+  --work:#dd6c0b; --idle:#a47d06; --done:#23935a; --stop:#6c7484; --fail:#d63c3c;
+  --app:#c4612f; --cli:#79736a; --ds:#2b74de; --qwen:#7650dc;
+  --accent:#f0a800; --av:#efece6;
+}
+/* ============ 原泳道看板样式（颜色全部走主题变量） ============ */
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;-webkit-font-smoothing:antialiased}
-body{padding:18px 22px 14px;min-height:100vh}
+.viewlink{font-size:11px;letter-spacing:.16em;color:var(--dim);text-decoration:none;border:1px solid currentColor;border-radius:4px;padding:2px 6px;vertical-align:middle;margin-left:8px;font-weight:400}
+.viewlink:hover{color:var(--text)}
 .eyebrow{font-size:11px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
 .dim{color:var(--dim)} .faint{color:var(--faint)}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
 
 /* header */
-header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+#top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
 h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-spacing:-.01em}
 .clockbox{display:flex;align-items:flex-end;gap:18px}
 .livebadge{display:flex;align-items:center;gap:7px;color:var(--work);font-size:11px;letter-spacing:.16em;justify-content:flex-end}
@@ -105,7 +120,7 @@ h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-
 .child::before{content:"";position:absolute;left:30px;top:0;height:50%;width:18px;border-left:2px solid color-mix(in srgb,var(--sc) 60%,transparent);border-bottom:2px solid color-mix(in srgb,var(--sc) 60%,transparent);border-bottom-left-radius:8px}
 .child.mid::after{content:"";position:absolute;left:30px;top:50%;bottom:0;border-left:2px solid color-mix(in srgb,var(--sc) 60%,transparent)}
 .child .av{margin-left:40px}
-.av{width:34px;height:34px;border-radius:8px;flex:none;border:1.5px solid var(--line2);background:#1d1f25;position:relative}
+.av{width:34px;height:34px;border-radius:8px;flex:none;border:1.5px solid var(--line2);background:var(--av);position:relative}
 .av img{width:100%;height:100%;display:block;border-radius:6px;object-fit:cover}
 .avi{display:block;width:100%;height:100%;overflow:hidden;border-radius:6px}
 .avi img{transform:scale(1.15);transform-origin:50% 50%}   /* 头像框不变，内部画面放大 15% */
@@ -169,15 +184,158 @@ footer{margin-top:14px;font-size:11px;color:var(--faint);display:flex;justify-co
 
 @media (max-width:860px){.lanes{--L:minmax(0,58%);--R:74px}.stat .sub{display:none}.stat .col .bar{display:block}}
 @media (max-width:720px){.grid{grid-template-columns:1fr}.logl{max-height:420px}}
-@media (max-width:560px){body{padding:14px 16px}.stats{grid-template-columns:repeat(2,1fr);row-gap:12px}.stat:nth-child(3){border-left:0;padding-left:0}.lanes{--L:minmax(0,1fr);--R:64px}.lhead .ax,.tl{display:none}.lhead,.row{grid-template-columns:minmax(0,1fr) var(--R)}h1{font-size:24px}.clock{font-size:28px}}
+@media (max-width:560px){.stats{grid-template-columns:repeat(2,1fr);row-gap:12px}.stat:nth-child(3){border-left:0;padding-left:0}.lanes{--L:minmax(0,1fr);--R:64px}.lhead .ax,.tl{display:none}.lhead,.row{grid-template-columns:minmax(0,1fr) var(--R)}h1{font-size:24px}.clock{font-size:28px}}
+
+
+/* ============ 页面骨架：顶部 / 任务栏 / 常规栏 + 排班 / 办公室 | 日志 ============ */
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;-webkit-font-smoothing:antialiased}
+body{height:100vh;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-rows:auto auto auto auto minmax(0,1fr);gap:10px 12px;padding:12px 14px;overflow:hidden;transition:background-color .5s,color .5s}
+#top{grid-area:1/1/2/3;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:end;gap:26px}
+.ticker{grid-area:2/1/3/3;margin:0}
+#map{grid-area:3/1/4/3}
+#toolbar{grid-area:4/1/5/2}
+#office{grid-area:5/1/6/2}
+#logp{grid-area:4/2/6/3}
+#top h1{font-size:24px;margin-top:4px}
+#top .clock{font-size:32px}
+#top .stats{margin:0}
+
+/* 任务栏：一台设备一行，左边机器名，右边是这台机器上的任务标签（多了横向滚动） */
+.map{padding:2px 0;min-width:0}
+/* 整块是一个两列网格（行用 display:contents），各行的机器名列宽一致 */
+.mapbody{display:grid;grid-template-columns:max-content minmax(0,1fr)}
+.drow{display:contents}
+.drow+.drow>*{border-top:1px solid var(--line)}
+.dname{display:flex;align-items:center;gap:7px;padding:0 14px;min-height:38px;max-width:280px;min-width:0;white-space:nowrap;border-right:1px solid var(--line)}
+.dname i{flex:none;width:8px;height:8px;border-radius:2px}
+.dname b{font:600 12.5px var(--sans);overflow:hidden;text-overflow:ellipsis}
+.dname small{flex:none;font-size:11px;color:var(--dim)}
+.dname small em{font-style:normal;color:var(--work);font-weight:700}
+.dtabs{display:flex;align-items:center;gap:4px;overflow-x:auto;padding:4px 8px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent)}
+.dtabs::-webkit-scrollbar{display:none}
+.tab{flex:none;display:flex;align-items:center;gap:7px;max-width:270px;padding:4px 10px;border-radius:7px;border:1px solid transparent;white-space:nowrap;color:var(--text)}
+.tab:hover{background:var(--panel2);border-color:var(--line)}
+.tab.sel{background:color-mix(in srgb,var(--accent) 16%,var(--panel));border-color:color-mix(in srgb,var(--accent) 60%,transparent)}
+.tab i{flex:none;width:7px;height:7px;border-radius:50%}
+.tab.working i{box-shadow:0 0 0 3px color-mix(in srgb,var(--work) 22%,transparent)}
+.tab .tt{overflow:hidden;text-overflow:ellipsis;font:600 12.5px var(--sans)}
+.tab .tm{flex:none;font-size:11px;color:var(--dim)}
+.tab .tm em{font-style:normal;color:var(--work);font-weight:700}
+.tab.off{color:var(--dim)}
+.tab.off .tt{font-weight:400}
+.dempty{font-size:11.5px;color:var(--faint);padding:0 4px}
+
+/* 常规栏：主题 / 版式；右侧是排班（泳道图）开关 */
+.toolbar{display:flex;align-items:center;gap:10px;min-width:0}
+.tb-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;overflow-x:auto;scrollbar-width:none;padding:1px}
+.tb-main::-webkit-scrollbar{display:none}
+.tb-main .seg{flex:none;background:var(--panel)}
+.seg.theme button{padding:5px 10px;font-size:12px}
+.laysel{flex:none;display:flex;align-items:center;gap:4px;padding:1px 4px 1px 10px;border:1px solid var(--line2);border-radius:7px;background:var(--panel);font-size:11px;color:var(--dim)}
+.laysel select{background:transparent;color:var(--text);border:0;font:inherit;font-size:12px;padding:4px 2px;cursor:pointer;outline:none}
+.laysel select option{color:#1e2740;background:#fff}
+.tb-lanes{flex:none;display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--line2);border-radius:9px;background:var(--panel);font:700 12.5px var(--sans);color:var(--text)}
+.tb-lanes small{font:400 11px var(--mono);color:var(--dim)}
+.tb-lanes:hover{border-color:var(--dim)}
+.tb-lanes.on{background:color-mix(in srgb,var(--accent) 20%,var(--panel));border-color:color-mix(in srgb,var(--accent) 65%,transparent)}
+.tb-lanes .ar{display:inline-block;transition:transform .25s}
+.tb-lanes.on .ar{transform:rotate(180deg)}
+
+/* 排班抽屉：从办公室右侧推出，内容就是原来的泳道图 */
+.drawer{position:absolute;top:0;right:0;bottom:0;width:min(760px,94%);z-index:6;display:flex;flex-direction:column;border-radius:14px 0 0 14px;border-right:0;box-shadow:-14px 0 34px #0006;transform:translateX(104%);visibility:hidden;transition:transform .32s cubic-bezier(.2,.8,.2,1),visibility 0s .32s}
+.drawer.open{transform:none;visibility:visible;transition:transform .32s cubic-bezier(.2,.8,.2,1),visibility 0s}
+.drawer .lanesbody{flex:1;min-height:0;overflow:auto}
+.drawer .ph .x{font-size:14px;color:var(--dim);padding:2px 6px;border-radius:6px}
+.drawer .ph .x:hover{color:var(--text);background:var(--line)}
+.row.lead[data-lead]{cursor:pointer}
+.blk.sel{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 70%,transparent)}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,35%{background:color-mix(in srgb,var(--accent) 32%,transparent)}}
+
+/* 日志列 */
+.log{display:flex;flex-direction:column;min-height:0;min-width:0}
+.log .logl{flex:1;min-height:0;max-height:none}
+.log footer{margin:0;padding:8px 12px;border-top:1px solid var(--line);gap:10px}
+.log footer span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev.cur{box-shadow:inset 2px 0 0 var(--accent)}
+
+/* ============ 办公室（WebGL 体素场景） ============ */
+.office{position:relative;overflow:hidden;border-radius:14px;border:1px solid var(--line);min-height:280px;isolation:isolate;background:#74c0ff}
+body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
+#sky{position:absolute;inset:0;z-index:0;pointer-events:none}
+#stars{position:absolute;inset:0 0 35% 0;z-index:0;pointer-events:none;opacity:0}
+#stars i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;animation:tw 3s ease-in-out infinite}
+@keyframes tw{50%{opacity:.25}}
+.celes{position:absolute;z-index:0;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;pointer-events:none}
+#sun{background:radial-gradient(circle,#fffbe6 0 45%,#ffe58a 46% 60%,#ffd34d00 72%);filter:drop-shadow(0 0 22px #ffe28a)}
+/* 月牙：透明圆 + 偏移的同尺寸外阴影；外阴影不画在元素自身下面，剩下的就是一弯月牙 */
+#moon{width:40px;height:40px;margin:-20px 0 0 -20px;background:transparent;box-shadow:11px -7px 0 0 #f6f1d2;filter:drop-shadow(0 0 9px #fff3c4aa)}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;z-index:1}
+#gl.drag{cursor:grabbing} #gl.pick{cursor:pointer}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.hud{background:#1e2740eb;color:#eef2ff;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:2px solid #34405f;border-radius:10px;box-shadow:0 3px 0 #0f1526,0 6px 16px #0f152640;font-family:var(--sans)}
+.ohud{position:absolute;left:10px;right:10px;top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;z-index:4;pointer-events:none}
+.ohud>*{pointer-events:auto}
+.otitle{display:flex;align-items:center;gap:8px;padding:4px 6px 4px 10px;font-size:12px;max-width:100%;min-width:0}
+.otitle i{flex:none;width:8px;height:8px;border-radius:50%}
+.otitle b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;min-width:3em;flex:0 1 auto}
+.otitle span{color:#aab4cc;white-space:nowrap}
+.otitle em{font-style:normal;color:#7dffb0;font-weight:700}
+.otitle button{border:0;background:#2a3655;color:#eef2ff;border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:10px;flex:none}
+.otitle button:hover{background:#3a4870}
+.otitle button:first-child{margin-left:-4px}
+.time{display:flex;align-items:center;gap:4px;padding:4px 5px 4px 11px;font-size:12px}
+.time b{font-size:13px;margin-right:6px;min-width:92px}
+.time button{border:0;background:transparent;font:inherit;font-size:12px;padding:4px 8px;border-radius:6px;cursor:pointer;color:#aab4cc}
+.time button:hover{color:#fff}
+.time button.on{background:#ffd166;color:#1e2740;font-weight:700}
+.ol{position:absolute;left:0;top:0;display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:10px;background:#fff;color:#2b2f3a;font:700 12px var(--sans);white-space:nowrap;box-shadow:0 4px 12px #1a2a4a30;opacity:0;transition:opacity .5s}
+.ol i{width:8px;height:8px;border-radius:50%}
+.zl{position:absolute;left:0;top:0;display:flex;align-items:center;gap:5px;padding:2px 8px;border-radius:8px;background:#ffffffeb;color:#2b2f3a;font:11px var(--sans);white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 8px #1a2a4a26;opacity:0;transition:opacity .4s}
+.zl b{font-weight:700;overflow:hidden;text-overflow:ellipsis}
+.zl i{flex:none;width:7px;height:7px;border-radius:50%}
+.zl small{flex:none;color:#6b7280}
+.zl em{flex:none;font-style:normal;color:#2f9e6f;font-weight:700}
+.zl.mini{max-width:130px;padding:1px 7px;font-size:10.5px}
+.zl.mini small,.zl.mini em{display:none}
+.ol.vis,.zl.vis{opacity:1}
+.zl.vis{pointer-events:auto;cursor:pointer}
+#tip{position:fixed;z-index:60;max-width:320px;padding:9px 12px;border-radius:12px;background:#fffffff5;color:#2b2f3a;border:1px solid #e6e0d4;box-shadow:0 10px 30px #1a2a4a33;font:12px/1.4 var(--sans);pointer-events:none;display:none}
+#tip h4{margin:0 0 4px;font-size:13px;display:flex;gap:6px;align-items:center}
+#tip h4 i{width:8px;height:8px;border-radius:50%}
+#tip h4 small{font-weight:500;color:#6b7280}
+#tip .tr{color:#6b7280} #tip .tr b{color:#2b2f3a;font-weight:500}
+#tip .r{margin-top:6px;padding-top:6px;border-top:1px dashed #e6e0d4;white-space:pre-wrap;word-break:break-word}
+#loader{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:10px;padding:8px 14px;font-size:12px;transition:opacity .6s}
+#loader .bar{width:180px;height:8px;border-radius:2px;background:#0f1526;overflow:hidden;border:1px solid #34405f}
+#loader .bar b{display:block;height:100%;width:0;background:linear-gradient(90deg,#5b9dff,#4fbf7a)}
+#loader.done{opacity:0;pointer-events:none}
+#hint{position:absolute;left:12px;bottom:12px;z-index:4;padding:6px 11px;font-size:12px;color:#aab4cc}
+.ctl{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;z-index:4}
+.ctl button{width:36px;height:36px;border-radius:9px;border:2px solid #34405f;background:#1e2740eb;box-shadow:0 3px 0 #0f1526;font:15px var(--sans);cursor:pointer;color:#eef2ff;padding:0}
+.ctl button:hover{background:#2a3655}
+.ctl button:active{transform:translateY(2px);box-shadow:none}
+#nogl,.oempty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:12px 18px;display:none;z-index:3;text-align:center;font-size:13px}
+
+/* ============ 窄屏 / 矮屏：改为单列，整页滚动 ============ */
+@media (max-width:1180px){body{grid-template-columns:minmax(0,1fr) 290px}#top{gap:16px}}
+@media (max-width:900px),(max-height:620px){
+  body{height:auto;min-height:100vh;overflow:auto;display:flex;flex-direction:column}
+  #office{height:72vh;min-height:380px;flex:none}
+  #logp{height:60vh;flex:none}
+  #top{grid-template-columns:minmax(0,1fr) auto}
+  #top .stats{grid-column:1/-1;grid-row:2}
+}
+@media (max-width:560px){body{padding:10px}.dname{max-width:120px;padding:0 10px}.dname small{display:none}#top{grid-template-columns:minmax(0,1fr);gap:10px}#top .stats{grid-row:auto}#top .clockbox{justify-content:space-between}.otitle b{max-width:170px}.otitle .who{display:none}.time b{min-width:0}#hint{display:none}.drawer{width:100%;border-radius:0}}
 </style>
 </head>
 <body>
-<header>
+<header id="top">
   <div>
     <div class="eyebrow" id="eyebrow">AGENT DECK · 值班台</div>
-    <h1>谁在值班</h1>
+    <h1>谁在值班 <a class="viewlink" href="/classic" title="原版泳道看板">CLASSIC →</a></h1>
   </div>
+  <section class="stats" id="stats"></section>
   <div class="clockbox">
     <div>
       <div class="livebadge" id="live"><i></i><span>LIVE</span></div>
@@ -189,28 +347,1330 @@ footer{margin-top:14px;font-size:11px;color:var(--faint);display:flex;justify-co
 
 <div class="ticker"><div class="lab">◀ FEED</div><div class="track"><div class="run" id="ticker"></div></div></div>
 
-<section class="stats" id="stats"></section>
-<section class="sources" id="sources"></section>
+<section class="panel map" id="map" aria-label="任务（一台设备一行）">
+  <div class="mapbody" id="mapbody"></div>
+</section>
 
-<div class="grid">
-  <section class="panel lanes">
+<nav class="toolbar" id="toolbar" aria-label="常规">
+  <div class="tb-main">
+    <div class="seg theme" id="theme" title="页面主题：自动按服务器时间切换"><button data-theme="auto">◐ 自动</button><button data-theme="light">☀ 白天</button><button data-theme="night">☾ 夜晚</button></div>
+    <label class="laysel" title="办公室布局版式">版式<select id="lay"></select></label>
+  </div>
+  <button class="tb-lanes" id="lanesBtn" aria-controls="drawer" aria-expanded="false">排班 · 泳道图 <small id="lanesn"></small><span class="ar">◂</span></button>
+</nav>
+
+<main class="office" id="office">
+  <div id="sky"></div>
+  <div id="stars"></div>
+  <div class="celes" id="sun"></div>
+  <div class="celes" id="moon"></div>
+  <canvas id="gl"></canvas>
+  <div id="labels"></div>
+  <div class="ohud">
+    <div class="hud otitle" id="otitle"></div>
+    <div class="hud time" id="timebar"><b id="sceneclock">—</b>
+      <button data-h="auto" class="on" title="跟随页面主题">跟随</button><button data-h="8">早上</button><button data-h="13">中午</button><button data-h="17.9">黄昏</button><button data-h="21.5">夜晚</button>
+    </div>
+  </div>
+  <div class="hud" id="loader"><span id="ltext">正在铺设办公区…</span><div class="bar"><b id="lbar"></b></div><span id="lpct">0%</span></div>
+  <div class="hud" id="hint">悬停小人看详情 · 拖动平移 · 滚轮缩放 · ←/→ 切换任务</div>
+  <div class="ctl">
+    <button id="replay" title="重新铺设">↻</button>
+    <button id="zin" title="放大">＋</button>
+    <button id="zout" title="缩小">－</button>
+    <button id="zfit" title="适配全部">⤢</button>
+    <button id="zfull" title="全屏办公室">⛶</button>
+  </div>
+  <div class="hud" id="nogl">当前浏览器不支持 WebGL2，无法显示体素办公室。</div>
+  <div class="hud oempty" id="oempty">暂无任务 · 办公室空着</div>
+  <aside class="drawer panel lanes" id="drawer" aria-label="排班">
     <div class="ph">
-      <h2>泳道</h2><span class="note">进行中优先 · 用时 = 最后活动 − 开始</span>
+      <h2>排班</h2><span class="note">泳道图 · 进行中优先 · 用时 = 最后活动 − 开始 · 点主 agent 切换办公室</span>
       <span class="sp"></span>
       <div class="seg" id="win"></div>
+      <button class="x" id="drawerX" title="收起（Esc）">✕</button>
     </div>
     <div class="chips" id="jobs"></div>
     <div class="lhead"><span>AGENT · JOB · TASK</span><div class="ax" id="axis"></div><span class="w">用时</span></div>
     <div class="lanesbody" id="lanes"></div>
-  </section>
-  <aside class="panel log">
-    <div class="ph"><h2>日志</h2><span class="note" id="logn"></span></div>
-    <div class="logl" id="log"></div>
   </aside>
-</div>
-<footer><span id="foot">本机各档位 Agent 会话 · 只读扫描</span><span id="upd"></span></footer>
+</main>
+
+<aside class="panel log" id="logp">
+  <div class="ph"><h2>日志</h2><span class="note" id="logn"></span></div>
+  <div class="logl" id="log"></div>
+  <footer><span id="foot">本机各档位 Agent 会话 · 只读扫描</span><span id="upd"></span></footer>
+</aside>
+
+<div id="tip"></div>
 
 <script>
+"use strict";
+/* ============================================================
+   Agent Office Voxel —— 平铺开放办公区（手写 WebGL2 实例化体素，零依赖，全部程序化生成）
+   一个任务（主会话）= 一间办公室：主管坐课长席，子 agent 在岛上对坐（超过 12 人再开第 2、3 个岛）；
+   页面上方的任务栏（一台设备一行）负责切换办公室。
+   单位：1 = 大体素（一格地板）；微体素 M = 1/8。
+   每个体素 13 个 float：位置(最小角) 尺寸 颜色 出现时间 t0 自发光 em 模式 mode 高亮 hl
+   mode：0 普通（em>0 时夜里透出暖色室内光） 1 自身颜色发光（灯、状态牌） 2 窗玻璃（映出天空）
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const h = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const SRC_HEX = {app:"#e08a5f", cli:"#8f8a80", ds:"#5b9dff", qwen:"#a884ff"};
+const srcHex = id => SRC_HEX[String(id || "").split("@")[0]] || "#5b9dff";
+const DEV_HEX = ["#5b9dff", "#e08a5f", "#4fbf7a", "#a884ff", "#ff7aa8", "#3cc3b8", "#f0a35e", "#7aa2ff"];
+const JOB_HEX = ["#ff9a3c", "#5b9dff", "#4fbf7a", "#a884ff", "#e8b84a", "#3cc3b8", "#ff7aa8", "#8cc152", "#f08a4b", "#7aa2ff"];
+function hashStr(s){ let x = 2166136261; for (const ch of String(s)) x = Math.imul(x ^ ch.charCodeAt(0), 16777619); return x >>> 0 }
+function hash3(a, b, c){ let x = Math.imul(a | 0, 374761393) ^ Math.imul(b | 0, 668265263) ^ Math.imul(c | 0, 1274126177); x = Math.imul(x ^ (x >>> 13), 1103515245); return (x ^ (x >>> 16)) >>> 0 }
+function rng32(seed){ let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296 } }
+const RGBC = new Map();
+function rgbOf(hx){ let c = RGBC.get(hx); if (!c){ c = [1, 3, 5].map(i => parseInt(hx.slice(i, i + 2), 16) / 255); RGBC.set(hx, c) } return c }
+const toHex = c => "#" + c.map(v => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, "0")).join("");
+const tint = (hx, t) => toHex(rgbOf(hx).map(v => v + (1 - v) * t));
+const shade = (hx, f) => toHex(rgbOf(hx).map(v => v * f));
+const mixHex = (a, b, t) => { const x = rgbOf(a), y = rgbOf(b); return toHex(x.map((v, i) => lerp(v, y[i], t))) };
+const toolName = t => (String(t).replace(/^mcp(?=_)/i, "").replace(/_+/g, " ").trim() || String(t)).toUpperCase();
+function dur(ms){ const s = Math.max(0, Math.round(ms / 1000)); if (s < 60) return s + "s"; const m = Math.round(s / 60); if (m < 60) return m + "m"; return Math.floor(m / 60) + "h " + (m % 60) + "m" }
+
+/* ---------------- 体素写入 ---------------- */
+const STRIDE = 13;
+let OUT = [], RND = Math.random, EM = 0, HL = 0;
+function add(x, y, z, sx, sy, sz, hx, t0, e = EM, m = 0, j = 0){
+  const c = rgbOf(hx), f = j ? 1 + (RND() * 2 - 1) * j : 1;
+  OUT.push(x, y, z, sx, sy, sz, c[0] * f, c[1] * f, c[2] * f, t0, e, m, HL);
+}
+
+/* ---------------- 调色板 ---------------- */
+const C = {
+  marble: "#f4f0e8", marble2: "#e9e3d8", aisle: "#efeae1", aisle2: "#e5dfd3",
+  wall: "#f7f3ec", wallTop: "#ffffff", frame: "#5b6573", glass: "#b9e3f7", metal: "#9aa3ad", steel: "#c9d1da",
+  wood: "#c58b55", wood2: "#a8733f", deskTop: "#f8f6f1", deskLeg: "#9aa3ad", leather: "#3a3f4b",
+  leaf: "#5fbf62", leaf2: "#80d87e", pot: "#e58f65", white: "#ffffff", dark: "#2b2f3a",
+  screenOn: "#6fe3ff", lamp: "#fff1b8", gold: "#ffcf3f", tie: "#e5484d", suit: "#2f3b59",
+  chairs: ["#5b9dff", "#ff9a3c", "#4fbf7a", "#a884ff", "#ff7aa8", "#3cc3b8"],
+  books: ["#e5484d", "#5b9dff", "#ffd166", "#4fbf7a", "#a884ff", "#ff9a3c", "#3b4252"],
+  skin: ["#ffe0bd", "#f7cfa4", "#e8b48a", "#c98d5f"],
+  hair: ["#2b2f3a", "#5a3825", "#8b4a2b", "#e8c07a", "#d9534f", "#8e7cc3", "#3b5998", "#f2f2f2"],
+  pants: ["#3b4252", "#4a5568", "#2c3e50", "#5b4636", "#33415c"],
+  accent: ["#ff6b6b", "#ffd166", "#4fd17a", "#7cc7ff", "#ff9ad5"],
+  cans: ["#e5484d", "#5b9dff", "#ffd166", "#4fbf7a", "#ff9f43", "#a884ff", "#3cc3b8", "#ffffff", "#2b2f3a"]
+};
+const ST_COL = {working: "#2fbf71", finished: "#5b9dff", failed: "#ff5a5a", stopped: "#9aa3ad", idle: "#8b7fd6", done: "#b6bec9"};
+const ST_ZH = {working: "工作中", finished: "已完成", failed: "失败", stopped: "已中止", idle: "待命", done: "已结束"};
+
+/* ---------------- 楼层布局（按真实写字楼层：侧边核心筒 + 大开间） ----------------
+   左侧核心筒 x∈[0,5)：茶水间 / 男女卫生间 / 电梯厅（门禁入口）/ 楼梯间 / 机房；其右 [5,6.6) 是核心筒前通道。
+   右侧大开间铺统一的拼块地毯：每个任务是一个"岛"（对向工位），沿进深方向排开，岛与岛之间是通道；
+   楼层中间一条主通道；人多时上下两排岛，课长席都在靠窗一端、背对窗户。主通道另一侧放玻璃会议室、休息区、复印角。 */
+const M = 1 / 8;
+const CORE = 5, TX0 = 7, TW = 4, MAIN = 2;                    // 核心筒宽、首个岛的 x、每个岛占宽、主通道宽
+const WALLH = 2.3, CWH = 1.2, LOWH = .45, MAXP = 6;           // 外墙高、核心筒内墙高、剖切外墙高、每岛最多 6 对桌
+const bandDepth = p => 2.3 + 1.2 * Math.max(2, p) + .8;
+/* 版式预设：骨架（核心筒 / 主通道 / 岛位 / 会议室休息区）共用，工位形式、主管席、名牌、材质和第三类设施不同 */
+const LAYOUTS = {
+  jp:     {name: "日式岛型",   carpet: ["#c6ced8", "#bec7d2"], aisle: ["#d6dce4", "#cfd6de"], wall: "#f7f3ec", brick: false, frame: "#5b6573", pillar: "#ebe7e0", desk: "jp",     boss: "jp",     sign: "hang",  third: "copy",  sofa: "#5fa8a0"},
+  loft:   {name: "Loft 长桌",  planks: ["#c9955f", "#bd8a55", "#d29f68"], aisle: ["#b9b4ad", "#b1aca5"], wall: "#f2ede6", brick: true, frame: "#2b2f3a", pillar: "#3b3f46", desk: "bench", boss: "loft", sign: "neon", third: "bar", sofa: "#8b5a3c"},
+  cube:   {name: "美式格子间", carpet: ["#a3adbb", "#9ba6b4"], aisle: ["#c8ced6", "#c1c8d1"], wall: "#eef0f3", brick: false, frame: "#5b6573", pillar: "#e3e6ea", desk: "cube",   boss: "glass",  sign: "plate", third: "copy",  sofa: "#5b7fa6"},
+  nordic: {name: "北欧明亮",   planks: ["#ead6b4", "#e2cca6", "#efdcbc"], aisle: ["#efeeea", "#e8e6e1"], wall: "#ffffff", brick: false, frame: "#c9ced6", pillar: "#f4f2ee", desk: "nordic", boss: "nordic", sign: "wood", third: "booth", sofa: "#b8c4cc"}
+};
+let LY = LAYOUTS.jp;
+const subSeat = s => { const k = Math.floor(s / 2), b = s % 2; return {x: b ? 2.7 : .7, y: 2.85 + 1.2 * k, dir: b ? 2 : 0, k, b} };   // 以岛（顶排朝向）左上角为原点
+const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+/* 以座位为原点、朝向 dir 的局部坐标绘制：u 向前（朝桌子）、v 向左右 */
+function OB(cx, cy, dir, t){
+  const f = DIRS[dir], s = [-f[1], f[0]];
+  return (u0, u1, v0, v1, z, h, col, e = EM, m = 0, tt = t) => {
+    const xs = [cx + f[0] * u0 + s[0] * v0, cx + f[0] * u1 + s[0] * v1], ys = [cy + f[1] * u0 + s[1] * v0, cy + f[1] * u1 + s[1] * v1];
+    const x0 = Math.min(...xs), y0 = Math.min(...ys);
+    add(x0, y0, z, Math.max(...xs) - x0, Math.max(...ys) - y0, h, col, tt, e, m);
+  };
+}
+
+/* ============================================================
+   静态场景
+   ============================================================ */
+function buildWorld(offices, opt){
+  OUT = []; EM = 0; HL = 0; LY = LAYOUTS[S.layout] || LAYOUTS.jp;
+  const W0 = {labels: [], zoneLabels: [], seats: new Map(), doors: [], maxT: 0, MW: 0, MD: 0, entry: [], spots: [], spotMap: new Map()};
+  let X0 = 0;
+  offices.forEach((off, oi) => { const r = buildOffice(off, oi, X0, opt, W0); X0 += r.W + 5; W0.MD = Math.max(W0.MD, r.D) });
+  W0.MW = Math.max(1, X0 - 5);
+  for (const sp of W0.spots) for (const k in sp) for (const x of sp[k]) W0.spotMap.set(x.id, x);
+  W0.data = new Float32Array(OUT); W0.count = OUT.length / STRIDE; W0.maxT += .8;
+  return W0;
+}
+
+function buildOffice(off, oi, X0, opt, W0){
+  const zones = off.zones, n = zones.length;
+  const nt = n > 5 ? Math.ceil(n / 2) : n, nb = n - nt;                     // 上排 / 下排岛数
+  const top = zones.slice(0, nt), bot = zones.slice(nt);
+  const topP = Math.max(2, ...top.map(z => z.pairs)), BD1 = bandDepth(topP), BD2 = nb ? bandDepth(Math.max(2, ...bot.map(z => z.pairs))) : 6.5;
+  const D = Math.ceil(Math.max(15.5, BD1 + MAIN + BD2)), mainY = BD1 + MAIN / 2, ty2 = BD1 + MAIN;
+  const corr = X0 + CORE + .8, HUB = [corr, mainY];                          // 所有路线都经过这个枢纽
+  const W = Math.ceil(Math.max(TX0 + (nt + 1) * TW, TX0 + nb * TW + 13, 20) + 1);          // 上排末尾多留一个共享工位岛
+  // 核心筒分段（y）
+  const PAN = 3.6, WC1 = PAN + 1.0, WC2 = WC1 + 1.0, EVE = WC2 + 4.4, STE = EVE + 1.5, SVE = D;
+  const e1 = WC2 + 1.2, e2 = WC2 + 3.1, entY = e1 + .1;                      // 两部电梯；门禁入口与电梯 1 对齐
+  const dedupe = path => path.filter((q, i) => i === 0 || Math.hypot(q[0] - path[i - 1][0], q[1] - path[i - 1][1]) > 1e-3);
+  W0.entry[oi] = dedupe([[X0 + .2, e1], [X0 + 3.4, e1], [X0 + 3.4, entY], [corr, entY], HUB]);
+  W0.spots[oi] = {meet: [], lounge: [], srv: []};
+  const spot = (kind, p, dir, pose, appr, t) => { const L = W0.spots[oi][kind]; L.push({id: `${oi}:${kind}:${L.length}`, kind, p, dir, pose, approach: dedupe([HUB, ...appr, p]), t, oi}) };
+  const coreAt = y => y < PAN ? "pan" : y < WC2 ? "wc" : y < EVE ? "ev" : y < STE ? "st" : "srv";
+  const teams = [...top.map((z, i) => ({z, x: TX0 + i * TW, band: 0})), ...bot.map((z, i) => ({z, x: TX0 + i * TW, band: 1}))];
+  for (const T of teams){ T.y0 = T.band ? ty2 : 0; T.bd = T.band ? D - ty2 : BD1 }
+  // 岛内纵向坐标 → 世界 y（下排镜像：课长在靠前窗一端）
+  const Yp = (T, yl) => T.band ? D - yl : yl;
+  const Yr = (T, a, b) => T.band ? [D - b, D - a] : [a, b];
+
+  // ---- 铺设顺序：从电梯门口出发，主通道和核心筒前通道代价低
+  const N = W * D, dist = new Float64Array(N).fill(1e9), heap = [];
+  const cost = (i, j) => { const x = i + .5, y = j + .5; if (x < CORE) return coreAt(y) === "ev" ? 1 : 2; if (x < TX0 - .4 || (y > BD1 && y < BD1 + MAIN)) return 1; return 2.2 };
+  const hpush = (d, k) => { heap.push([d, k]); let i = heap.length - 1; while (i > 0){ const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p } };
+  const hpop = () => { const top = heap[0], last = heap.pop(); if (heap.length){ heap[0] = last; let i = 0; for (;;){ const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m } } return top };
+  const o = Math.floor(e1) * W; dist[o] = 0; hpush(0, o);
+  while (heap.length){
+    const [d, k] = hpop(); if (d > dist[k]) continue;
+    const i = k % W, j = (k - i) / W;
+    for (const [di, dj] of DIRS){ const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= W || b >= D) continue; const q = b * W + a, nd = d + cost(a, b); if (nd < dist[q]){ dist[q] = nd; hpush(nd, q) } }
+  }
+  const anim = !!opt.animate;
+  const T0 = (x, y, d = 0) => { if (!anim) return -1; const i = clamp(Math.floor(x - X0), 0, W - 1), j = clamp(Math.floor(y), 0, D - 1); return oi * .5 + .3 + dist[j * W + i] * .03 + d };
+  RND = rng32(hashStr(off.id));
+  const hx = off.hex;
+
+  // ---- 楼下楼体
+  EM = 0;
+  add(X0 - .25, -.25, -2.6, W + .25, D + .25, 2.3, "#d7dce2", -1);
+  add(X0 + W, -.25, -.55, .04, D + .29, .25, hx, -1); add(X0 - .25, D, -.55, W + .29, .04, .25, hx, -1);
+  for (let j = 0; j < D; j++) add(X0 + W, j + .1, -1.6, .03, .8, .7, C.glass, -1, RND() < .45 ? .8 : 0, 2);
+  for (let i = 0; i < W; i++) add(X0 + i + .1, D, -1.6, .8, .03, .7, C.glass, -1, RND() < .45 ? .8 : 0, 2);
+
+  // ---- 地板：大开间统一拼块地毯（主通道略浅）；核心筒各房间各自材质
+  EM = .3;
+  for (let j = 0; j < D; j++) for (let i = 0; i < W; i++){
+    const c = (i + j) & 1, x = i + .5, y = j + .5;
+    let col;
+    if (x < CORE){
+      const r = coreAt(y);
+      col = r === "pan" ? (c ? "#e9d8ba" : "#dfcba8") : r === "wc" ? (c ? "#eef3f7" : "#dde6ee") : r === "ev" ? (c ? "#f2eee7" : "#e7e1d6") : r === "st" ? "#c9ced6" : (c ? "#cfd4dc" : "#c3c9d2");
+    } else if (y > BD1 && y < BD1 + MAIN) col = c ? LY.aisle[0] : LY.aisle[1];
+    else col = LY.planks ? LY.planks[(i + (j % 2) * 2) % 3] : (c ? LY.carpet[0] : LY.carpet[1]);
+    add(X0 + i, j, -.3, 1, 1, .3, col, T0(X0 + i, j), EM, 0, .012);
+  }
+
+  // ---- 外墙：后墙（-y）整排窗带百叶帘、内侧结构柱；左墙是核心筒外墙；前、右两面剖到窗台高度
+  EM = .25;
+  const wallSeg = (x, y, alongX, len, win, t, solidCol = C.wall, brick = false) => {
+    const wc = brick ? "#b5563d" : LY.wall;
+    const W2 = (a, b, c, d, e, f, col, tt, em = EM, m = 0) => alongX ? add(x + a, y + b, c, d, e, f, col, tt, em, m) : add(x + b, y + a, c, e, d, f, col, tt, em, m);
+    if (!win) W2(0, -.25, 0, len, .25, WALLH, solidCol, t);
+    else {
+      W2(0, -.25, 0, len, .25, .7, wc, t);
+      W2(.06, -.21, .7, len - .12, .16, 1.35, C.glass, t + .05, 0, 2);
+      W2(0, -.25, .7, .06, .25, 1.35, LY.frame, t + .05);
+      W2(0, -.25, 2.05, len, .25, WALLH - 2.05, wc, t + .08);
+      if (brick) for (const [z0, z1] of [[0, .7], [2.05, WALLH]]) for (let z = z0 + .12; z < z1 - .02; z += .14){
+        W2(0, 0, z, len, .012, .018, "#d8c4b0", t + .03);
+        for (let a = (Math.round(z / .14) % 2) * .25; a < len - .05; a += .5) W2(a, 0, z, .018, .012, .14, "#d8c4b0", t + .03);
+      }
+      W2(.04, 0, .64, len - .08, .07, .06, C.white, t + .1);
+      const ns = 1 + Math.floor(RND() * 6);
+      for (let k = 0; k < ns; k++) W2(.06, -.05, 1.97 - k * .13, len - .12, .05, .035, "#f1f3f5", t + .12);
+      W2(len - .16, -.03, 1.97 - ns * .13, .015, .015, ns * .13 - .05, C.metal, t + .12);
+    }
+    W2(0, -.25, WALLH, len, .25, .06, C.wallTop, t + .1);
+    W2(0, -.25, 0, len, .27, .1, "#a7aeb7", t + .02);
+  };
+  for (let i = 0; i < W; i++) wallSeg(X0 + i, 0, true, 1, !(i >= 1 && i < 3), T0(X0 + i, 0, .25), C.wall, LY.brick && i >= CORE);
+  for (let x = CORE + 1; x < W - 1; x += 6){ const t = T0(X0 + x, .3, .3); add(X0 + x, -.25, 0, .55, .6, WALLH + .06, LY.pillar, t) }            // 结构柱
+  const lifts = [[e1 - .75, e1 + .75], [e2 - .75, e2 + .75]], spans = [];
+  let yy = 0;
+  for (const [a, b] of lifts){ spans.push([yy, a]); spans.push([a, b, "lift"]); yy = b }
+  spans.push([yy, D]);
+  for (const [a, b, kind] of spans){
+    if (kind !== "lift"){
+      let s = a;
+      while (s < b - 1e-6){ const len = Math.min(1, b - s); wallSeg(X0, s, false, len, s + len <= PAN && s > .5 && len > .5, T0(X0, s, .25), coreAt(s + .5) === "srv" ? "#e3e6ea" : C.wall); s += len }
+    } else {
+      const c = (a + b) / 2, t = T0(X0, c, .25);
+      add(X0 - .25, a, 0, .25, .15, WALLH, C.wall, t); add(X0 - .25, b - .15, 0, .25, .15, WALLH, C.wall, t);
+      add(X0 - .25, a, 1.9, .25, b - a, WALLH - 1.9, C.wall, t); add(X0 - .25, a, WALLH, .25, b - a, .06, C.wallTop, t + .1);
+      add(X0 - .02, a + .1, 0, .12, .1, 1.95, C.metal, t + .05); add(X0 - .02, b - .2, 0, .12, .1, 1.95, C.metal, t + .05);
+      add(X0 - .02, a + .1, 1.85, .12, b - a - .2, .12, C.metal, t + .05);
+      add(X0 + .01, c - .3, 2.02, .08, .6, .22, C.dark, t + .1); add(X0 + .09, c - .14, 2.06, .02, .28, .12, "#ffb347", t + .12, 1, 1);
+      add(X0 - 1.0, c - .6, 0, .75, 1.2, 1.85, "#efe3cc", t, .6);
+      add(X0 + .02, b + .02, .95, .04, .1, .2, C.steel, t + .1); add(X0 + .06, b + .05, 1.07, .02, .04, .04, "#7ccfff", t + .12, 1, 1);
+      W0.doors.push({x: X0, y: c, open: 0, main: Math.abs(c - e1) < .01});
+    }
+  }
+  // 前、右两面外墙剖到窗台：矮墙 + 窗框短柱
+  { const t = T0(X0 + W / 2, D - .5, .3);
+    add(X0, D - .18, 0, W, .18, LOWH, C.wall, t); add(X0 - .01, D - .19, LOWH, W + .02, .2, .05, C.wallTop, t + .05);
+    add(X0 + W - .18, 0, 0, .18, D, LOWH, C.wall, t); add(X0 + W - .19, -.01, LOWH, .2, D + .02, .05, C.wallTop, t + .05);
+    for (let x = 1; x < W; x++) add(X0 + x - .03, D - .16, LOWH, .06, .14, .12, C.frame, t + .08);
+    for (let y = 1; y < D; y++) add(X0 + W - .16, y - .03, LOWH, .14, .06, .12, C.frame, t + .08) }
+
+  // ---- 核心筒
+  EM = .3;
+  const tcw = T0(X0 + 4, D / 2, .2);
+  // 核心筒外侧墙（面向通道），各房间开门；门禁入口较宽、装玻璃门和读卡器
+  const exitY = EVE + .35;
+  iwall(X0 + CORE - .15, 0, false, D, CWH, "#ece8e1", tcw,
+        [[1.4, 2.2], [PAN + .15, PAN + .85], [WC1 + .15, WC1 + .85], [entY - .75, entY + .75], [exitY, exitY + .8], [STE + .8, STE + 1.6]]);
+  for (const yb of [PAN, WC1, WC2, EVE, STE]) iwall(X0, yb - .075, true, CORE - .15, yb === WC1 ? CWH : CWH, "#ece8e1", T0(X0 + 2, yb, .2), []);
+  // 卫生间门牌（蓝 / 红像素小人）
+  for (const [y0, col] of [[PAN + .15, "#3b7dd8"], [WC1 + .15, "#e5484d"]]){
+    const t = T0(X0 + CORE, y0, .4), x = X0 + CORE + .01;
+    add(x, y0 + .9, .85, .02, .3, .32, C.white, t);
+    add(x + .02, y0 + 1.0, 1.08, .01, .1, .08, col, t + .02); add(x + .02, y0 + .98, .93, .01, .14, .14, col, t + .02);
+    if (col === "#e5484d") add(x + .02, y0 + .95, .9, .01, .2, .05, col, t + .02);
+  }
+  // 楼梯间门上的绿色"非常口"灯
+  { const t = T0(X0 + CORE, exitY, .4); add(X0 + CORE + .01, exitY + .1, 1.0, .03, .6, .16, "#2fbf71", t, 1, 1); add(X0 + CORE + .04, exitY + .18, 1.03, .01, .1, .1, C.white, t + .02, 1, 1); add(X0 + CORE + .04, exitY + .36, 1.03, .01, .3, .03, C.white, t + .02, 1, 1) }
+  // 门禁：玻璃门 + 读卡器 + 公司名牌
+  { const t = T0(X0 + CORE, entY, .4);
+    add(X0 + CORE - .12, entY - .75, 0, .08, .06, 1.1, C.metal, t); add(X0 + CORE - .12, entY + .69, 0, .08, .06, 1.1, C.metal, t);
+    add(X0 + CORE - .1, entY - .69, 0, .04, .25, 1.05, "#cfe6f2", t + .05); add(X0 + CORE - .1, entY + .44, 0, .04, .25, 1.05, "#cfe6f2", t + .05);
+    add(X0 + CORE + .02, entY + .82, .9, .05, .1, .16, C.dark, t + .06); add(X0 + CORE + .07, entY + .85, 1.0, .01, .04, .03, "#4fd17a", t + .07, 1, 1);
+    add(X0 + 1.2, WC2 + .08, .55, 2.4, .04, .55, hx, t + .05, .4, 1); add(X0 + 1.3, WC2 + .12, .62, 2.2, .01, .41, tint(hx, .75), t + .06, .6, 1) }
+
+  // 茶水间
+  const tb = T0(X0 + 2, 2, .3);
+  add(X0 + .08, .08, 0, .62, .6, 1.55, "#eef1f5", tb); add(X0 + .08, .4, 1.0, .62, .02, .02, "#c4ccd6", tb + .03); add(X0 + .66, .1, .55, .04, .05, .35, C.metal, tb + .04); add(X0 + .66, .1, 1.1, .04, .05, .3, C.metal, tb + .04);
+  for (let s = 0; s < 3; s++) add(X0 + .15 + s * .16, .7, .3 + s * .4, .1, .01, .1, ["#ffd166", "#ff9fb0", "#9fd8ff"][s], tb + .06);
+  add(X0 + .78, .04, 0, 2.5, .6, .84, "#f4f1ec", tb + .03); add(X0 + .76, .02, .84, 2.54, .64, .05, C.wood, tb + .05);
+  for (let s = 0; s < 4; s++) add(X0 + .9 + s * .6, .63, .45, .4, .01, .015, C.metal, tb + .06);
+  add(X0 + 1.2, .12, .87, .5, .34, .02, "#9aa3ad", tb + .07); add(X0 + 1.42, .08, .88, M / 2, M / 2, .24, C.metal, tb + .08); add(X0 + 1.42, .08, 1.1, M / 2, .16, M / 2, C.metal, tb + .08);
+  add(X0 + 1.85, .12, .89, .14, .14, .2, C.white, tb + .09); add(X0 + 1.89, .15, 1.09, .06, .08, .02, "#ff6b6b", tb + .1, 1, 1);
+  add(X0 + 2.15, .1, .89, .5, .38, .3, "#4a5260", tb + .1); add(X0 + 2.2, .48, .95, .3, .01, .2, "#2b2f3a", tb + .11); add(X0 + 2.55, .48, 1.08, .05, .01, .05, "#4fd17a", tb + .11, 1, 1);
+  add(X0 + 2.75, .12, .89, .28, .3, .42, C.dark, tb + .1); add(X0 + 2.8, .4, 1.05, .18, .03, .05, "#ff6b6b", tb + .11, 1, 1);
+  for (let s = 0; s < 5; s++) add(X0 + .95 + s * .14, .3, .89, .1, .1, .12, [C.white, "#ffd166", "#9fd8ff", "#ff9fb0", "#b8f0c8"][s], tb + .12);
+  add(X0 + .78, -.02, 1.45, 2.5, .34, .55, "#f4f1ec", tb + .08);
+  for (let s = 0; s < 4; s++) add(X0 + 1.05 + s * .6, .32, 1.62, .18, .02, .02, C.metal, tb + .1);
+  add(X0 + 3.5, .15, 0, .32, .32, .6, C.white, tb + .1); add(X0 + 3.53, .18, .6, .26, .26, .32, "#a8dcff", tb + .12);
+  add(X0 + 1.3, 1.7, .66, 1.3, .8, .06, C.wood, tb + .12);
+  for (const [a, b] of [[1.35, 1.75], [1.35, 2.4], [2.5, 1.75], [2.5, 2.4]]) add(X0 + a, b, 0, .06, .06, .66, C.wood2, tb + .1);
+  for (const [a, b] of [[1.45, 1.3], [2.1, 1.3], [1.45, 2.62], [2.1, 2.62]]){ add(X0 + a, b, .4, .4, .38, .06, "#e58f65", tb + .14); add(X0 + a + .17, b + .15, 0, .06, .06, .4, C.metal, tb + .12) }
+  add(X0 + 1.55, 1.9, .72, .1, .1, .1, C.white, tb + .16); add(X0 + 2.1, 2.0, .72, .26, .18, .07, "#b5482f", tb + .16); add(X0 + 2.1, 2.06, .79, .26, .04, .006, "#ffd166", tb + .17);
+  for (let s = 0; s < 3; s++) add(X0 + .2 + s * .32, 3.05, 0, .28, .26, .5, ["#5b9dff", "#4fbf7a", "#ffd166"][s], tb + .12);
+  plant(X0 + 3.9, 2.9, 0, tb + .12, true);
+  // 卫生间：洗手台 + 镜子 + 隔间
+  for (const y0 of [PAN, WC1]){
+    const t = T0(X0 + 2, y0 + .5, .3);
+    add(X0 + .05, y0 + .15, .7, .5, .7, .08, "#f4f1ec", t); add(X0 + .05, y0 + .25, 0, .4, .5, .7, "#e9edf2", t);
+    add(X0 + .2, y0 + .35, .78, .2, .3, .02, "#cfd8e2", t + .03); add(X0 + .01, y0 + .2, 1.0, .03, .6, .45, "#cfe6f2", t + .03, 0, 2);
+    for (let k = 0; k < 2; k++){ const x = X0 + 1.3 + k * 1.15; add(x, y0 + .1, 0, .05, .8, 1.05, "#d9dee5", t + .05); add(x + .05, y0 + .82, .1, 1.05, .05, .95, k ? "#f2c9d4" : "#c9daf2", t + .06); add(x + .45, y0 + .2, 0, .3, .4, .4, C.white, t + .07) }
+  }
+  // 电梯厅：长椅、盆栽、伞架
+  const th = T0(X0 + 2, e1 + 1, .3);
+  add(X0 + .15, e1 - .7, 0, 1.0, e2 - e1 + 1.4, .02, "#7a5a44", th);
+  add(X0 + 2.6, e2 + .7, .32, 1.4, .42, .06, C.wood, th + .05); for (const a of [.1, 1.2]) add(X0 + 2.6 + a, e2 + .75, 0, .1, .32, .32, C.dark, th + .03);
+  plant(X0 + 4.2, WC2 + .25, 0, th + .05, true); plant(X0 + 4.2, EVE - .6, 0, th + .05, false);
+  add(X0 + 3.5, WC2 + .2, 0, .28, .28, .45, "#5b6573", th + .05); for (let s = 0; s < 3; s++) add(X0 + 3.55 + s * .06, WC2 + .25 + (s % 2) * .1, .45, .03, .03, .25, ["#ff6b6b", "#5b9dff", "#ffd166"][s], th + .08);
+  // 楼梯间：台阶 + 扶手
+  { const t = T0(X0 + 2, EVE + .7, .3);
+    for (let k = 0; k < 8; k++) add(X0 + .3 + k * .45, EVE + .25, 0, .45, .9, .12 * (k + 1), "#d5dae1", t + k * .02);
+    add(X0 + .3, EVE + .2, .5, 3.6, .04, .04, C.metal, t + .2); for (let k = 0; k < 4; k++) add(X0 + .4 + k * .9, EVE + .2, 0, .04, .04, .5 + k * .45, C.metal, t + .2) }
+  // 机房
+  { const t = T0(X0 + 2, STE + 1.5, .3), y = STE + .5;
+    for (let k = 0; k < 3; k++){
+      const x = X0 + .3 + k * .78;
+      add(x, y, 0, .66, .7, 1.6, "#2b3140", t + k * .05); add(x + .03, y + .7, .05, .6, .02, 1.5, "#363d4f", t + k * .05 + .02);
+      for (let r = 0; r < 7; r++){ add(x + .06, y + .72, .15 + r * .2, .5, .01, .02, "#4a5266", t + .1); for (let c = 0; c < 4; c++) if (RND() < .75) add(x + .08 + c * .12, y + .72, .2 + r * .2, .05, .02, .04, ["#4fd17a", "#5bc0ff", "#ffb347", "#4fd17a"][(r + c + k) % 4], t + .15, 1, RND() < .6 ? 4 : 1) }
+    }
+    for (let k = 0; k < 3; k++){
+      const x = X0 + .3 + k * .78;
+      add(x + .08, y + .7, .92, .5, .22, .03, "#4a5266", t + .2); add(x + .12, y + .74, .95, .42, .14, .015, C.dark, t + .21);
+      add(x + .14, y + .7, 1.2, .38, .02, .22, "#1d3b4f", t + .21, .8, 1); add(x + .17, y + .72, 1.25, .2, .005, .02, "#9df2b4", t + .22, 1, 1);
+      spot("srv", [x + .33, y + 1.15], 3, "stand", [[corr, STE + 1.2], [X0 + CORE + .3, STE + 1.2], [X0 + 4.3, STE + 1.2], [X0 + 4.3, y + 1.15]], t + .5);
+    }
+    add(X0 + 2.75, STE + .25, 0, .9, .55, 1.4, "#eef1f4", t + .1); for (let s = 0; s < 8; s++) add(X0 + 2.8, STE + .81, .2 + s * .14, .8, .01, .04, "#b9c1cb", t + .12);
+    add(X0 + .3, y + 1.1, .001, 2.3, .12, .01, "#ffd166", t + .1); for (let s = 0; s < 6; s++) add(X0 + .35 + s * .38, y + 1.1, .012, .18, .12, .005, C.dark, t + .11);
+    add(X0 + 3.9, D - .7, 0, .16, .16, .4, "#e5484d", t + .1) }
+  // 核心筒前通道：饮水机、分类垃圾桶、灭火器
+  { const t = T0(X0 + CORE + .3, 1, .3);
+    add(X0 + CORE + .05, .3, 0, .3, .3, .62, C.white, t); add(X0 + CORE + .08, .33, .62, .24, .24, .3, "#a8dcff", t + .03);
+    for (let s = 0; s < 3; s++) add(X0 + CORE + .05, D - 1.4 + s * .32, 0, .28, .28, .5, ["#5b9dff", "#4fbf7a", "#ffd166"][s], T0(X0 + CORE, D - 1, .3));
+    add(X0 + CORE + .05, BD1 - .5, 0, .16, .16, .4, "#e5484d", T0(X0 + CORE, BD1, .3)) }
+
+  // ---- 大开间：任务岛
+  for (const T of teams){
+    const Z = T.z, tx = X0 + T.x, t = T0(tx + 1.7, Yp(T, 2), .3);
+    // 课长席（靠窗端，背对窗户）
+    const bs = [tx + 1.7, Yp(T, .9)], bdir = T.band ? 3 : 1;
+    if (!Z.part){
+      bossDesk(bs[0], bs[1], bdir, Z.status === "working", T0(bs[0], bs[1], .4));
+      seat(Z.key + "|boss", bs, bdir, T, null, T0(bs[0], bs[1], .9));
+    } else plant(bs[0] - .3, bs[1] - .3, 0, T0(bs[0], bs[1], .4), true);
+    // 对向工位 + 隔板
+    const occ = new Map(Z.subs.map(a => [a.slot, a]));
+    for (let k = 0; k < Z.pairs; k++){
+      const [ya, yb] = Yr(T, 2.3 + 1.2 * k, 3.4 + 1.2 * k), tp = T0(tx + 1.7, (ya + yb) / 2, .4);
+      partitionRow(tx, ya, yb, tp);
+      for (const b of [0, 1]){
+        const slot = k * 2 + b, a = occ.get(slot), ss = subSeat(slot), p = [tx + ss.x, Yp(T, ss.y)];
+        jpDesk(p[0], p[1], ss.dir, !!(a && a.status === "working"), !!a, slot + hashStr(Z.key) % 97, T0(p[0], p[1], .4));
+        if (a) seat(Z.key + "|" + a.id, p, ss.dir, T, b, T0(p[0], p[1], .9));
+      }
+    }
+    // 岛尾矮柜（朝主通道）
+    const [ea, eb] = Yr(T, 2.35 + 1.2 * Z.pairs, 2.8 + 1.2 * Z.pairs), te = T0(tx + 1.7, ea, .5);
+    add(tx + 1.0, ea, 0, 1.4, eb - ea, .68, "#d3d9e0", te);
+    if (hashStr(Z.key) % 2){ add(tx + 1.1, ea + .02, .68, .55, .41, .3, "#eef0f2", te + .05); add(tx + 1.15, ea + .05, .98, .45, .35, .03, "#d9dde2", te + .06) }
+    else plant(tx + 1.2, ea + .05, .68, te + .05, false);
+    for (let s = 0; s < 4; s++) add(tx + 1.75 + s * .15, ea + .06, .68, .12, .32, .24, C.books[(s + 2) % 7], te + .07);
+    // 吊牌：从天花板吊下来的部门名牌
+    const sy = Yp(T, 2.6 + 1.2 * Z.pairs), ts = T0(tx + 1.7, sy, .7);
+    const lz = teamSign(tx, sy, Z.hex, ts, ea, eb);
+    W0.zoneLabels.push({x: tx + 1.7, y: LY.sign === "plate" ? (ea + eb) / 2 : sy, z: lz, t: T0(tx + 1.7, sy, .8), ...(Z.part ? {amen: "第 " + (Z.part + 1) + " 组"} : {Z}), oi, cx: tx + 1.7, cy: Yp(T, T.bd / 2)});
+  }
+  // 共享工位岛（自由席）：空桌椅，不分配给任务
+  { const sx = X0 + TX0 + nt * TW, pairs = Math.min(3, topP);
+    for (let k = 0; k < pairs; k++){
+      const ya = 2.3 + 1.2 * k, tp = T0(sx + 1.7, ya + .5, .4);
+      partitionRow(sx, ya, ya + 1.1, tp);
+      for (const b of [0, 1]){ const ss = subSeat(k * 2 + b); jpDesk(sx + ss.x, ss.y, ss.dir, false, false, 500 + k * 2 + b + oi * 31, T0(sx + ss.x, ss.y, .4)) }
+    }
+    const ea = 2.35 + 1.2 * pairs, te = T0(sx + 1.7, ea, .5);
+    add(sx + 1.0, ea, 0, 1.4, .45, .68, "#d3d9e0", te); plant(sx + 1.2, ea + .05, .68, te + .05, false);
+    const sy = 2.6 + 1.2 * pairs, ts = T0(sx + 1.7, sy, .7);
+    const lz = teamSign(sx, sy, "#9aa3ad", ts, ea, ea + .45);
+    W0.zoneLabels.push({amen: "共享工位", x: sx + 1.7, y: LY.sign === "plate" ? ea + .22 : sy, z: lz, t: ts + .3, oi, cx: sx + 1.7, cy: BD1 / 2});
+  }
+  // 上排右侧剩余：开放洽谈桌 + 绿植
+  if (TX0 + (nt + 1) * TW + 4 <= W - 1){ const x = X0 + TX0 + (nt + 1) * TW + .5; openMeet(x, 2.2, T0(x, 3, .5)); plant(X0 + W - 1.2, .5, 0, T0(X0 + W - 1, .5, .4), true) }
+
+  // ---- 主通道另一侧：玻璃会议室、开放式休息区、复印角
+  let ax = X0 + TX0 + nb * TW + .4; const ay = ty2 + .5, ad = Math.min(5.5, D - ty2 - 1.0), aend = X0 + W - .6;
+  if (aend - ax >= 6){ meetingRoom(ax, ay, 6, ad); ax += 6.4 }
+  if (aend - ax >= 5){ const w = Math.min(8, aend - ax - (aend - ax >= 8.5 ? 3 : 0)); lounge(ax, ay, w, ad); ax += w + .4 }
+  if (aend - ax >= 2.5) thirdAmenity(ax, ay, aend - ax);
+
+  W0.labels.push({x: X0 + CORE - .1, y: entY, z: CWH + .9, t: T0(X0 + CORE, entY, .5), off});
+  W0.maxT = Math.max(W0.maxT, anim ? oi * .5 + .3 + Math.max(...dist) * .03 + 1.2 : 0);
+  EM = 0;
+  return {W, D};
+
+  /* 座位与路线：电梯门 → 电梯厅 → 门禁 → 核心筒前通道 → 主通道 → 岛旁通道 → 座位 */
+  function seat(key, p, dir, T, side, t){
+    const lane = side === 1 ? X0 + T.x + 3.75 : X0 + T.x - .25;
+    W0.seats.set(key, {id: key, p, dir, pose: "seat", approach: dedupe([HUB, [lane, mainY], [lane, p[1]], [p[0], p[1]]]), t, oi});
+  }
+  function iwall(x, y, alongX, len, hgt, col, t, gaps = []){
+    let s = 0; const segs = [];
+    for (const [a, b] of gaps.slice().sort((p, q) => p[0] - q[0])){ if (a > s) segs.push([s, a]); s = Math.max(s, b) }
+    if (s < len) segs.push([s, len]);
+    const A = (a, b, z, d, e, f, c, tt) => alongX ? add(x + a, y + b, z, d, e, f, c, tt) : add(x + b, y + a, z, e, d, f, c, tt);
+    for (const [a, b] of segs){ A(a, 0, 0, b - a, .15, hgt, col, t); A(a, -.01, hgt, b - a, .17, .04, C.white, t + .05); A(a, -.01, 0, b - a, .17, .08, "#a7aeb7", t + .02) }
+    for (const [a, b] of gaps){ A(a - .05, -.01, 0, .05, .17, hgt + .02, "#b9c1cb", t + .05); A(b, -.01, 0, .05, .17, hgt + .02, "#b9c1cb", t + .05) }
+  }
+  function plant(x, y, z0, t, big){
+    add(x, y, z0, .36, .36, .32, C.pot, t); add(x + .03, y + .03, z0 + .32, .3, .3, .02, "#6b4a33", t + .02);
+    if (big) add(x + .16, y + .16, z0 + .34, .05, .05, .45, "#8b5e3c", t + .03);
+    const n = big ? 18 : 9, hgt = big ? 7 : 4, base = big ? .55 : .34;
+    for (let s = 0; s < n; s++) add(x - (big ? M : 0) + Math.floor(RND() * (big ? 5 : 3)) * M, y - (big ? M : 0) + Math.floor(RND() * (big ? 5 : 3)) * M, z0 + base + Math.floor(RND() * hgt) * M * (big ? .8 : 1), M, M, M, RND() < .5 ? C.leaf : C.leaf2, t + .04 + s * .01);
+  }
+  function chairAt(A, cc){
+    A(-.24, .24, -.24, .24, .36, .07, cc); A(-.46, -.35, -.22, .22, .43, .48, cc);
+    A(-.2, .2, -.29, -.25, .43, .14, C.dark); A(-.2, .2, .25, .29, .43, .14, C.dark);
+    A(-.03, .03, -.03, .03, .06, .3, C.dark); A(-.24, .24, -.03, .03, 0, .04, C.dark); A(-.03, .03, -.24, .24, 0, .04, C.dark);
+  }
+  /* 课长席：u 向前（朝岛），v 左右 */
+  function bossDesk(x, y, dir, on, t){
+    const A = OB(x, y, dir, t);
+    if (bossVariant(A, on)) return;
+    A(.3, 1.12, -.8, .8, .66, .06, "#e6e8eb"); A(.3, .34, -.8, .8, .62, .08, "#9aa3ad");
+    A(.32, 1.1, -.8, -.74, 0, .66, "#b9c1cb"); A(.32, 1.1, .74, .8, 0, .66, "#b9c1cb"); A(1.04, 1.08, -.7, .7, .08, .52, "#c3cad3");
+    A(.36, .96, .25, .7, 0, .6, "#d3d9e0"); for (let s = 0; s < 3; s++) A(.35, .36, .3, .65, .1 + s * .18, .015, "#9aa3ad");
+    A(.88, 1.04, -.12, .12, .72, M / 2, C.metal); A(.94, .99, -.04, .04, .72, .14, C.metal);
+    A(.9, .97, -.38, .38, .84, .42, "#3a4352"); A(.895, .9, -.35, .35, .87, .36, on ? "#1d3b4f" : "#2c3440", on ? .8 : 0, on ? 1 : 0);
+    if (on) A(.9, .97, -.38, .38, 1.26, .025, C.screenOn, 1, 1);
+    A(.36, .52, -.25, .2, .72, .025, C.dark);
+    A(.36, .46, -.72, -.32, .72, .1, C.gold); A(.355, .36, -.68, -.36, .76, .04, "#8a6d1a");
+    A(.6, .82, .35, .55, .72, .05, "#e3e6ea"); A(.62, .8, .5, .54, .77, .03, "#cfd5dc");
+    A(.75, 1.05, .58, .78, .72, .02, "#9aa3ad"); A(.77, 1.03, .6, .76, .74, .05, C.white); A(.75, 1.05, .58, .78, .79, .02, "#9aa3ad");
+    A(.95, 1.05, -.75, -.65, .72, .08, C.pot); for (let s = 0; s < 4; s++) A(.95 + (s % 2) * .05, 1.0 + (s % 2) * .05, -.74 + Math.floor(s / 2) * .05, -.69 + Math.floor(s / 2) * .05, .8 + s * .04, .05, s % 2 ? "#ffffff" : "#ffd6ec");
+    A(-.3, .24, -.3, .3, .36, .1, C.leather); A(-.5, -.36, -.32, .32, .44, .9, C.leather);
+    A(-.3, .2, -.38, -.3, .44, .22, C.leather); A(-.3, .2, .3, .38, .44, .22, C.leather);
+    A(-.04, .04, -.04, .04, .06, .3, C.dark); A(-.25, .25, -.03, .03, 0, .05, C.dark); A(-.03, .03, -.25, .25, 0, .05, C.dark);
+  }
+  /* 日式钢制办公桌（坐人一侧为 u=0.3） */
+  function jpDesk(x, y, dir, on, occ, seed, t){
+    if (LY.desk === "bench") return benchDesk(x, y, dir, on, occ, seed, t);
+    if (LY.desk === "cube") return cubeDesk(x, y, dir, on, occ, seed, t);
+    if (LY.desk === "nordic") return nordicDesk(x, y, dir, on, occ, seed, t);
+    const R = rng32(seed * 7919 + 13), A = OB(x, y, dir, t);
+    const P = (lw, ld0, ld1, z, sw, sz, c, e = EM, m = 0) => A(.3 + ld0, .3 + ld1, -.55 + lw, -.55 + lw + sw, z, sz, c, e, m);
+    A(.3, 1.0, -.55, .55, .68, .05, "#eceef1"); A(.3, .33, -.55, .55, .63, .05, "#9aa3ad");
+    A(.32, 1.0, -.55, -.5, 0, .68, "#c3cad3"); A(.32, 1.0, .5, .55, 0, .68, "#c3cad3"); A(.94, .98, -.5, .5, .08, .5, "#c9cfd6");
+    A(.36, .92, .13, .47, 0, .6, "#d3d9e0");
+    for (let s = 0; s < 3; s++){ A(.355, .36, .13, .47, .1 + s * .17, .012, "#9aa3ad"); A(.345, .355, .24, .36, .17 + s * .17, .02, C.metal) }
+    A(.8, .92, -.12, .12, .73, .015, C.metal); A(.86, .9, -.02, .02, .73, .16, C.metal);
+    A(.82, .88, -.31, .31, .86, .38, "#3a4352");
+    A(.815, .82, -.28, .28, .89, .32, on ? "#1d3b4f" : "#2c3440", on ? .8 : 0, on ? 1 : 0);
+    if (on){ for (let r = 0; r < 5; r++){ const v0 = -.25 + (r % 3) * .04; A(.81, .815, v0, v0 + .12 + R() * .3, .93 + r * .055, .018, ["#6fe3ff", "#9df2b4", "#ffd166"][r % 3], 1, 1) } A(.82, .88, -.31, .31, 1.24, .02, C.screenOn, 1, 1) }
+    if (R() < .6) A(.81, .82, .2, .27, 1.12, .07, ["#ffe58a", "#ffb3c7", "#b8f0c8"][Math.floor(R() * 3)]);
+    A(.38, .56, -.21, .21, .73, .025, "#3b4252"); for (let s = 0; s < 3; s++) A(.41 + s * .045, .43 + s * .045, -.19, .19, .755, .004, "#5b6573");
+    A(.42, .5, .27, .34, .73, .03, "#3b4252");
+    if (R() < .7){ A(.72, .9, -.53, -.35, .73, .05, "#e3e6ea"); A(.84, .89, -.52, -.36, .78, .03, "#cfd5dc"); A(.74, .82, -.5, -.4, .781, .004, "#9aa3ad") }
+    const spots = [[.03, .06], [.88, .32], [.92, .5], [.03, .25]], kinds = [];
+    while (kinds.length < 3){ const k = Math.floor(R() * ITEMS.length); if (!kinds.includes(k)) kinds.push(k) }
+    kinds.forEach((k, i) => ITEMS[k](P, spots[i][0], spots[i][1], R));
+    chairAt(A, occ ? "#4a5260" : "#7d8593");
+    if (R() < .5) A(.35, .53, .58, .76, 0, .26, "#9aa3ad");
+  }
+  /* ===================== 版式相关的家具 ===================== */
+  /* 岛中线：日式 = 磨砂隔板 + 便利贴；Loft = 吊灯；北欧 = 绿植带；格子间的隔断画在各自工位里 */
+  function partitionRow(tx, ya, yb, tp){
+    if (LY.desk === "jp"){
+      add(tx + 1.685, ya, .73, .03, yb - ya, .28, "#dfe8ef", tp + .2); add(tx + 1.68, ya, 1.01, .04, yb - ya, .025, C.metal, tp + .22);
+      for (let s = 0; s < 3; s++) if (RND() < .6) add(tx + 1.717, ya + .1 + RND() * .85, .8 + RND() * .15, .004, .07, .07, ["#ffe58a", "#ffb3c7", "#b8f0c8"][s], tp + .25);
+    } else if (LY.desk === "bench"){
+      const yc = (ya + yb) / 2;
+      add(tx + 1.69, yc - .01, 1.95, .02, .02, .65, C.dark, tp + .3);
+      add(tx + 1.55, yc - .15, 1.75, .3, .3, .2, "#2b2f3a", tp + .32); add(tx + 1.62, yc - .08, 1.71, .16, .16, .05, "#ffcf6b", tp + .33, 1, 1);
+    } else if (LY.desk === "nordic"){
+      add(tx + 1.58, ya + .15, .73, .24, yb - ya - .3, .1, "#d8b98f", tp + .2);
+      for (let s = 0; s < 8; s++) add(tx + 1.6 + Math.floor(RND() * 2) * M, ya + .2 + RND() * (yb - ya - .45), .83 + Math.floor(RND() * 2) * M, M, M, M, RND() < .5 ? C.leaf : C.leaf2, tp + .25);
+    }
+  }
+  /* 团队名牌：日式吊牌 / Loft 霓虹灯牌 / 北欧木牌 / 格子间立在岛尾柜上的桌牌。返回标签高度 */
+  function teamSign(tx, sy, col, ts, ea, eb){
+    if (LY.sign === "plate"){
+      const yc = (ea + eb) / 2;
+      add(tx + 1.25, yc - .03, .68, .9, .06, .26, col, ts, .4, 1); add(tx + 1.3, yc - .04, .72, .8, .01, .16, tint(col, .78), ts + .02, .5, 1);
+      return 1.05;
+    }
+    const neon = LY.sign === "neon", wood = LY.sign === "wood";
+    add(tx + 1.0, sy - .03, 2.05, 1.4, .06, .32, neon ? "#2b2f3a" : wood ? "#d8b98f" : col, ts, neon ? 0 : .5, neon ? 0 : 1);
+    if (neon){
+      for (const z of [2.05, 2.34]) add(tx + 1.0, sy - .045, z, 1.4, .015, .03, col, ts + .02, 1, 1);
+      add(tx + 1.0, sy - .045, 2.05, .03, .015, .32, col, ts + .02, 1, 1); add(tx + 2.37, sy - .045, 2.05, .03, .015, .32, col, ts + .02, 1, 1);
+      add(tx + 1.15, sy - .046, 2.16, 1.1, .01, .1, tint(col, .35), ts + .03, 1, 1);
+    } else if (wood){ add(tx + 1.06, sy - .04, 2.14, 1.28, .01, .1, col, ts + .02, .5, 1); add(tx + 1.06, sy + .03, 2.14, 1.28, .01, .1, col, ts + .02, .5, 1) }
+    else { add(tx + 1.06, sy - .04, 2.1, 1.28, .01, .22, tint(col, .78), ts + .02, .6, 1); add(tx + 1.06, sy + .03, 2.1, 1.28, .01, .22, tint(col, .78), ts + .02, .6, 1) }
+    add(tx + 1.15, sy - .005, 2.37, .01, .01, .45, neon ? C.dark : C.metal, ts); add(tx + 2.25, sy - .005, 2.37, .01, .01, .45, neon ? C.dark : C.metal, ts);
+    return 2.45;
+  }
+  function monitorAt(A, on, R, body = "#3a4352", u = .82){
+    A(u - .02, u + .1, -.12, .12, .73, .015, C.metal); A(u + .04, u + .08, -.02, .02, .73, .16, C.metal);
+    A(u, u + .06, -.31, .31, .86, .38, body);
+    A(u - .005, u, -.28, .28, .89, .32, on ? "#1d3b4f" : "#2c3440", on ? .8 : 0, on ? 1 : 0);
+    if (on){ for (let r = 0; r < 5; r++){ const v0 = -.25 + (r % 3) * .04; A(u - .01, u - .005, v0, v0 + .12 + R() * .3, .93 + r * .055, .018, ["#6fe3ff", "#9df2b4", "#ffd166"][r % 3], 1, 1) } A(u, u + .06, -.31, .31, 1.24, .02, C.screenOn, 1, 1) }
+  }
+  function deskItems(A, R, kb = "#3b4252"){
+    const P = (lw, ld0, ld1, z, sw, sz, c, e = EM, m = 0) => A(.3 + ld0, .3 + ld1, -.55 + lw, -.55 + lw + sw, z, sz, c, e, m);
+    A(.38, .56, -.21, .21, .73, .025, kb); A(.42, .5, .27, .34, .73, .03, kb);
+    const spots = [[.03, .06], [.88, .32], [.92, .5], [.03, .25]], kinds = [];
+    while (kinds.length < 3){ const k = Math.floor(R() * ITEMS.length); if (!kinds.includes(k)) kinds.push(k) }
+    kinds.forEach((k, i) => ITEMS[k](P, spots[i][0], spots[i][1], R));
+  }
+  /* Loft：实木长桌（左右相接连成一条），黑铁桌腿，显示器或笔记本，彩色工业风椅 */
+  function benchDesk(x, y, dir, on, occ, seed, t){
+    const R = rng32(seed * 7919 + 13), A = OB(x, y, dir, t);
+    A(.3, 1.0, -.6, .6, .68, .05, "#b5835a"); A(.3, .32, -.6, .6, .64, .04, "#8f6440");
+    A(.34, .4, -.58, -.52, 0, .68, "#2b2f3a"); A(.9, .96, -.58, -.52, 0, .68, "#2b2f3a"); A(.34, .96, -.58, -.52, .05, .04, "#2b2f3a");
+    if (R() < .65) monitorAt(A, on, R, "#2b2f3a");
+    else { A(.45, .75, -.18, .18, .73, .015, "#c9cfd6"); A(.73, .75, -.18, .18, .745, .24, "#3a4352"); A(.725, .73, -.16, .16, .76, .2, on ? "#1d3b4f" : "#2c3440", on ? .8 : 0, on ? 1 : 0) }
+    deskItems(A, R);
+    const c = ["#e8833a", "#f2f2f2", "#2b2f3a", "#4a90a4"][Math.floor(R() * 4)], cc = occ ? c : tint(c, .35);
+    A(-.22, .22, -.22, .22, .38, .06, cc); A(-.36, -.3, -.2, .2, .44, .35, cc);
+    for (const [a, b] of [[-.2, -.2], [.16, -.2], [-.2, .16], [.16, .16]]) A(a, a + .04, b, b + .04, 0, .38, C.dark);
+  }
+  /* 美式格子间：背板 + 一侧布面隔断（1.25 高，坐着刚好露头），L 形桌，软木板 */
+  function cubeDesk(x, y, dir, on, occ, seed, t){
+    const R = rng32(seed * 7919 + 13), A = OB(x, y, dir, t), fab = "#8fa3b8", trim = "#c9cfd6";
+    A(1.0, 1.04, -.6, .6, 0, 1.25, fab); A(.99, 1.05, -.6, .6, 1.25, .03, trim);
+    A(-.45, 1.0, -.6, -.56, 0, 1.25, fab); A(-.45, 1.0, -.61, -.55, 1.25, .03, trim);
+    A(.99, 1.0, -.45, .15, .85, .32, "#c89b63");
+    for (let s = 0; s < 4; s++) A(.985, .99, -.4 + s * .14, -.3 + s * .14, .9 + (s % 2) * .1, .12, s % 2 ? C.white : ["#ffe58a", "#b8f0c8"][s % 2], EM);
+    A(.3, 1.0, -.55, .55, .68, .05, "#d9d4cb"); A(-.25, .3, .3, .55, .68, .05, "#d9d4cb");
+    A(.36, .92, .13, .47, 0, .6, "#c3cad3"); for (let s = 0; s < 3; s++) A(.355, .36, .13, .47, .1 + s * .17, .012, "#9aa3ad");
+    monitorAt(A, on, R);
+    if (R() < .7){ A(.72, .9, -.53, -.35, .73, .05, "#e3e6ea"); A(.84, .89, -.52, -.36, .78, .03, "#cfd5dc") }
+    deskItems(A, R);
+    chairAt(A, occ ? "#3b4252" : "#7d8593");
+  }
+  /* 北欧：白色桌面 + 原木腿，白色显示器，马卡龙色椅子 */
+  function nordicDesk(x, y, dir, on, occ, seed, t){
+    const R = rng32(seed * 7919 + 13), A = OB(x, y, dir, t), wood = "#d8b98f";
+    A(.3, 1.0, -.55, .55, .68, .05, "#f7f5f0");
+    for (const [a, b] of [[.33, -.52], [.92, -.52], [.33, .47], [.92, .47]]) A(a, a + .05, b, b + .05, 0, .68, wood);
+    monitorAt(A, on, R, "#e9ecef");
+    deskItems(A, R, "#dfe3e8");
+    const c = ["#a8d5c2", "#f4c2c2", "#b8d4f0", "#f5e1a4"][Math.floor(R() * 4)], cc = occ ? c : tint(c, .4);
+    A(-.22, .22, -.22, .22, .38, .07, cc); A(-.42, -.33, -.2, .2, .45, .36, cc);
+    for (const [a, b] of [[-.2, -.2], [.15, -.2], [-.2, .15], [.15, .15]]) A(a, a + .05, b, b + .05, 0, .38, wood);
+  }
+  /* 主管席的版式变体 */
+  function bossVariant(A, on){
+    const R = rng32(17);
+    if (LY.boss === "loft"){
+      A(.3, 1.12, -.8, .8, .66, .07, "#a8744a"); A(.32, 1.1, -.78, -.72, 0, .66, "#2b2f3a"); A(.32, 1.1, .72, .78, 0, .66, "#2b2f3a");
+      monitorAt(A, on, R, "#2b2f3a", .9);
+      A(.95, 1.0, .55, .6, .73, .4, C.dark); A(.82, 1.0, .5, .6, 1.1, .05, C.dark); A(.84, .9, .52, .58, 1.0, .1, "#ffcf6b", 1, 1);
+      A(.36, .46, -.7, -.35, .73, .08, "#8f6440");
+      A(-.3, .24, -.3, .3, .36, .1, "#6b4226"); A(-.5, -.36, -.32, .32, .44, .8, "#6b4226");
+      A(-.04, .04, -.04, .04, .06, .3, C.dark); A(-.25, .25, -.03, .03, 0, .05, C.dark); A(-.03, .03, -.25, .25, 0, .05, C.dark);
+      return true;
+    }
+    if (LY.boss === "nordic"){
+      A(.3, 1.12, -.8, .8, .66, .06, "#f7f5f0");
+      for (const [a, b] of [[.33, -.77], [1.05, -.77], [.33, .72], [1.05, .72]]) A(a, a + .05, b, b + .05, 0, .66, "#d8b98f");
+      monitorAt(A, on, R, "#e9ecef", .9);
+      A(.95, 1.05, .5, .6, .72, .08, C.pot); for (let s = 0; s < 6; s++) A(.95 + (s % 2) * .05, 1.0 + (s % 2) * .05, .5 + Math.floor(s / 2) * .03, .55 + Math.floor(s / 2) * .03, .8 + s * .03, .05, s % 2 ? C.leaf : C.leaf2);
+      A(.36, .46, -.7, -.35, .73, .08, "#d8b98f");
+      A(-.24, .24, -.24, .24, .38, .07, "#a8d5c2"); A(-.46, -.35, -.24, .24, .45, .7, "#a8d5c2");
+      for (const [a, b] of [[-.22, -.22], [.17, -.22], [-.22, .17], [.17, .17]]) A(a, a + .05, b, b + .05, 0, .38, "#d8b98f");
+      return true;
+    }
+    if (LY.boss === "glass"){                                           // 格子间：主管坐在靠窗的玻璃小办公室里，两侧开门
+      const G = "#d4ebf5";
+      A(1.3, 1.35, -1.5, 1.5, 0, 1.3, G); A(1.29, 1.36, -1.5, 1.5, 1.3, .04, C.metal);
+      for (const [v0, v1] of [[-1.5, -1.45], [1.45, 1.5]]){
+        A(-.85, -.42, v0, v1, 0, 1.3, G); A(.42, 1.35, v0, v1, 0, 1.3, G);
+        A(-.85, 1.35, v0 - .01, v1 + .01, 1.3, .04, C.metal); A(-.42, .42, v0, v1, 1.05, .25, G);
+        A(-.46, -.42, v0 - .01, v1 + .01, 0, 1.3, C.metal); A(.42, .46, v0 - .01, v1 + .01, 0, 1.3, C.metal);
+      }
+      A(1.26, 1.3, -.9, -.2, .9, .2, C.white); A(1.255, 1.26, -.85, -.25, .95, .1, "#3b4252");
+    }
+    return false;
+  }
+  /* 第三类设施：日式 / 格子间 = 复印角；Loft = 咖啡吧台；北欧 = 电话亭 */
+  function thirdAmenity(x, y, w){
+    if (LY.third === "bar"){
+      const t = T0(x + w / 2, y + 1, .3);
+      add(x + .2, y + .6, 0, w - .5, .7, .95, "#2b2f3a", t); add(x + .15, y + .55, .95, w - .4, .8, .06, "#b5835a", t + .03);
+      add(x + .35, y + .7, 1.01, .32, .3, .42, "#c9cfd6", t + .05); add(x + .42, y + .99, 1.15, .18, .02, .05, "#ff6b6b", t + .06, 1, 1);
+      for (let s = 0; s < 4; s++) add(x + .9 + s * .14, y + .8, 1.01, .1, .1, .12, [C.white, "#ffd166", "#9fd8ff", "#ff9fb0"][s], t + .07);
+      add(x + w - .9, y + .75, 1.01, .3, .3, .08, "#e58f65", t + .07); for (let s = 0; s < 4; s++) add(x + w - .87 + (s % 2) * .12, y + .78 + Math.floor(s / 2) * .12, 1.09, .1, .1, .08, ["#ff6b6b", "#ffd166", "#4fbf7a", "#ff9f43"][s], t + .08);
+      for (let k = 0; k < Math.floor((w - .6) / .7); k++){ const sx = x + .45 + k * .7; add(sx, y + 1.55, .62, .3, .3, .05, "#e8833a", t + .1); add(sx + .13, y + 1.68, 0, .05, .05, .62, C.dark, t + .09) }
+      for (let k = 0; k < 2; k++){ const lx = x + w * (k + 1) / 3; add(lx - .01, y + .95, 1.6, .02, .02, .9, C.dark, t + .12); add(lx - .12, y + .84, 1.45, .24, .24, .18, "#2b2f3a", t + .13); add(lx - .06, y + .9, 1.41, .12, .12, .05, "#ffcf6b", t + .14, 1, 1) }
+      W0.zoneLabels.push({amen: "咖啡吧台", x: x + w / 2, y: y + .6, z: 1.6, t: t + .6, oi, cx: x + w / 2, cy: y + 1});
+    } else if (LY.third === "booth"){
+      const t = T0(x + w / 2, y + 1, .3), n = Math.max(1, Math.min(2, Math.floor(w / 1.2)));
+      for (let k = 0; k < n; k++){
+        const bx = x + .1 + k * 1.15;
+        add(bx, y + .3, 0, 1.0, 1.0, .06, "#d8b98f", t); add(bx, y + .3, 1.8, 1.0, 1.0, .08, "#d8b98f", t + .05);
+        add(bx, y + .3, 0, .06, 1.0, 1.8, "#d8b98f", t + .03); add(bx + .94, y + .3, 0, .06, 1.0, 1.8, "#d8b98f", t + .03); add(bx, y + .3, 0, 1.0, .06, 1.8, "#e9e4da", t + .03);
+        add(bx + .06, y + 1.27, .06, .88, .03, 1.74, "#d4ebf5", t + .05); add(bx + .06, y + 1.26, .9, .88, .04, .04, "#d8b98f", t + .06);
+        add(bx + .15, y + .4, .06, .7, .35, .38, "#a8d5c2", t + .07); add(bx + .3, y + .4, .9, .4, .25, .04, "#f7f5f0", t + .08);
+        add(bx + .45, y + .75, 1.72, .1, .1, .06, C.lamp, t + .09, 1, 1);
+      }
+      W0.zoneLabels.push({amen: "电话亭", x: x + .6, y: y + .3, z: 2.1, t: t + .6, oi, cx: x + w / 2, cy: y + 1});
+    } else copyCorner(x, y, w);
+  }
+  /* 开放洽谈桌 */
+  function openMeet(x, y, t){
+    add(x + .6, y + .5, .66, 1.3, 1.0, .06, C.wood, t); add(x + 1.15, y + .9, 0, .2, .2, .66, C.metal, t);
+    for (const [a, b] of [[.3, .75], [2.05, .75], [1.05, .05], [1.05, 1.65]]){ add(x + a, y + b, .38, .4, .4, .06, "#e58f65", t + .05); add(x + a + .17, y + b + .17, 0, .06, .06, .38, C.metal, t + .04) }
+    add(x + .9, y + .7, .72, .3, .22, .02, C.white, t + .08); add(x + 1.4, y + .65, .72, .07, .07, .09, C.white, t + .08);
+    add(x + .1, y + 2.4, 0, 1.6, .06, 1.0, "#dfe8ef", t + .06); add(x + .15, y + 2.36, .4, 1.5, .04, .55, C.white, t + .07);
+  }
+  /* 玻璃会议室：长桌、椅子、白板、显示屏、会议电话、笔记本、矿泉水 */
+  function meetingRoom(x, y, w, d){
+    const t = T0(x + w / 2, y + d / 2, .3);
+    add(x, y, .001, w, d, .01, "#b7c1cf", t);
+    const glass = (gx, gy, alongX, len, gaps) => {
+      let s = 0; const segs = []; for (const [a, b] of gaps){ if (a > s) segs.push([s, a]); s = b } if (s < len) segs.push([s, len]);
+      for (const [a, b] of segs){
+        if (alongX){ add(gx + a, gy, 0, b - a, .1, 1.3, "#d4ebf5", t + .05); add(gx + a, gy - .01, .6, b - a, .12, .25, "#eef6fa", t + .06); add(gx + a, gy - .01, 1.3, b - a, .12, .05, C.metal, t + .06) }
+        else { add(gx, gy + a, 0, .1, b - a, 1.3, "#d4ebf5", t + .05); add(gx - .01, gy + a, .6, .12, b - a, .25, "#eef6fa", t + .06); add(gx - .01, gy + a, 1.3, .12, b - a, .05, C.metal, t + .06) }
+        for (let k = Math.ceil(a); k < b; k++) alongX ? add(gx + k - .02, gy - .01, 0, .04, .12, 1.3, C.metal, t + .06) : add(gx - .01, gy + k - .02, 0, .12, .04, 1.3, C.metal, t + .06);
+      }
+    };
+    glass(x, y, true, w, [[w - 1.3, w - .5]]); glass(x, y, false, d, []);
+    add(x, y + d - .1, 0, w, .1, LOWH, "#d4ebf5", t + .05); add(x + w - .1, y, 0, .1, d, LOWH, "#d4ebf5", t + .05);
+    // 白板（贴后玻璃墙内侧）+ 显示屏（左墙）
+    add(x + .6, y + .1, .45, 2.4, .04, .8, C.white, t + .1); for (let s = 0; s < 4; s++) add(x + .75 + RND() * .4, y + .14, .65 + s * .14, .4 + RND() * 1.2, .005, .025, ["#5b9dff", "#e5484d", "#2f9e6f", "#3b4252"][s], t + .12);
+    add(x + .1, y + 1.2, .5, .05, 2.0, .8, C.dark, t + .1); add(x + .15, y + 1.28, .56, .01, 1.84, .68, "#1d3b4f", t + .12, .9, 1);
+    for (let s = 0; s < 6; s++) add(x + .16, y + 1.4 + s * .28, .62, .01, .18, .1 + RND() * .4, ["#6fe3ff", "#9df2b4", "#ffd166"][s % 3], t + .13, 1, 1);
+    // 长桌 + 椅子
+    const tx0 = x + 1.3, tx1 = x + w - .9, ty0 = y + d / 2 - .55, ty1 = y + d / 2 + .55;
+    add(tx0, ty0, .66, tx1 - tx0, ty1 - ty0, .06, "#f4f1ec", t + .15); add(tx0 + .3, ty0 + .4, 0, .2, .3, .66, C.steel, t + .14); add(tx1 - .5, ty0 + .4, 0, .2, .3, .66, C.steel, t + .14);
+    const doorX = x + w - .9, mid = (ty0 + ty1) / 2;
+    for (let cx = tx0 + .4; cx < tx1 - .2; cx += .8){
+      chairAt(OB(cx, ty0 - .38, 1, t + .2), "#5b6b86"); chairAt(OB(cx, ty1 + .38, 3, t + .2), "#5b6b86");
+      spot("meet", [cx, ty0 - .38], 1, "seat", [[doorX, mainY], [doorX, y + .6], [cx, y + .6]], t + .5);
+      spot("meet", [cx, ty1 + .38], 3, "seat", [[doorX, mainY], [doorX, y + .6], [x + w - .35, y + .6], [x + w - .35, y + d - .45], [cx, y + d - .45]], t + .5);
+      if (RND() < .6){ const s = RND() < .5 ? -1 : 1, yy = s < 0 ? ty0 + .1 : ty1 - .35; add(cx - .15, yy, .72, .3, .25, .015, "#c9cfd6", t + .25); add(cx - .15, s < 0 ? yy + .22 : yy, .72, .3, .03, .2, "#3a4352", t + .26) }
+      if (RND() < .5) add(cx + .2, (ty0 + ty1) / 2 + (RND() - .5) * .5, .72, .05, .05, .16, "#bfe6ff", t + .27);
+    }
+    chairAt(OB(tx1 + .4, mid, 2, t + .2), "#5b6b86");
+    spot("meet", [tx1 + .4, mid], 2, "seat", [[doorX, mainY], [doorX, y + .6], [x + w - .35, y + .6], [x + w - .35, mid]], t + .5);
+    add((tx0 + tx1) / 2 - .12, (ty0 + ty1) / 2 - .12, .72, .24, .24, .03, C.dark, t + .28); add((tx0 + tx1) / 2 - .05, (ty0 + ty1) / 2 - .05, .75, .1, .1, .01, "#4fd17a", t + .29, 1, 1);
+    for (let s = 0; s < 3; s++) add(tx0 + .5 + s * .9, (ty0 + ty1) / 2 - .1, .72, .2, .26, .012, C.white, t + .28);
+    plant(x + .3, y + d - .75, 0, t + .2, true);
+    W0.zoneLabels.push({amen: "会议室", x: x + w / 2, y: y + .2, z: 1.75, t: t + .6, oi, cx: x + w / 2, cy: y + d / 2});
+  }
+  /* 开放式休息区：L 形沙发、茶几、懒人沙发、书架、小街机、落地灯 */
+  function lounge(x, y, w, d){
+    const t = T0(x + w / 2, y + d / 2, .3), sc = LY.sofa;
+    add(x + .2, y + .2, .001, w - .4, d - .4, .015, "#f3e3c6", t);
+    for (let k = 0; k < Math.floor((w - .4) / .5); k++) add(x + .25 + k * .5, y + .25, .015, .25, d - .5, .002, "#ead6b2", t + .02);
+    add(x + .5, y + .4, 0, 2.6, .75, .35, sc, t + .05); add(x + .5, y + .3, .35, 2.6, .22, .45, shade(sc, .9), t + .07);
+    add(x + .3, y + .4, 0, .75, 2.4, .35, sc, t + .05); add(x + .2, y + .4, .35, .22, 2.4, .45, shade(sc, .9), t + .07);
+    for (const [a, b, c] of [[.8, .5, "#ffd166"], [1.7, .5, "#ff9fb0"], [.45, 1.6, "#9fd8ff"]]) add(x + a, y + b, .35, .4, .3, .3, c, t + .1);
+    add(x + 1.4, y + 1.5, 0, 1.3, .8, .3, C.wood, t + .1);
+    for (const sx of [1.0, 1.85, 2.7]) spot("lounge", [x + sx, y + .85], 1, "seat", [[x + sx, mainY]], t + .5);
+    for (const sy of [1.55, 2.35]) spot("lounge", [x + .75, y + sy], 0, "seat", [[x + 1.2, mainY], [x + 1.2, y + sy]], t + .5);
+    add(x + 1.55, y + 1.65, .3, .3, .22, .03, "#5b9dff", t + .12); add(x + 1.6, y + 1.68, .33, .26, .18, .02, "#ffd166", t + .13);
+    add(x + 2.1, y + 1.7, .3, .2, .2, .07, "#e58f65", t + .12); for (let s = 0; s < 4; s++) add(x + 2.12 + (s % 2) * .08, y + 1.72 + Math.floor(s / 2) * .08, .37, .06, .06, .03, ["#ffd166", "#ff7aa8", "#4fbf7a", "#ff9f43"][s], t + .13);
+    add(x + 2.4, y + 1.95, .3, .14, .08, .03, C.dark, t + .13);
+    if (w >= 6){ for (const [a, b, c] of [[w - 1.8, 2.6, "#ff7aa8"], [w - 1.0, 3.3, "#ffd166"]]){ add(x + a, y + b, 0, .6, .6, .3, c, t + .1); add(x + a + .08, y + b + .08, .3, .44, .44, .12, tint(c, .2), t + .12); spot("lounge", [x + a + .3, y + b + .3], 2, "seat", [[x + a - .5, mainY], [x + a - .5, y + b + .3]], t + .5) } }
+    add(x + .25, y + d - 1.6, 0, .4, 1.2, 1.1, C.wood2, t + .08);
+    for (const hh of [.05, .4, .75]){ let yy = y + d - 1.55; while (yy < y + d - .5){ const ww = .07 + RND() * .08; add(x + .62, yy, hh, .04, ww, .25 + RND() * .07, C.books[Math.floor(RND() * C.books.length)], t + .12); yy += ww + .01 } }
+    add(x + w - 1.0, y + .3, 0, .7, .6, 1.5, "#3b4a6b", t + .1); add(x + w - .95, y + .9, .85, .6, .02, .45, "#1d2b44", t + .12); add(x + w - .9, y + .91, .9, .5, .01, .35, "#6fe3ff", t + .13, 1, 1);
+    for (let s = 0; s < 3; s++) add(x + w - .85 + s * .18, y + .92, 1.0 + (s % 2) * .1, .1, .005, .08, ["#ffd166", "#ff7aa8", "#9df2b4"][s], t + .14, 1, 1);
+    add(x + w - .95, y + .9, .55, .6, .25, .08, "#2b2f3a", t + .12); add(x + w - .8, y + 1.05, .63, .06, .06, .06, "#e5484d", t + .13, 1, 1); add(x + w - .6, y + 1.05, .63, .06, .06, .04, "#5b9dff", t + .13);
+    add(x + w - .95, y + .3, 1.5, .6, .62, .18, "#ff7aa8", t + .12, .6, 1);
+    add(x + w - .5, y + d - .6, 0, M, M, 1.3, C.dark, t + .1); add(x + w - .6, y + d - .7, 1.25, .34, .34, .22, C.lamp, t + .12, 1, 1);
+    plant(x + 1.3, y + d - .7, 0, t + .1, true);
+    W0.zoneLabels.push({amen: "休息区", x: x + w / 2, y: y + .2, z: 1.3, t: t + .6, oi, cx: x + w / 2, cy: y + d / 2});
+  }
+  /* 复印角：复合机、碎纸机、文件柜 */
+  function copyCorner(x, y, w){
+    const t = T0(x + w / 2, y + 1, .3);
+    add(x + .1, y + .3, 0, 1.0, .7, .92, "#eef0f2", t); add(x + .15, y + .35, .92, .9, .6, .08, "#d9dde2", t + .03);
+    add(x + .65, y + .95, .85, .35, .1, .06, C.dark, t + .05); add(x + .7, y + 1.04, .87, .2, .01, .03, "#7cf", t + .06, 1, 1);
+    for (let s = 0; s < 3; s++) add(x + .15, y + 1.0, .15 + s * .22, .9, .01, .02, "#b9c1cb", t + .05);
+    add(x + 1.3, y + .4, 0, .35, .3, .55, C.dark, t + .05); add(x + 1.35, y + .45, .55, .25, .05, .01, "#9aa3ad", t + .06);
+    if (w >= 2.4){ add(x + 1.8, y + .2, 0, .5, .9, 1.0, "#e4e7eb", t + .05); for (let s = 0; s < 6; s++) add(x + 1.83 + s * .075, y + 1.1, .55, .06, .02, .32, C.books[s % 7], t + .07) }
+    W0.zoneLabels.push({amen: "复印角", x: x + w / 2, y: y + .2, z: 1.4, t: t + .6, oi, cx: x + w / 2, cy: y + 1});
+  }
+}
+
+/* 桌面小物件库（P 为桌面局部坐标绘制函数，z = .73 为桌面） */
+const Z0 = .73;
+const ITEMS = [
+  (P, x, y, R) => { const c = ["#ffffff", "#ffd166", "#ff9fb0", "#9fd8ff"][Math.floor(R() * 4)]; P(x, y, y + .07, Z0, .07, .09, c); P(x + .01, y + .01, y + .06, Z0 + .09, .05, .005, "#6b4a33"); P(x + .07, y + .025, y + .045, Z0 + .02, .02, .05, c) },                        // 马克杯
+  (P, x, y, R) => { P(x, y, y + .08, Z0, .08, .1, "#5b6573"); for (let i = 0; i < 3; i++) P(x + .01 + i * .022, y + .02 + i * .012, y + .034 + i * .012, Z0 + .1, .012, .06, ["#e5484d", "#5b9dff", "#2b2f3a"][i]) },   // 笔筒
+  (P, x, y, R) => { for (let i = 0; i < 4; i++){ const c = C.books[Math.floor(R() * C.books.length)]; P(x + i * .045, y, y + .2, Z0, .04, .24, c); P(x + i * .045 + .008, y - .003, y, Z0 + .15, .024, .05, C.white) } },  // 立式文件夹
+  (P, x, y, R) => { for (let i = 0; i < 3; i++) P(x + (R() - .5) * .02, y + (R() - .5) * .02, y + .26, Z0 + i * .015, .2, .015, i % 2 ? "#f4f4f4" : C.white); P(x + .08, y + .2, y + .23, Z0 + .045, .04, .008, C.dark) },  // 纸堆
+  (P, x, y, R) => { P(x, y, y + .26, Z0, .2, .02, "#9aa3ad"); P(x + .01, y + .01, y + .25, Z0 + .02, .18, .03, C.white); P(x, y, y + .26, Z0 + .1, .2, .02, "#9aa3ad"); P(x + .01, y + .01, y + .25, Z0 + .12, .18, .02, "#fff8e1"); P(x, y, y + .02, Z0, .02, .12, C.metal) },  // 文件托盘
+  (P, x, y, R) => { P(x, y, y + .05, Z0, .15, .11, C.white); P(x, y, y + .05, Z0 + .11, .15, .025, "#e5484d"); P(x + .02, y - .002, y, Z0 + .03, .11, .05, "#c7ccd3") },  // 台历
+  (P, x, y, R) => { P(x, y, y + .07, Z0, .07, .05, "#e58f65"); P(x + .015, y + .015, y + .055, Z0 + .05, .04, .09, "#4caf50"); P(x + .055, y + .025, y + .045, Z0 + .08, .03, .03, "#4caf50"); P(x + .02, y + .02, y + .05, Z0 + .14, .03, .015, "#ff7aa8") },  // 仙人掌
+  (P, x, y, R) => { const c = C.accent[Math.floor(R() * 5)]; P(x, y, y + .06, Z0, .06, .01, C.dark); P(x + .01, y + .01, y + .05, Z0 + .01, .04, .05, c); P(x + .005, y + .005, y + .055, Z0 + .06, .05, .045, "#ffe0bd"); P(x + .005, y + .005, y + .055, Z0 + .1, .05, .015, C.hair[Math.floor(R() * 4)]) },  // 手办
+  (P, x, y, R) => { P(x, y, y + .1, Z0, .15, .045, "#b5482f"); P(x, y + .04, y + .06, Z0 + .045, .15, .006, "#ffd166"); P(x + .02, y + .11, y + .12, Z0, .14, .008, C.wood) },  // 便当
+  (P, x, y, R) => { P(x, y, y + .08, Z0, .15, .06, ["#ffd6e0", "#d6ecff", "#e2f7d6"][Math.floor(R() * 3)]); P(x + .05, y + .03, y + .05, Z0 + .06, .05, .03, C.white) },  // 纸巾盒
+  (P, x, y, R) => { P(x, y, y + .08, Z0, .08, .015, C.white); P(x + .035, y + .035, y + .045, Z0 + .015, .01, .08, C.white); P(x - .02, y + .03, y + .05, Z0 + .07, .12, .12, "#cfe8ff") },  // 小风扇
+  (P, x, y, R) => { const c = C.cans[Math.floor(R() * C.cans.length)]; P(x, y, y + .04, Z0, .04, .08, c); P(x + .005, y + .005, y + .035, Z0 + .08, .03, .005, C.metal); if (R() < .5){ P(x + .06, y, y + .04, Z0, .04, .08, C.cans[Math.floor(R() * C.cans.length)]) } },  // 饮料罐
+  (P, x, y, R) => { P(x, y, y + .06, Z0, .08, .025, "#c0392b"); P(x + .1, y + .01, y + .03, Z0, .02, .06, C.wood); P(x + .1, y + .01, y + .03, Z0 + .06, .02, .01, "#e5484d") },  // 印章与印泥
+  (P, x, y, R) => { P(x, y, y + .13, Z0, .09, .015, "#5b6573"); P(x + .01, y + .09, y + .12, Z0 + .015, .07, .003, "#b7d8b0"); for (let i = 0; i < 3; i++) P(x + .015, y + .015 + i * .025, y + .03 + i * .025, Z0 + .015, .06, .003, "#9aa3ad") },  // 计算器
+  (P, x, y, R) => { P(x, y, y + .02, Z0, .1, .08, C.wood); P(x + .01, y - .003, y, Z0 + .01, .08, .06, "#9fd3f2"); P(x + .01, y - .004, y - .003, Z0 + .01, .08, .02, "#7cc47a") },  // 相框
+  (P, x, y, R) => { P(x, y, y + .06, Z0, .06, .015, C.dark); P(x + .025, y + .025, y + .035, Z0 + .015, .01, .2, C.dark); P(x - .01, y + .02, y + .12, Z0 + .2, .08, .04, C.dark); P(x, y + .04, y + .1, Z0 + .195, .06, .006, C.lamp, 1, 1) },  // 台灯
+  (P, x, y, R) => { P(x, y, y + .18, Z0, .13, .015, C.books[Math.floor(R() * C.books.length)]); P(x + .02, y + .05, y + .06, Z0 + .015, .1, .01, C.dark) },  // 笔记本
+  (P, x, y, R) => { P(x, y, y + .12, Z0, .12, .05, "#ffd166"); P(x + .02, y + .02, y + .1, Z0 + .05, .08, .03, "#ff9f43"); P(x + .04, y + .04, y + .08, Z0 + .08, .04, .02, "#e5484d") }   // 零食盒
+];
+
+/* ============================================================
+   体素小人（动态实例，每帧重写）
+   局部坐标：u 朝前、v 朝左右、z 朝上，单位为微体素；整体朝 +x 坐（脸朝镜头一侧）
+   ============================================================ */
+function lookOf(name, type, boss){
+  const r = rng32(hashStr(name + "|look"));
+  const pick = a => a[Math.floor(r() * a.length)];
+  const k = r();
+  return {skin: pick(C.skin), hair: pick(C.hair), pants: pick(C.pants), accent: pick(C.accent),
+          style: k < .45 ? 0 : k < .8 ? 1 : 2,                       // 0 短发 / 1 长发 / 2 鸭舌帽
+          shirt: boss ? C.suit : JOB_HEX[hashStr(type || "agent") % JOB_HEX.length]};
+}
+/* 工具 → 气泡图标 */
+function toolIcon(tool){
+  const t = String(tool || "").toLowerCase();
+  if (!t) return "dots";
+  if (/edit|write|notebook|patch/.test(t)) return "pencil";
+  if (/read|view|cat/.test(t)) return "doc";
+  if (/bash|shell|terminal|exec|run/.test(t)) return "term";
+  if (/grep|glob|search|find|ls/.test(t)) return "lens";
+  if (/web|fetch|browser|http|url|navigate/.test(t)) return "globe";
+  if (/task|agent|todo|plan/.test(t)) return "list";
+  return "gear";
+}
+/* 体素小人（简化版）：只用直角方块，每人约 10 块——腿、躯干、两臂、头、头发、两眼（主管多一条领带）；
+   不再有倒角、腮红、嘴、耳朵、眼镜等细节，外观差异只靠肤色 / 发色 / 发型 / 衣服颜色。
+   正常人比例：站高约 1.3 格（头 3 微体素），和 0.68 高的办公桌、0.35 高的沙发坐面相称。
+   姿势：坐（工位 / 会议椅 / 沙发）、站（机房控制台前）、走路。 */
+function personVox(P, t){
+  const L = P.look, f = DIRS[P.dir], s = [-f[1], f[0]], T = P.t0;
+  const bx = (u0, u1, v0, v1, a, b, hx, e = .3, m = 0) => {
+    const xs = [P.x + (f[0] * u0 + s[0] * v0) * M, P.x + (f[0] * u1 + s[0] * v1) * M], ys = [P.y + (f[1] * u0 + s[1] * v0) * M, P.y + (f[1] * u1 + s[1] * v1) * M];
+    const x0 = Math.min(...xs), y0 = Math.min(...ys);
+    add(x0, y0, a * M, Math.max(...xs) - x0, Math.max(...ys) - y0, (b - a) * M, hx, T, e, m);
+  };
+  const sit = P.state === "seat", stand = P.state === "stand", rest = sit || stand, st = P.status, work = rest && st === "working";
+  const wsw = rest ? 0 : Math.sin(P.walk);
+  const bob = sit ? (work ? Math.max(0, Math.sin(t * 15 + P.phase)) * .12 : Math.sin(t * 1.6 + P.phase) * .08) : stand ? Math.sin(t * 1.6 + P.phase) * .05 : Math.abs(wsw) * .3;
+  // 腿：坐姿 = 并拢的大腿 + 两条小腿；站 / 走 = 两条直腿（走路前后摆）
+  let tb;
+  if (sit){
+    tb = 4;
+    bx(-.6, 2.5, -1.0, 1.0, 3.3, tb, L.pants);
+    bx(1.85, 2.5, -.95, -.1, 0, 3.3, L.pants); bx(1.85, 2.5, .1, .95, 0, 3.3, L.pants);
+  } else {
+    tb = 4.5;
+    const sw = wsw * .9;
+    bx(-.4 + sw, .4 + sw, -.95, -.1, 0, tb, L.pants); bx(-.4 - sw, .4 - sw, .1, .95, 0, tb, L.pants);
+  }
+  // 躯干（闲坐时略往后靠）；主管是深色西装 + 领带
+  const lean = sit && !work ? -.25 : 0, TH = 2.9;
+  bx(-.7 + lean, .7 + lean, -1.1, 1.1, tb, tb + TH, L.shirt);
+  if (P.boss) bx(.7 + lean, .76 + lean, -.2, .2, tb + .6, tb + TH, C.tie);
+  // 手臂：工作时双臂前伸（交替起落 = 打字 / 操作控制台），否则垂在两侧（走路时前后摆）
+  if (work){
+    const ph = Math.sin(t * 15 + P.phase) > 0 ? .25 : 0;
+    bx(-.3 + lean, 2.2, -1.6, -1.13, tb + 1.2 + ph, tb + 1.75 + ph, L.shirt);
+    bx(-.3 + lean, 2.2, 1.13, 1.6, tb + 1.45 - ph, tb + 2.0 - ph, L.shirt);
+  } else {
+    const sw = wsw * .8;
+    bx(-.3 - sw + lean, .3 - sw + lean, -1.6, -1.13, tb + .3, tb + 2.75, L.shirt);
+    bx(-.3 + sw + lean, .3 + sw + lean, 1.13, 1.6, tb + .3, tb + 2.75, L.shirt);
+  }
+  // 头 3×3×3 + 两眼
+  const hb = tb + TH + bob, u0 = -1.3 + lean, u1 = 1.7 + lean, HW = 1.5, v = sit && !work ? Math.sin(t * 1.1 + P.phase) * .1 : 0;
+  bx(u0, u1, -HW + v, HW + v, hb, hb + 3, L.skin);
+  const shut = st === "idle" || st === "finished" || st === "done" || ((t * .7 + P.phase) % 4) < .13;
+  for (const c of [-.65, .65]) bx(u1, u1 + .06, c - .2 + v, c + .2 + v, hb + (shut ? 1.2 : 1.0), hb + (shut ? 1.38 : 1.6), C.dark);
+  // 头发：头顶一块（前沿略探出 = 刘海）+ 后脑一块（长发垂到肩）；帽子款把头顶换成彩色并加帽檐
+  const HV = HW + .15, cap = L.style === 2, hc = cap ? L.accent : L.hair;
+  bx(u0 - .15, u1 + .1, -HV + v, HV + v, hb + 2.1, hb + 3.3, hc);
+  bx(u0 - .15, u0 + .6, -HV + v, HV + v, L.style === 1 ? hb - .5 : hb + .7, hb + 2.1, L.hair);
+  if (cap) bx(u1 + .1, u1 + .6, -1.2 + v, 1.2 + v, hb + 2.1, hb + 2.3, hc);
+  // 头顶气泡（坐 / 站时）：工作中 = 白气泡 + 工具图标（底部绿条）；其它状态 = 彩色气泡 + 白色符号
+  if (rest){
+    const pz = hb + 4 + Math.sin(t * 2.2 + P.phase) * .2;
+    const working = st === "working", bg = working ? C.white : (ST_COL[st] || "#9aa3ad"), glow = working ? .9 : .45;
+    bx(-.35, .35, -1.9, 1.9, pz, pz + 3.2, bg, glow, 1);
+    bx(-.25, .25, -.38, .38, pz - .45, pz, bg, glow, 1);
+    if (working) bx(-.38, .38, -1.6, 1.6, pz, pz + .3, ST_COL.working, 1, 1);
+    if (P.boss) bx(-.35, .35, -1.9, 1.9, pz + 3.2, pz + 3.6, C.gold, 1, 1);
+    const px = (c, r, col, w = 1, hh = 1) => { const v0 = -1.5 + c * .6, z0 = pz + .45 + r * .6; bx(.36, .44, v0, v0 + .6 * w, z0, z0 + .6 * hh, col, 1, 1); bx(-.44, -.36, v0, v0 + .6 * w, z0, z0 + .6 * hh, col, 1, 1) };
+    if (working){
+      const ic = toolIcon(P.d && P.d.tool), DK = "#3b4252";
+      if (ic === "pencil"){ px(0, 0, DK); px(1, 1, "#ffb020"); px(2, 2, "#ffb020"); px(3, 3, "#ff7aa8") }
+      else if (ic === "doc"){ for (const [c, r] of [[1, 0], [1, 1], [1, 2], [1, 3], [2, 3], [3, 0], [3, 1], [3, 2], [2, 0]]) px(c, r, "#5b9dff"); px(3, 3, "#bcd6ff"); px(2, 1, "#bcd6ff"); px(2, 2, "#bcd6ff") }
+      else if (ic === "term"){ px(0, 0, "#2b2f3a", 5, 4); px(1, 2, "#4fd17a"); px(2, 1, "#4fd17a"); px(1, 0, "#4fd17a"); px(3, 0, "#4fd17a") }
+      else if (ic === "lens"){ for (const [c, r] of [[1, 3], [2, 3], [0, 2], [3, 2], [1, 1], [2, 1]]) px(c, r, DK); px(1, 2, "#9fd8ff"); px(2, 2, "#9fd8ff"); px(3, 0, DK); px(4, 0, DK) }
+      else if (ic === "globe"){ px(1, 3, "#5b9dff", 3); px(0, 1, "#5b9dff", 5, 2); px(1, 0, "#5b9dff", 3); px(1, 2, "#4fbf7a"); px(3, 1, "#4fbf7a"); px(2, 0, "#4fbf7a") }
+      else if (ic === "list"){ for (const r of [3, 1.5, 0]){ px(0, r, "#4fbf7a", 1, .75); px(1.25, r, DK, 3, .75) } }
+      else if (ic === "gear"){ for (const [c, r] of [[1, 0], [2, 0], [3, 0], [1, 1], [3, 1], [1, 2], [2, 2], [3, 2], [2, 3], [0, 1], [4, 1]]) px(c, r, "#7d8593") }
+      else { const k = Math.floor(t * 3 + P.phase) % 4; for (let d = 0; d < 3; d++) px(.25 + d * 1.5, 1.2, d < k ? "#2fbf71" : "#b9e8cc", 1, 1) }
+    } else if (st === "finished" || st === "done"){ px(0, 1.5, C.white); px(1, .75, C.white); px(2, 1.5, C.white); px(3, 2.25, C.white); px(4, 3, C.white, 1, .75) }
+    else if (st === "failed"){ px(2, 1.2, C.white, 1, 2.6); px(2, 0, C.white, 1, .8) }
+    else if (st === "stopped"){ px(1, .5, C.white, 1, 3); px(3, .5, C.white, 1, 3) }
+    else if (st === "idle"){ px(1, 3, C.white, 3, .7); px(2.5, 2.2, C.white, 1, .8); px(1.5, 1.4, C.white, 1, .8); px(1, .6, C.white, 3, .7) }
+  }
+}
+
+/* ============================================================
+   WebGL2 渲染器
+   ============================================================ */
+const canvas = $("gl");
+const gl = canvas.getContext("webgl2", {antialias: true, alpha: true});
+if (!gl){ $("nogl").style.display = "block"; throw new Error("no webgl2") }
+canvas.addEventListener("webglcontextlost", e => e.preventDefault());
+canvas.addEventListener("webglcontextrestored", () => location.reload());
+const VS = `#version 300 es
+layout(location=0) in vec3 aC; layout(location=1) in vec3 aN; layout(location=2) in vec2 aUV;
+layout(location=3) in vec3 iP; layout(location=4) in vec3 iS; layout(location=5) in vec3 iCol; layout(location=6) in vec3 iX; layout(location=7) in float iH;
+uniform mat4 uVP; uniform float uTime;
+out vec3 vCol; out vec3 vN; out vec2 vE; out vec2 vD; out float vEm; out float vMode; out float vZ; out float vHL;
+void main(){
+  float t0 = iX.x;
+  float s = 1.0, dz = 0.0;
+  if (t0 >= 0.0){
+    float p = clamp((uTime - t0) / 0.55, 0.0, 1.0);
+    float e = 1.0 - (1.0 - p) * (1.0 - p) * (1.0 - p);
+    float q = p - 1.0;
+    float back = 1.0 + 2.70158 * q * q * q + 1.70158 * q * q;
+    s = p <= 0.0 ? 0.0 : clamp(mix(0.3, 1.0, back), 0.0, 1.12);
+    dz = (1.0 - e) * clamp(iS.z * 2.0 + 0.9, 0.9, 3.0);
+  }
+  vec3 p = iP + iS * 0.5 + (aC - 0.5) * iS * s + vec3(0.0, 0.0, dz);
+  gl_Position = uVP * vec4(p, 1.0);
+  float thin = min(min(iS.x, iS.y), iS.z);
+  gl_Position.z -= (1.0 - smoothstep(0.004, 0.06, thin)) * 0.00015;
+  vN = aN; vCol = iCol; vEm = iX.y; vMode = iX.z; vZ = p.z; vHL = iH;
+  vD = abs(aN.x) > 0.5 ? iS.yz : (abs(aN.y) > 0.5 ? iS.xz : iS.xy);
+  vE = aUV * vD;
+}`;
+const FS = `#version 300 es
+precision highp float;
+in vec3 vCol; in vec3 vN; in vec2 vE; in vec2 vD; in float vEm; in float vMode; in float vZ; in float vHL;
+uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uSky; uniform vec3 uGnd; uniform vec3 uWin; uniform float uNight;
+out vec4 o;
+void main(){
+  vec3 n = normalize(vN);
+  bool isWin = vMode > 1.5 && vMode < 2.5;
+  vec3 base = isWin ? mix(uWin, vCol, 0.18) : vCol;
+  float ndl = max(dot(n, uSun), 0.0);
+  vec3 amb = mix(uGnd, uSky, n.z * 0.5 + 0.5);
+  vec3 c = base * (amb + uSunCol * ndl);
+  if (n.z < 0.5 && vZ > -0.35) c *= mix(0.86, 1.0, smoothstep(0.0, 0.6, vZ));
+  float w = min(0.035, 0.16 * min(vD.x, vD.y));
+  vec2 d = min(vE, vD - vE);
+  c *= 1.0 - 0.17 * (1.0 - smoothstep(0.0, w, min(d.x, d.y)));
+  if (vEm > 0.0){
+    vec3 glow = isWin ? vec3(1.0, 0.86, 0.58) : (vMode > 0.5 && vMode < 1.5) ? vCol * 1.3 : vCol * vec3(1.08, 0.97, 0.82) + vec3(0.14, 0.10, 0.04);
+    c = mix(c, glow, clamp(vEm * uNight, 0.0, 1.0));
+  }
+  c = mix(c, c * 1.12 + vec3(0.08, 0.09, 0.1), vHL * 0.9);
+  o = vec4(c, 1.0);
+}`;
+function shader(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s }
+const prog = gl.createProgram();
+gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+const U = {}; for (const n of ["uVP", "uTime", "uSun", "uSunCol", "uSky", "uGnd", "uWin", "uNight"]) U[n] = gl.getUniformLocation(prog, n);
+const cube = [], idx = [];
+const FACES = [[[1,0,0], (u, v) => [1, u, v]], [[-1,0,0], (u, v) => [0, u, v]], [[0,1,0], (u, v) => [u, 1, v]], [[0,-1,0], (u, v) => [u, 0, v]], [[0,0,1], (u, v) => [u, v, 1]], [[0,0,-1], (u, v) => [u, v, 0]]];
+FACES.forEach(([nrm, fn], f) => { for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) cube.push(...fn(u, v), ...nrm, u, v); idx.push(f * 4, f * 4 + 1, f * 4 + 2, f * 4, f * 4 + 2, f * 4 + 3) });
+const cubeBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, cubeBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cube), gl.STATIC_DRAW);
+const idxBuf = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(idx), gl.STATIC_DRAW);
+function makeVAO(buf){
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, cubeBuf);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 32, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 32, 12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 32, 24);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  for (const [loc, off] of [[3, 0], [4, 12], [5, 24], [6, 36]]){ gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, STRIDE * 4, off); gl.vertexAttribDivisor(loc, 1) }
+  gl.enableVertexAttribArray(7); gl.vertexAttribPointer(7, 1, gl.FLOAT, false, STRIDE * 4, 48); gl.vertexAttribDivisor(7, 1);
+  gl.bindVertexArray(null); return vao;
+}
+const staticBuf = gl.createBuffer(), dynBuf = gl.createBuffer();
+const staticVAO = makeVAO(staticBuf), dynVAO = makeVAO(dynBuf);
+let staticCount = 0;
+
+/* ---------------- 相机：正交 2:1 等距 ---------------- */
+const PITCH = Math.PI / 6, YAW = Math.PI / 4;
+const DV = [Math.cos(PITCH) * Math.cos(YAW), Math.cos(PITCH) * Math.sin(YAW), Math.sin(PITCH)];
+const norm = v => { const l = Math.hypot(...v); return v.map(x => x / l) };
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const RV = norm(cross([0, 0, 1], DV)), UV = cross(DV, RV);
+const cam = {tx: 0, ty: 0, zoom: 20};
+let cssW = 1, cssH = 1;
+const VP = new Float32Array(16);
+const EYE = 150;                                    // 相机到目标的距离；近远平面收紧到 ±110，提高深度精度
+function updateVP(){
+  const eye = [cam.tx + DV[0] * EYE, cam.ty + DV[1] * EYE, DV[2] * EYE];
+  const hw = cssW / (2 * cam.zoom), hh = cssH / (2 * cam.zoom), n = EYE - 110, f = EYE + 110;
+  const V = [RV[0], UV[0], DV[0], 0, RV[1], UV[1], DV[1], 0, RV[2], UV[2], DV[2], 0, -dot(RV, eye), -dot(UV, eye), -dot(DV, eye), 1];
+  const P = [1 / hw, 0, 0, 0, 0, 1 / hh, 0, 0, 0, 0, -2 / (f - n), 0, 0, 0, -(f + n) / (f - n), 1];
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++){ let s = 0; for (let k = 0; k < 4; k++) s += P[k * 4 + r] * V[c * 4 + k]; VP[c * 4 + r] = s }
+}
+function project(x, y, z){
+  const cx = VP[0] * x + VP[4] * y + VP[8] * z + VP[12], cy = VP[1] * x + VP[5] * y + VP[9] * z + VP[13];
+  return [(cx * .5 + .5) * cssW, (1 - (cy * .5 + .5)) * cssH];
+}
+function rayAt(sx, sy){
+  const nx = sx / cssW * 2 - 1, ny = 1 - sy / cssH * 2, hw = cssW / (2 * cam.zoom), hh = cssH / (2 * cam.zoom), b = [cam.tx, cam.ty, 0];
+  return [0, 1, 2].map(i => b[i] + DV[i] * EYE + RV[i] * nx * hw + UV[i] * ny * hh);
+}
+function ground(sx, sy){ const p = rayAt(sx, sy), t = p[2] / DV[2]; return [p[0] - DV[0] * t, p[1] - DV[1] * t] }
+function camTarget(x, y, z, zoom, down = 0){
+  const g = [x - DV[0] * z / DV[2], y - DV[1] * z / DV[2]], v = [UV[0] - DV[0] * UV[2] / DV[2], UV[1] - DV[1] * UV[2] / DV[2]], k = down * cssH / zoom;
+  return {tx: g[0] + v[0] * k, ty: g[1] + v[1] * k, zoom};
+}
+function fit(){
+  const c = S.world; if (!c) return;
+  const pts = []; for (const x of [0, c.MW]) for (const y of [0, c.MD]) for (const z of [-2.6, 4]) pts.push([x, y, z]);
+  const xs = pts.map(p => dot(p, RV)), ys = pts.map(p => dot(p, UV));
+  const w = Math.max(...xs) - Math.min(...xs), hgt = Math.max(...ys) - Math.min(...ys);
+  const top = 54, bot = 58;
+  cam.zoom = clamp(Math.min((cssW - 24) / w, (cssH - top - bot) / hgt), 4, 90);
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2 + (top - bot) / 2 / cam.zoom;
+  const p = [RV[0] * cx + UV[0] * cy, RV[1] * cx + UV[1] * cy, RV[2] * cx + UV[2] * cy], t = p[2] / DV[2];
+  cam.tx = p[0] - DV[0] * t; cam.ty = p[1] - DV[1] * t;
+}
+function resize(){
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const box = $("office"); cssW = Math.max(1, box.clientWidth); cssH = Math.max(1, box.clientHeight);
+  canvas.width = Math.round(cssW * dpr); canvas.height = Math.round(cssH * dpr);
+  if (S.autoFit) fit();
+  schedule();
+}
+
+/* ============================================================
+   昼夜：服务器时间（浏览器时区）插值关键帧；室内夜里亮灯
+   ============================================================ */
+const KEYS = [
+  {h: 0,    top: "#0b1736", bot: "#26305e", sun: "#8ea3e6", si: .24, sky: "#33416e", gnd: "#1b2034", night: 1},
+  {h: 4.8,  top: "#0d1a3c", bot: "#2b3566", sun: "#8ea3e6", si: .24, sky: "#33416e", gnd: "#1b2034", night: 1},
+  {h: 6.2,  top: "#7090d8", bot: "#ffc4a3", sun: "#ffc49a", si: .42, sky: "#7a7f9e", gnd: "#4a4248", night: .3},
+  {h: 8,    top: "#8ccaf7", bot: "#eaf6ff", sun: "#fff1dc", si: .5,  sky: "#959fb0", gnd: "#5e5a58", night: 0},
+  {h: 12,   top: "#74c0ff", bot: "#def2ff", sun: "#ffffff", si: .55, sky: "#9aa4b4", gnd: "#625e5a", night: 0},
+  {h: 15.5, top: "#82c4f8", bot: "#fff0d6", sun: "#fff2dc", si: .52, sky: "#96a0ae", gnd: "#605a55", night: 0},
+  {h: 17.3, top: "#f0a160", bot: "#ffd79a", sun: "#ffb066", si: .5,  sky: "#8a7f86", gnd: "#5a4640", night: .12},
+  {h: 18.5, top: "#6a4e9c", bot: "#f2896b", sun: "#ff8a66", si: .3,  sky: "#5d5679", gnd: "#3a2f3c", night: .6},
+  {h: 19.6, top: "#162250", bot: "#3a3772", sun: "#8ea3e6", si: .24, sky: "#33416e", gnd: "#1b2034", night: 1},
+  {h: 24,   top: "#0b1736", bot: "#26305e", sun: "#8ea3e6", si: .24, sky: "#33416e", gnd: "#1b2034", night: 1}
+];
+function lightAt(hr){
+  let i = 0; while (i < KEYS.length - 2 && KEYS[i + 1].h <= hr) i++;
+  const a = KEYS[i], b = KEYS[i + 1], t = clamp((hr - a.h) / (b.h - a.h), 0, 1), s = t * t * (3 - 2 * t);
+  const L = {night: lerp(a.night, b.night, s), si: lerp(a.si, b.si, s)};
+  for (const k of ["top", "bot", "sun", "sky", "gnd"]) L[k] = mixHex(a[k], b[k], s);
+  const f = clamp((hr - 6) / 13, 0, 1), az = lerp(-.25, 1.8, f), el = .45 + .95 * Math.sin(f * Math.PI);
+  const day = norm([Math.cos(az), Math.sin(az), el]), moon = norm([.55, .45, .9]);
+  L.dir = norm(day.map((v, i) => lerp(v, moon[i], L.night)));
+  return L;
+}
+const PHASES = [[5, 10, "早上", "🌅"], [10, 16, "中午", "☀️"], [16, 19.5, "黄昏", "🌇"]];
+const phaseOf = hr => { for (const [a, b, n, ic] of PHASES) if (hr >= a && hr < b) return [n, ic]; return ["夜晚", "🌙"] };
+(function makeStars(){ const r = rng32(7); let s = ""; for (let i = 0; i < 110; i++) s += `<i style="left:${(r() * 100).toFixed(2)}%;top:${(r() * 100).toFixed(2)}%;opacity:${(.4 + r() * .6).toFixed(2)};animation-delay:${(r() * 3).toFixed(2)}s;transform:scale(${(.5 + r()).toFixed(2)})"></i>`; $("stars").innerHTML = s })();
+let lastSky = "";
+function applySky(hr, L){
+  const sky = `linear-gradient(180deg,${L.top} 0%,${L.bot} 78%)`;
+  if (sky !== lastSky){ $("sky").style.background = sky; lastSky = sky }
+  $("stars").style.opacity = L.night.toFixed(3);
+  const f = (hr - 6) / 13, sun = $("sun");
+  sun.style.opacity = (f > -.05 && f < 1.05 ? 1 - L.night : 0).toFixed(3);
+  sun.style.left = (8 + 84 * clamp(f, 0, 1)) + "%"; sun.style.top = (42 - 20 * Math.sin(clamp(f, 0, 1) * Math.PI)) + "%";   // 最高处也在左上角名牌栏之下
+  const g = (((hr - 19) % 24) + 24) % 24 / 11, moon = $("moon");
+  moon.style.opacity = (g <= 1 ? L.night : 0).toFixed(3);
+  moon.style.left = (8 + 84 * clamp(g, 0, 1)) + "%"; moon.style.top = (40 - 16 * Math.sin(clamp(g, 0, 1) * Math.PI)) + "%";
+}
+
+/* ============================================================
+   数据 → 办公区；人员管理（入座 / 从电梯走进来 / 走回电梯离开）
+   ============================================================ */
+const AG_KEEP = 15 * 60e3, ZONE_KEEP = 30 * 60e3, MAX_SUB = 36;
+const S = {world: null, start: performance.now(), autoFit: true, skew: 0, data: null, sig: "", slots: new Map(),
+           hourMode: "auto", themeMode: "auto", hourShown: null, people: new Map(), labelEls: [], zoneEls: [], lastFrame: 0, raf: 0,
+           animEnd: 0, hover: null, tween: null, down: null, layout: "jp"};
+// 版式：链接参数 ?layout= 优先，其次本地记忆
+try { const q = new URLSearchParams(location.search).get("layout"), m = localStorage.getItem("office.layout"); S.layout = LAYOUTS[q] ? q : LAYOUTS[m] ? m : "jp" } catch {}
+
+/* 任务键：同一 id 可能出现在不同档位 / 设备上 */
+function leadKey(l){ return l.src + "|" + l.id }
+function devOf(d, id){ return String(id || "").split("@")[1] || d.host || "本机" }
+/* 当前选中任务 → 一间办公室；页面层会替换 selLead（按任务栏的选择） */
+let selLead = d => (d.leads || []).find(l => l.status === "working") || (d.leads || [])[0] || null;
+function officesFrom(d){
+  const l = selLead(d), srcLabel = new Map((d.sources || []).map(s => [s.id, String(s.label).split(" · ")[0]]));
+  const dev = l ? devOf(d, l.src) : (d.host || "本机"), hex = DEV_HEX[hashStr(dev) % DEV_HEX.length];
+  if (!l) return [{id: dev, label: dev, hex, zones: []}];
+  // 已结束的任务按它最后活动的时刻取在座的人（定格在下班那一刻）
+  const live = l.status === "working" || l.status === "idle", ref = live ? d.now : l.last, key = leadKey(l);
+  const subs = l.agents.filter(a => a.status === "working" || ref - a.last < AG_KEEP)
+    .sort((a, b) => (a.status !== "working") - (b.status !== "working") || b.last - a.last).slice(0, MAX_SUB);
+  // 槽位：已经坐着的保持原位，新人填最小空位；有空洞导致多占一列时压紧
+  let sm = S.slots.get(key); if (!sm){ sm = new Map(); S.slots.set(key, sm) }
+  const ids = new Set(subs.map(a => a.id));
+  for (const k of [...sm.keys()]) if (!ids.has(k)) sm.delete(k);
+  const used = new Set(sm.values());
+  for (const a of subs) if (!sm.has(a.id)){ let s = 0; while (used.has(s)) s++; sm.set(a.id, s); used.add(s) }
+  const need = Math.max(1, Math.ceil(subs.length / 2));
+  if (Math.floor(Math.max(-1, ...sm.values()) / 2) + 1 > need) [...sm.entries()].sort((a, b) => a[1] - b[1]).forEach(([k], i) => sm.set(k, i));
+  // 每岛 12 个座位；超过就开第 2、3 个岛（续岛没有课长席）
+  const parts = [];
+  for (const a of subs){ const s = sm.get(a.id), p = Math.floor(s / (MAXP * 2)); (parts[p] = parts[p] || []).push({id: a.id, slot: s % (MAXP * 2), status: a.status, a}) }
+  const groups = Array.from({length: Math.max(1, parts.length)}, (_, i) => parts[i] || []);
+  const hidden = l.agents.filter(a => a.status === "working").length - subs.filter(a => a.status === "working").length;
+  const base = {title: l.title || l.project || l.name, name: l.name, face: l.face, status: l.status, src: srcLabel.get(l.src) || "", hex: srcHex(l.src), lead: l};
+  return [{id: dev, label: dev, hex, zones: groups.map((ps, i) => ({...base, key: i ? key + "#" + i : key, part: i,
+    pairs: clamp(Math.floor(Math.max(-1, ...ps.map(x => x.slot)) / 2) + 1, 1, MAXP), subs: ps, hidden: i ? 0 : hidden}))}];
+}
+const DEMO = (() => { const now = Date.now(), ag = (id, name, type, status, tool) => ({id, name, type, status, tool, task: "示例子任务", start: now - 9e5, last: now, reply: "这是演示数据。"});
+  return {now, host: "Demo", hours: 12, events: [], sources: [{id: "app", label: "Claude App", sessions: 2, online: 2, working: 1, agents: 5, dir: "演示数据"}], leads: [
+    {id: "d1", src: "app", name: "Aurora", title: "示例任务 · 重构", status: "working", start: now - 3e6, last: now, tool: "Edit", agents: [ag("a1", "Hazel", "implementer", "working", "Edit"), ag("a2", "Sage", "researcher", "finished"), ag("a3", "Mira", "code-explorer", "working", "Grep")]},
+    {id: "d2", src: "app", name: "Nova", title: "示例任务 · 文档", status: "idle", start: now - 2e6, last: now, agents: [ag("b1", "Esme", "docs-writer", "working", "Write"), ag("b2", "Juno", "helper", "failed")]}]} })();
+
+function staticSig(offices){
+  return JSON.stringify(offices.map(o => [o.id, o.zones.map(z => [z.key, z.status, z.pairs, z.src, z.subs.map(s => [s.slot, s.status === "working", s.id])])]));
+}
+
+function build(offices, animate){
+  const w = buildWorld(offices, {animate});
+  S.world = w;
+  gl.bindBuffer(gl.ARRAY_BUFFER, staticBuf); gl.bufferData(gl.ARRAY_BUFFER, w.data, gl.STATIC_DRAW);
+  staticCount = w.count;
+  const lab = $("labels"); lab.replaceChildren(); S.labelEls = []; S.zoneEls = [];
+  for (const L of w.labels){
+    const e = document.createElement("div"); e.className = "ol";
+    e.innerHTML = `<i style="background:${L.off.hex}"></i>${h(L.off.label)}`;
+    lab.appendChild(e); S.labelEls.push([e, L]);
+  }
+  for (const Z of w.zoneLabels){
+    const e = document.createElement("div"); e.className = "zl"; e.innerHTML = zoneLabelHTML(Z);
+    lab.appendChild(e); S.zoneEls.push([e, Z]);
+  }
+  if (S.autoFit) fit();
+}
+
+// 去处规则：完成的子 agent → 休息区；讨论类（advisor / Plan / reviewer…）工作时 → 会议室；运维类（ops / deploy / helper…）工作时 → 机房；其余 → 自己的工位
+const MEET_RE = /advis|plan|review|brain|consult|architect|discuss|debate|judge|critic|verif|reason|council/i;
+const OPS_RE = /ops|deploy|infra|sre|\bci\b|release|docker|k8s|kube|monitor|admin|helper|maint/i;
+const PLACE_ZH = {meet: "在会议室开会", lounge: "在休息区休息", srv: "在机房操作"};
+const placeKind = sp => sp.boss ? null : sp.status === "finished" ? "lounge" : sp.status === "working" && MEET_RE.test(sp.type || "") ? "meet" : sp.status === "working" && OPS_RE.test(sp.type || "") ? "srv" : null;
+
+// 人员同步：首次（或铺设动画未完）直接就位；之后新人从电梯走进来，换去处的人沿通道走过去，离开的人走回电梯
+function syncPeople(offices, settle){
+  const w = S.world, plan = new Map();
+  offices.forEach((o, oi) => { for (const z of o.zones){
+    if (!z.part) plan.set(z.key + "|boss", {boss: true, name: z.name, type: "lead", status: z.status, d: z.lead, z, oi});
+    for (const s of z.subs) plan.set(z.key + "|" + s.id, {boss: false, name: s.a.name, type: s.a.type, status: s.status, d: s.a, z, oi});
+  }});
+  for (const [k, p] of S.people){
+    if (plan.has(k) && w.seats.has(k)) continue;
+    if (!settle && (p.state === "seat" || p.state === "stand") && p.at) walkTo(p, null);
+    else if (p.state !== "out") S.people.delete(k);
+  }
+  // 位置分配：已经在用的保留，其余按顺序分配空位；满了就留在自己工位
+  const taken = new Set();
+  for (const [k, sp] of plan){
+    sp.home = w.seats.get(k); sp.kind = placeKind(sp);
+    const p = S.people.get(k), cur = p && p.want && w.spotMap.get(p.want.id);
+    if (sp.kind && cur && cur.kind === sp.kind && !taken.has(cur.id)){ sp.spot = cur; taken.add(cur.id) }
+  }
+  for (const [, sp] of plan){
+    if (!sp.kind || sp.spot) continue;
+    const free = ((w.spots[sp.oi] || {})[sp.kind] || []).find(x => !taken.has(x.id));
+    if (free){ sp.spot = free; taken.add(free.id) }
+  }
+  for (const [k, sp] of plan){
+    if (!sp.home) continue;
+    const target = sp.spot || sp.home;
+    let p = S.people.get(k);
+    if (!p){
+      p = {key: k, look: lookOf(sp.name, sp.type, sp.boss), phase: Math.random() * 6.28, dir: 0, walk: 0, t0: -1};
+      S.people.set(k, p);
+      if (settle) place(p, target, target.t); else enter(p, target);
+    } else if (p.state === "out") enter(p, target);
+    else if (p.state === "seat" || p.state === "stand"){
+      if (p.at && p.at.id !== target.id && !settle) walkTo(p, target); else place(p, target, p.t0);
+    } else if (p.next && p.next.id === target.id) p.next = target;
+    Object.assign(p, {boss: sp.boss, name: sp.name, status: sp.status, d: sp.d, z: sp.z, oi: sp.oi, want: target});
+  }
+}
+function place(p, target, t0){ Object.assign(p, {state: target.pose || "seat", at: target, next: null, x: target.p[0], y: target.p[1], dir: target.dir, t0}) }
+function setPath(p, path, state, next){
+  const cum = [0]; for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
+  Object.assign(p, {state, path, cum, s: 0, t0: -1, next, x: path[0][0], y: path[0][1]});
+}
+function enter(p, target){ setPath(p, [...S.world.entry[target.oi], ...target.approach.slice(1)], "in", target) }
+// 从当前位置先退回枢纽，再走向目标；target 为空表示下班离开（走回电梯）
+function walkTo(p, target){
+  const back = [[p.x, p.y], ...p.at.approach.slice().reverse().slice(1)];
+  if (!target){ const e = (S.world.entry[p.at.oi] || []).slice().reverse(); setPath(p, [...back, ...e.slice(1)], "out", null); return }
+  setPath(p, [...back, ...target.approach.slice(1)], "in", target);
+}
+function stepPeople(dt){
+  for (const [k, p] of S.people){
+    if (p.state === "seat" || p.state === "stand") continue;
+    p.s += dt * 1.9; p.walk += dt * 11;
+    const L = p.cum[p.cum.length - 1];
+    if (p.s >= L){ if (p.state === "in" && p.next) place(p, p.next, -1); else S.people.delete(k); continue }
+    let i = 1; while (i < p.cum.length - 1 && p.cum[i] < p.s) i++;
+    const a = p.path[i - 1], b = p.path[i], u = (p.s - p.cum[i - 1]) / Math.max(1e-6, p.cum[i] - p.cum[i - 1]);
+    p.x = lerp(a[0], b[0], u); p.y = lerp(a[1], b[1], u);
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    p.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 0 : 2) : (dy > 0 ? 1 : 3);
+  }
+}
+
+function dynamic(t, dt){
+  OUT = []; EM = 0; HL = 0;
+  stepPeople(dt);
+  for (const p of S.people.values()){ HL = S.hover === p.key ? 1 : 0; personVox(p, t) }
+  HL = 0;
+  // 电梯门：有人在门口附近就打开
+  for (const d of S.world.doors){
+    let near = false;
+    if (d.main) for (const p of S.people.values()) if ((p.state === "in" || p.state === "out") && Math.hypot(p.x - d.x, p.y - d.y) < 1.4) near = true;
+    d.open = lerp(d.open, near ? 1 : 0, Math.min(1, dt * 6));
+    const half = .6 * (1 - d.open);
+    add(d.x - .02, d.y - .6, 0, .1, half, 1.82, C.steel, -1, .2); add(d.x - .02, d.y + .6 - half, 0, .1, half, 1.82, C.steel, -1, .2);
+    if (half > .05){ add(d.x + .07, d.y - .6 + half - .02, .2, .02, .02, 1.4, C.metal, -1); add(d.x + .07, d.y + .6 - half, .2, .02, .02, 1.4, C.metal, -1) }
+  }
+  const arr = new Float32Array(OUT);
+  gl.bindBuffer(gl.ARRAY_BUFFER, dynBuf); gl.bufferData(gl.ARRAY_BUFFER, arr, gl.DYNAMIC_DRAW);
+  return arr.length / STRIDE;
+}
+
+function currentHour(){
+  const d = new Date(Date.now() + S.skew);
+  const real = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+  const target = S.hourMode !== "auto" ? +S.hourMode : S.themeMode === "light" ? 12.5 : S.themeMode === "night" ? 21.5 : real;   // “跟随”页面主题
+  if (S.hourShown === null) S.hourShown = target;
+  let diff = target - S.hourShown; if (diff > 12) diff -= 24; if (diff < -12) diff += 24;
+  S.hourShown = (((S.hourShown + diff * .06) % 24) + 24) % 24;
+  if (Math.abs(diff) < .002) S.hourShown = target;
+  return S.hourShown;
+}
+
+function renderLabels(t){
+  for (const [e, L] of S.labelEls){ const [x, y] = project(L.x, L.y, L.z); e.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`; e.classList.toggle("vis", t > L.t || L.t < 0) }
+  const showZ = cam.zoom >= 11, mini = cam.zoom < 60;          // 全景只显示紧凑名牌；放大后显示完整信息和设施名
+  for (const [e, Z] of S.zoneEls){ const [x, y] = project(Z.x, Z.y, Z.z); e.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-100%)`; e.classList.toggle("mini", mini); e.classList.toggle("vis", showZ && (!Z.amen || !mini) && (t > Z.t || Z.t < 0)) }
+}
+function zoneLabelHTML(Z){
+  if (Z.amen) return `<i style="background:#9aa3ad"></i><b>${h(Z.amen)}</b>`;
+  const z = Z.Z, busy = (z.status === "working" ? 1 : 0) + z.subs.filter(s => s.status === "working").length;
+  return `<i style="background:${ST_COL[z.status] || "#b6bec9"}"></i><b>${h(z.title)}</b><small style="color:${z.hex}">${h(z.src)}</small><small>主1 · 子${z.subs.length}${z.hidden > 0 ? `+${z.hidden}` : ""}</small>${busy ? `<em>${busy} 在忙</em>` : ""}`;
+}
+
+function frame(ts){
+  S.raf = 0;
+  if (document.hidden || !S.world) return;
+  const dt = S.lastFrame ? Math.min(.5, (ts - S.lastFrame) / 1000) : 0;   // 低帧率（后台面板）时走路也不至于停滞
+  S.lastFrame = ts;
+  const t = (ts - S.start) / 1000;
+  if (S.tween){
+    const p = clamp((ts - S.tween.t0) / S.tween.dur, 0, 1), e = p * p * (3 - 2 * p);
+    for (const k of ["tx", "ty", "zoom"]) cam[k] = lerp(S.tween.a[k], S.tween.b[k], e);
+    if (p >= 1) S.tween = null;
+  }
+  const hr = currentHour(), L = lightAt(hr);
+  applySky(hr, L);
+  const [pn, pic] = phaseOf(hr), hh = Math.floor(hr), mm = Math.floor((hr - hh) * 60);
+  $("sceneclock").textContent = `${pic} ${pn} ${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+  const nDyn = dynamic(t, dt);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+  gl.useProgram(prog);
+  updateVP();
+  gl.uniformMatrix4fv(U.uVP, false, VP);
+  gl.uniform1f(U.uTime, t);
+  gl.uniform3fv(U.uSun, L.dir); gl.uniform3fv(U.uSunCol, rgbOf(L.sun).map(v => v * L.si));
+  gl.uniform3fv(U.uSky, rgbOf(L.sky)); gl.uniform3fv(U.uGnd, rgbOf(L.gnd));
+  gl.uniform3fv(U.uWin, rgbOf(mixHex(mixHex(L.bot, L.top, .4), "#ffffff", .25)));
+  gl.uniform1f(U.uNight, L.night);
+  gl.bindVertexArray(staticVAO); gl.drawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0, staticCount);
+  if (nDyn){ gl.bindVertexArray(dynVAO); gl.drawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0, nDyn) }
+  gl.bindVertexArray(null);
+  renderLabels(t);
+  const p = clamp(t / S.world.maxT, 0, 1);
+  $("lbar").style.width = (p * 100).toFixed(1) + "%"; $("lpct").textContent = Math.round(p * 100) + "%";
+  $("ltext").textContent = p < .5 ? "正在铺设办公区…" : p < .85 ? "正在摆放工位…" : p < 1 ? "员工入座…" : "完成";
+  $("loader").classList.toggle("done", p >= 1);
+  S.raf = requestAnimationFrame(frame);
+}
+function schedule(){ if (!S.raf) S.raf = requestAnimationFrame(frame) }
+document.addEventListener("visibilitychange", () => { S.lastFrame = 0; schedule() });
+
+/* 数据更新（页面轮询调用）：结构变了就重建静态场景（铺设动画进行中则继续动画），再同步人员；replay = 重新铺设 */
+function sceneUpdate(d, replay){
+  S.skew = d.now - Date.now(); S.data = d;
+  if (replay){ sceneReplay(); return }
+  const offices = officesFrom(d), sig = staticSig(offices);
+  const animating = (performance.now() - S.start) / 1000 < S.animEnd;
+  if (sig !== S.sig){ S.sig = sig; build(offices, animating) }
+  syncPeople(offices, animating);
+  const zs = offices.flatMap(o => o.zones);
+  for (const [e, Z] of S.zoneEls){ if (Z.amen) continue; const z = zs.find(x => x.key === Z.Z.key); if (z){ Z.Z = z; e.innerHTML = zoneLabelHTML(Z) } }
+  $("oempty").style.display = zs.length ? "none" : "block";
+}
+/* 重新铺设：首次加载、切换任务、换版式、点 ↻ */
+function sceneReplay(){
+  if (!S.data) return;
+  const offices = officesFrom(S.data);
+  S.sig = staticSig(offices); S.start = performance.now(); S.autoFit = true; S.tween = null;
+  build(offices, true); S.animEnd = S.world.maxT; S.people.clear(); syncPeople(offices, true); schedule();
+  $("oempty").style.display = offices[0].zones.length ? "none" : "block";
+}
+
+/* ---------------- 交互：悬停小人看详情 / 点分区牌聚焦 / 拖动 / 缩放 ---------------- */
+function pickPerson(sx, sy){
+  const O = rayAt(sx, sy), Dr = DV.map(v => -v);
+  let best = null, bt = Infinity;
+  for (const p of S.people.values()){
+    const lo = [p.x - .35, p.y - .35, 0], hi = [p.x + .35, p.y + .35, p.state === "seat" || p.state === "stand" ? 2.3 : 1.6];
+    let t0 = -Infinity, t1 = Infinity;
+    for (let i = 0; i < 3; i++){ const a = (lo[i] - O[i]) / Dr[i], c = (hi[i] - O[i]) / Dr[i]; t0 = Math.max(t0, Math.min(a, c)); t1 = Math.min(t1, Math.max(a, c)) }
+    if (t1 >= t0 && t0 < bt){ bt = t0; best = p }
+  }
+  return best;
+}
+const tip = $("tip");
+function hideTip(){ tip.style.display = "none" }
+function showTip(p, sx, sy){
+  const d = p.d || {}, now = S.data ? S.data.now : Date.now(), row = (k, v) => v ? `<div class="tr">${k}：<b>${h(v)}</b></div>` : "";
+  const walking = p.state === "in" ? "（正在走过去）" : p.state === "out" ? "（正在离开）" : "";
+  tip.innerHTML = `<h4><i style="background:${ST_COL[p.status] || "#9aa3ad"}"></i>${p.boss ? "★ " : ""}${h(p.name)} <small>${p.boss ? "主 agent" : h(d.type || "子 agent")} · ${h(ST_ZH[p.status] || p.status)}${walking}</small></h4>`
+    + row(p.boss ? "任务" : "子任务", p.boss ? p.z.title : d.task) + (p.boss ? "" : row("所属任务", p.z.title))
+    + row("位置", p.state === "in" || p.state === "out" ? "" : PLACE_ZH[p.at && p.at.kind] || (p.boss ? "在课长席" : "在工位")) + row("档位", p.z.src) + row("模型", d.model) + row("工具", p.status === "working" && d.tool ? toolName(d.tool) : "")
+    + (d.start && d.last ? row("用时", dur(d.last - d.start) + (p.status === "working" ? "" : " · " + dur(now - d.last) + " 前")) : "")
+    + (d.reply ? `<div class="r">${h(d.reply)}</div>` : "");
+  tip.style.display = "block";
+  const r = tip.getBoundingClientRect();
+  let x = sx + 16, y = sy + 16;
+  if (x + r.width > innerWidth - 8) x = sx - r.width - 16;
+  if (y + r.height > innerHeight - 8) y = Math.max(8, sy - r.height - 16);
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+const loc = e => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top] };   // 画布内坐标
+let onPersonClick = null;                                     // 页面层挂钩：点小人时在排班里定位
+function hoverAt(e){
+  const [x, y] = loc(e), p = pickPerson(x, y);
+  S.hover = p ? p.key : null;
+  canvas.classList.toggle("pick", !!p);
+  if (p) showTip(p, e.clientX, e.clientY); else hideTip();
+}
+const ptrs = new Map(); let pinch = null, dragG = null;
+canvas.addEventListener("pointerdown", e => {
+  canvas.setPointerCapture(e.pointerId); const q = loc(e); ptrs.set(e.pointerId, q);
+  if (ptrs.size === 1){ dragG = ground(...q); S.down = {x: q[0], y: q[1], moved: false} }
+  if (ptrs.size === 2){ const [a, b] = [...ptrs.values()]; pinch = {d: Math.hypot(a[0] - b[0], a[1] - b[1]), m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]}; dragG = null }
+});
+canvas.addEventListener("pointermove", e => {
+  if (!ptrs.has(e.pointerId)){ hoverAt(e); return }
+  const q = loc(e); ptrs.set(e.pointerId, q);
+  if (S.down && !S.down.moved){
+    if (ptrs.size === 1 && Math.hypot(q[0] - S.down.x, q[1] - S.down.y) <= 5) return;
+    S.down.moved = true; canvas.classList.add("drag"); hideTip(); S.tween = null;
+  }
+  if (ptrs.size === 2 && pinch){
+    const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const g0 = ground(...pinch.m); zoomBy(d / pinch.d, m[0], m[1]); const g1 = ground(...m);
+    cam.tx += g0[0] - g1[0]; cam.ty += g0[1] - g1[1]; pinch = {d, m};
+  } else if (dragG){ const g = ground(...q); cam.tx += dragG[0] - g[0]; cam.ty += dragG[1] - g[1] }
+  S.autoFit = false;
+});
+const endPtr = e => {
+  if (e.type === "pointerup" && ptrs.size === 1 && S.down && !S.down.moved){
+    const p = pickPerson(...loc(e));
+    if (p){ S.hover = p.key; showTip(p, e.clientX, e.clientY); if (onPersonClick) onPersonClick(p) } else { S.hover = null; hideTip() }
+  }
+  if (ptrs.size <= 1) S.down = null;
+  ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null;
+  if (!ptrs.size){ dragG = null; canvas.classList.remove("drag") } else if (ptrs.size === 1){ const [p] = [...ptrs.values()]; dragG = ground(...p) }
+};
+canvas.addEventListener("pointerup", endPtr); canvas.addEventListener("pointercancel", endPtr);
+canvas.addEventListener("pointerleave", () => { if (!ptrs.size){ S.hover = null; hideTip(); canvas.classList.remove("pick") } });
+function zoomBy(f, sx, sy){
+  S.tween = null;
+  const g0 = ground(sx, sy); cam.zoom = clamp(cam.zoom * f, 4, 90); const g1 = ground(sx, sy);
+  cam.tx += g0[0] - g1[0]; cam.ty += g0[1] - g1[1]; S.autoFit = false;
+}
+canvas.addEventListener("wheel", e => { e.preventDefault(); zoomBy(Math.exp(-e.deltaY * .0015), ...loc(e)) }, {passive: false});
+$("zin").onclick = () => zoomBy(1.25, cssW / 2, cssH / 2);
+$("zout").onclick = () => zoomBy(.8, cssW / 2, cssH / 2);
+$("zfit").onclick = () => { S.autoFit = true; S.tween = null; fit() };
+$("lay").innerHTML = Object.entries(LAYOUTS).map(([k, v]) => `<option value="${k}"${k === S.layout ? " selected" : ""}>🏢 ${v.name}</option>`).join("");
+$("lay").onchange = e => { S.layout = e.target.value; try { localStorage.setItem("office.layout", S.layout) } catch {} $("replay").onclick() };
+$("replay").onclick = () => sceneReplay();
+$("timebar").addEventListener("click", e => {
+  const b = e.target.closest("button[data-h]"); if (!b) return;
+  S.hourMode = b.dataset.h; for (const x of $("timebar").querySelectorAll("button")) x.classList.toggle("on", x === b);
+});
+$("labels").addEventListener("click", e => {
+  const el = e.target.closest(".zl.vis"); if (!el) return;
+  const Z = S.zoneEls.find(([x]) => x === el)?.[1]; if (!Z) return;
+  S.tween = {a: {...cam}, b: camTarget(Z.cx, Z.cy, .6, Math.max(cam.zoom, 64), .05), t0: performance.now(), dur: 650}; S.autoFit = false;
+});
+const officeRO = new ResizeObserver(() => resize()); officeRO.observe($("office"));
+var SCENE_OK = true;                                         // 页面层据此判断体素场景可用
+</script>
+<script>
+/* 原泳道看板（顶部统计 / 档位 / 排班泳道 / 日志 / 跑马灯），包成模块以免与体素场景的全局名冲突 */
+const Deck = (() => {
 const $ = id => document.getElementById(id);
 const SRC_COLOR = {app:"var(--app)", cli:"var(--cli)", ds:"var(--ds)", qwen:"var(--qwen)"};
 const SRC_HEX = {app:"#e08a5f", cli:"#b8b3a8", ds:"#5b9dff", qwen:"#a884ff"};
@@ -227,7 +1687,7 @@ function localSet(k,v){try{localStorage.setItem("deck."+k,v)}catch{}}
 
 function srcBase(id){return String(id||"").split("@")[0]}
 function sCol(id){return SRC_COLOR[srcBase(id)]||"#9a958c"}
-function sHex(id){return SRC_HEX[srcBase(id)]||"#9a958c"}
+function sHex(id){return sCol(id)}   /* 用 CSS 变量，白天 / 夜晚各自取色 */
 /* ---------- 增量更新：把新 HTML 与现有 DOM 对比，只改有变化的文字/属性，元素尽量复用
    （图片不重新加载、动画不中断）；带 data-key 的元素按 key 匹配，新出现的条目淡入。 */
 function patch(el, html){
@@ -261,7 +1721,8 @@ function morph(a,b,animate){
 
 function h(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 function hash(s){let x=2166136261;for(const c of String(s)){x^=c.charCodeAt(0);x=Math.imul(x,16777619)}return x>>>0}
-function jobColor(j){return j==="lead"?"#ebe7df":JOB_PALETTE[hash(j)%JOB_PALETTE.length]}
+function darken(c){return "#"+[1,3,5].map(i=>Math.round(parseInt(c.slice(i,i+2),16)*.68).toString(16).padStart(2,"0")).join("")}
+function jobColor(j){if(j==="lead")return "var(--text)";const c=JOB_PALETTE[hash(j)%JOB_PALETTE.length];return document.documentElement.dataset.theme==="light"?darken(c):c}
 function now(){return Date.now()+S.skew}
 function dur(ms){ms=Math.max(0,ms);const s=Math.round(ms/1000);if(s<60)return s+"s";const m=Math.floor(s/60);if(m<60)return m+"m "+String(s%60).padStart(2,"0")+"s";return Math.floor(m/60)+"h "+String(m%60).padStart(2,"0")+"m"}
 function ago(t){const s=Math.round((now()-t)/1000);if(s<60)return s+"s 前";const m=Math.round(s/60);if(m<120)return m+"m 前";return Math.round(m/60)+"h 前"}
@@ -335,6 +1796,7 @@ function renderStats(){
 }
 
 function renderSources(){
+  if(!$("sources")) return;   /* 主页面不显示档位筛选栏（数字已在顶部） */
   patch($("sources"),`<span class="lab">SOURCES</span>`+S.data.sources.filter(s=>s.sessions||srcBase(s.id)!=="cli").map(s=>`
     <button class="src ${S.off.has(s.id)?"off":""}" data-src="${h(s.id)}" title="${h(s.dir)} · 点击显示/隐藏">
       <span class="dot" style="background:${sCol(s.id)}"></span>
@@ -389,7 +1851,7 @@ function leadRow(l, live, hasKids){
   const n=l.agents.length, w=l.agents.filter(a=>a.status==="working").length;
   const fin=l.agents.filter(a=>a.status==="finished").length, stp=n-w-fin;
   const isW=l.status==="working";
-  return `<div class="row lead ${isW?"isw":""} ${hasKids?"kids":""}">
+  return `<div class="row lead ${isW?"isw":""} ${hasKids?"kids":""}" data-lead="${h(l.src+"|"+l.id)}" title="点击切换到这间办公室">
     <div class="who">
       <div class="av">${avatar(l.id,"lead",l.face||l.name)}<span class="sb" style="background:${sCol(l.src)}"></span></div>
       <div class="txt">
@@ -428,7 +1890,7 @@ function leadBlock(l, live){
     s+=`<div class="more">+ ${rest} more · ${fin} 完成 · ${rest-fin} 其他 · <button data-all="${h(l.id)}">▾ 全部展开</button></div>`}
   else if(all && l.agents.length>LIMIT) s+=`<div class="more"><button data-all="${h(l.id)}">▴ 收起</button></div>`;
   const hot = l.status==="working" || l.agents.some(a=>a.status==="working");
-  return `<div class="blk ${hot?"w":""}" style="--sc:${sHex(l.src)}" data-key="l:${h(l.src)}:${h(l.id)}">${s}</div>`;
+  return `<div class="blk ${hot?"w":""} ${l.src+"|"+l.id===API.sel?"sel":""}" style="--sc:${sHex(l.src)}" data-key="l:${h(l.src)}:${h(l.id)}">${s}</div>`;
 }
 
 function renderLanes(){
@@ -452,7 +1914,7 @@ function evLine(e){
 function renderLog(){
   const ev=S.data.events.filter(e=>!S.off.has(e.src) && (!S.job||e.job===S.job));
   $("logn").textContent=`${ev.length} 条 · 最新在前`;
-  patch($("log"),ev.slice(0,250).map(e=>`<div class="ev ${now()-e.at<120e3?"hl":""}" data-key="${h(e.src+"|"+e.lid+"|"+(e.aid||"")+"|"+e.kind+"|"+e.at)}"><span class="t">${hm(e.at,true)}</span><span class="k ${KIND_LABEL[e.kind]?e.kind:""}">${h(KIND_LABEL[e.kind]||e.kind)}</span><span class="w" title="${h(e.task||"")}">${evLine(e)}</span></div>`).join("")
+  patch($("log"),ev.slice(0,250).map(e=>`<div class="ev ${now()-e.at<120e3?"hl":""} ${e.src+"|"+e.lid===API.sel?"cur":""}" data-key="${h(e.src+"|"+e.lid+"|"+(e.aid||"")+"|"+e.kind+"|"+e.at)}"><span class="t">${hm(e.at,true)}</span><span class="k ${KIND_LABEL[e.kind]?e.kind:""}">${h(KIND_LABEL[e.kind]||e.kind)}</span><span class="w" title="${h(e.task||"")}">${evLine(e)}</span></div>`).join("")
     || `<div class="empty">暂无事件</div>`);
   const tk=ev.slice(0,14).map(e=>`<span class="tk"><span class="t">${hm(e.at,true)}</span><b style="color:${e.job==="lead"?sHex(e.src):jobColor(e.job)}">${h(e.who)}</b> ${h(VERB[e.kind]||e.kind)} · <span class="dim">${h(e.job==="lead"?"会话":e.job)}</span></span>`).join("");
   // 鼠标悬停时冻结跑马灯内容；只有事件真的变了才更新，避免停住时内容跳动
@@ -475,6 +1937,7 @@ function render(){
   if(!S.data) return;
   patch($("eyebrow"),`AGENT DECK · <span style="text-transform:none;color:var(--text)">${h(S.data.host)}</span> · 值班台`);
   renderStats(); renderSources(); renderJobs(); renderAxis(); renderLanes(); renderLog();
+  if(API.onRender) API.onRender();
 }
 
 function tickClock(){
@@ -484,19 +1947,19 @@ function tickClock(){
   $("date").textContent=d.toLocaleDateString("en-US",{weekday:"short",day:"2-digit",month:"short"}).toUpperCase().replace(",","")+` · GMT${off>=0?"+":""}${off}`;
 }
 
-let lastHtmlKey="";
-async function poll(){
-  try{
-    const r=await fetch("/api/state",{cache:"no-store"}); if(!r.ok) throw 0;
-    const d=await r.json(); S.data=d; S.skew=d.now-Date.now(); S.ok=true;
-    $("upd").textContent=(d.devices?`设备 ${d.devices.length?d.devices.map(x=>x.name).join("、"):"无（等待推送）"} · `:"")+"更新于 "+hm(Date.now(),true);
-  }catch{ S.ok=false }
+/* 页面层统一轮询后把数据交进来；d 为空表示这次没拉到（显示 OFFLINE，沿用旧数据） */
+const API={sel:null,onRender:null,onSelect:null,S,patch,render:()=>render(),ingest};
+function ingest(d, ok){
+  S.ok=ok;
+  if(d){ S.data=d; S.skew=d.now-Date.now();
+    $("upd").textContent=(d.devices?`设备 ${d.devices.length?d.devices.map(x=>x.name).join("、"):"无（等待推送）"} · `:"")+"更新于 "+hm(Date.now(),true); }
   $("live").classList.toggle("off",!S.ok); $("live").querySelector("span").textContent=S.ok?"LIVE":"OFFLINE";
   const sc=$("log").scrollTop; render(); $("log").scrollTop=sc;
 }
 
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-src],[data-job],[data-win],[data-all],[data-reply]"); if(!t) return;
+  const t=e.target.closest("[data-src],[data-job],[data-win],[data-all],[data-reply],[data-lead]"); if(!t) return;
+  if(t.dataset.lead!==undefined){ if(API.onSelect) API.onSelect(t.dataset.lead); return; }
   if(t.dataset.reply!==undefined){const k=t.dataset.reply; S.openReply.has(k)?S.openReply.delete(k):S.openReply.add(k); render(); return;}
   if(t.dataset.src){const k=t.dataset.src; S.off.has(k)?S.off.delete(k):S.off.add(k); localSet("off",JSON.stringify([...S.off]))}
   else if(t.dataset.job){S.job = S.job===t.dataset.job? null : t.dataset.job}
@@ -506,8 +1969,180 @@ document.addEventListener("click",e=>{
 });
 
 tickClock(); setInterval(tickClock,1000);
-poll(); setInterval(poll,3000);
 setInterval(()=>{ if(S.data){ renderAxis(); } },15000);
+
+return API;
+})();
+</script>
+<script>
+"use strict";
+/* ============================================================
+   页面编排：主题（自动 / 白天 / 夜晚）、任务栏、选中任务 → 办公室、排班抽屉、全屏、统一轮询
+   体素场景（第一段脚本）不可用时（无 WebGL2），其余部分照常工作
+   ============================================================ */
+const APP = {theme: "auto", sel: null, drawer: false, full: false, first: true, data: null};
+try { APP.theme = localStorage.getItem("deck.theme") || "auto"; APP.sel = localStorage.getItem("deck.sel"); APP.drawer = localStorage.getItem("deck.drawer") === "1" } catch {}
+if (!["auto", "light", "night"].includes(APP.theme)) APP.theme = "auto";
+const keep = (k, v) => { try { v == null ? localStorage.removeItem("deck." + k) : localStorage.setItem("deck." + k, v) } catch {} };
+const MAP_KEEP = 30 * 60e3;                                // 与办公室一致：任务结束 30 分钟内仍在任务栏上
+const isLive = l => l.status === "working" || l.status === "idle";
+const ST_VAR = {working: "var(--work)", idle: "var(--idle)", finished: "var(--done)", done: "var(--done)", stopped: "var(--stop)", failed: "var(--fail)"};
+const sceneOK = () => window.SCENE_OK === true;
+
+/* ---------------- 主题：自动档按服务器时间（6:00–18:00 白天） ---------------- */
+function serverHour(){ const d = new Date(Date.now() + (Deck.S.skew || 0)); return d.getHours() + d.getMinutes() / 60 }
+function applyTheme(){
+  const hr = serverHour();
+  const t = APP.theme === "light" ? "light" : APP.theme === "night" ? "night" : (hr >= 6 && hr < 18 ? "light" : "night");
+  const root = document.documentElement;
+  if (root.dataset.theme !== t){
+    root.dataset.theme = t;
+    document.querySelector('meta[name="theme-color"]').content = t === "light" ? "#f2efe8" : "#0c0d10";
+    if (Deck.S.data) Deck.render();                            // 职位颜色随主题加深 / 还原
+  }
+  if (sceneOK()) S.themeMode = APP.theme;                      // 办公室“跟随”档：白天固定中午、夜晚固定夜里、自动按真实时间
+  for (const b of $("theme").querySelectorAll("button")) b.classList.toggle("on", b.dataset.theme === APP.theme);
+}
+
+/* ---------------- 任务：按设备分组（任务栏顺序 = ←/→ 切换顺序） ---------------- */
+function mapGroups(d){
+  const now = d.now, off = Deck.S.off, groups = new Map(), at = n => { if (!groups.has(n)) groups.set(n, []); return groups.get(n) };
+  for (const x of d.devices || []) at(x.name);
+  for (const l of d.leads || []){
+    if (off.has(l.src)) continue;
+    if (isLive(l) || now - l.last < MAP_KEEP || leadKey(l) === APP.sel) at(devOf(d, l.src)).push(l);
+  }
+  if (!groups.size) at(d.host || "本机");
+  return [...groups].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0).map(([dev, ls]) => ({dev, hex: DEV_HEX[hashStr(dev) % DEV_HEX.length],
+    tasks: ls.sort((a, b) => isLive(b) - isLive(a) || (isLive(a) ? a.start - b.start : b.last - a.last))}));
+}
+const allTasks = () => APP.data ? mapGroups(APP.data).flatMap(g => g.tasks) : [];
+/* 选中的任务不在了（超出时间窗 / 被档位筛掉）就换一个：优先在忙的，其次在线的 */
+function pickSel(){
+  const tasks = allTasks();
+  if (APP.sel && tasks.some(l => leadKey(l) === APP.sel)) return false;
+  const l = tasks.find(x => x.status === "working") || tasks.find(isLive) || tasks[0] || null;
+  const k = l ? leadKey(l) : null, changed = k !== APP.sel;
+  APP.sel = k; Deck.sel = k;
+  return changed;
+}
+function select(k){
+  if (!k || k === APP.sel) return;
+  APP.sel = k; Deck.sel = k; keep("sel", k);
+  Deck.render();                                               // 排班高亮 + 地图 + 办公室标题（onRender）
+  if (sceneOK()) sceneReplay();                                // 进入新办公室：重新铺设
+  revealTile(); if (APP.drawer) revealLane($("lanes").querySelector(".blk.sel"), false);
+}
+/* 只滚动各自的容器（不用 scrollIntoView，避免把 overflow:hidden 的外层面板也滚动） */
+function revealTile(){
+  const el = $("mapbody").querySelector(".tab.sel"); if (!el) return;
+  const m = el.parentElement;
+  const r = el.getBoundingClientRect(), mr = m.getBoundingClientRect();
+  if (r.left < mr.left) m.scrollTo({left: m.scrollLeft + r.left - mr.left - 12, behavior: "smooth"});
+  else if (r.right > mr.right) m.scrollTo({left: m.scrollLeft + r.right - mr.right + 12, behavior: "smooth"});
+}
+function revealLane(el, center){
+  const L = $("lanes"); if (!el) return;
+  const r = el.getBoundingClientRect(), lr = L.getBoundingClientRect();
+  L.scrollTo({top: L.scrollTop + r.top - lr.top - (center ? Math.max(0, (L.clientHeight - r.height) / 2) : 10), behavior: "smooth"});
+}
+function step(dir){
+  const ts = allTasks(); if (ts.length < 2) return;
+  const i = ts.findIndex(l => leadKey(l) === APP.sel);
+  select(leadKey(ts[((i < 0 ? 0 : i + dir) + ts.length) % ts.length]));
+}
+
+/* ---------------- 任务栏：一台设备一行，每个任务一个标签 ---------------- */
+function tabHTML(l, srcLabel){
+  const now = APP.data.now, k = leadKey(l), live = isLive(l), sel = k === APP.sel, title = l.title || l.project || l.name;
+  const busy = (l.status === "working" ? 1 : 0) + l.agents.filter(a => a.status === "working").length;
+  const tm = live ? `${busy ? `<em>${busy} 忙</em> · ` : ""}子 ${l.agents.length}` : `已结束 · ${dur(now - l.last)} 前`;
+  return `<button class="tab ${sel ? "sel" : ""} ${live ? "" : "off"} ${l.status === "working" ? "working" : ""}" data-task="${h(k)}" data-key="t:${h(k)}" role="tab" aria-selected="${sel}"`
+    + ` title="${h(title)} · 主管 ${h(l.name)}${srcLabel.get(l.src) ? " · " + h(srcLabel.get(l.src)) : ""}"><i style="background:${ST_VAR[l.status] || "var(--stop)"}"></i><span class="tt">${h(title)}</span><span class="tm">${tm}</span></button>`;
+}
+function renderMap(){
+  const d = APP.data; if (!d) return;
+  const groups = mapGroups(d), srcLabel = new Map((d.sources || []).map(s => [s.id, String(s.label).split(" · ")[0]]));
+  const busyOf = ls => ls.filter(isLive).reduce((n, l) => n + (l.status === "working" ? 1 : 0) + l.agents.filter(a => a.status === "working").length, 0);
+  Deck.patch($("mapbody"), groups.map(g => { const b = busyOf(g.tasks);
+    return `<div class="drow" data-key="d:${h(g.dev)}"><div class="dname" title="${h(g.dev)}"><i style="background:${g.hex}"></i><b>${h(g.dev)}</b><small>${g.tasks.length} 任务${b ? ` · <em>${b} 忙</em>` : ""}</small></div>`
+      + `<div class="dtabs" role="tablist">${g.tasks.map(l => tabHTML(l, srcLabel)).join("") || `<span class="dempty">暂无任务</span>`}</div></div>` }).join(""));
+  const lv = (d.leads || []).filter(l => !Deck.S.off.has(l.src) && isLive(l));
+  $("lanesn").textContent = `${lv.length} 会话 · ${lv.reduce((n, l) => n + l.agents.filter(a => a.status === "working").length, 0)} 在岗`;
+}
+/* 办公室左上角：当前任务名牌 + 上一个 / 下一个 */
+function renderTitle(){
+  const d = APP.data, l = d && (d.leads || []).find(x => leadKey(x) === APP.sel), many = allTasks().length > 1;
+  if (!l){ Deck.patch($("otitle"), `<i style="background:#9aa3ad"></i><b>空办公室</b><span>暂无任务</span>`); return }
+  const busy = (l.status === "working" ? 1 : 0) + l.agents.filter(a => a.status === "working").length, title = l.title || l.project || l.name;
+  Deck.patch($("otitle"), (many ? `<button data-nav="-1" title="上一个任务（←）">◀</button>` : "")
+    + `<i style="background:${ST_COL[l.status] || "#9aa3ad"}"></i><b title="${h(title)}">${h(title)}</b><span class="who">主管 ${h(l.name)} · ${h(devOf(d, l.src))}</span>`
+    + `<span>子 ${l.agents.length}${busy ? ` · <em>${busy} 在忙</em>` : ""}</span>` + (many ? `<button data-nav="1" title="下一个任务（→）">▶</button>` : ""));
+}
+
+/* ---------------- 排班抽屉 / 全屏 ---------------- */
+function setDrawer(on){
+  APP.drawer = on; keep("drawer", on ? "1" : "0");
+  $("drawer").classList.toggle("open", on); $("lanesBtn").classList.toggle("on", on); $("lanesBtn").setAttribute("aria-expanded", String(on));
+  if (on && Deck.S.data) requestAnimationFrame(() => { Deck.render(); revealLane($("lanes").querySelector(".blk.sel"), false) });   // 时间轴刻度按抽屉宽度重排，并定位到当前任务
+}
+function setFull(on){
+  APP.full = on; document.body.classList.toggle("full", on);
+  $("zfull").textContent = on ? "✕" : "⛶"; $("zfull").title = on ? "退出全屏（Esc）" : "全屏办公室";
+}
+
+/* ---------------- 轮询：一次拉取，分发给看板（顶部 / 排班 / 日志）、地图和办公室 ---------------- */
+async function poll(){
+  let d = null, ok = true;
+  try { const r = await fetch("/api/state", {cache: "no-store"}); if (!r.ok) throw 0; d = await r.json() } catch { ok = false }
+  if (!d && APP.first && sceneOK()) d = DEMO;                 // 首次就连不上：先用演示数据把办公室摆出来
+  if (!d){ Deck.ingest(null, ok); return }
+  APP.data = d; Deck.S.skew = d.now - Date.now();
+  if (APP.first){ const cur = (d.leads || []).find(l => leadKey(l) === APP.sel); if (!cur || !isLive(cur)) APP.sel = null }   // 刷新后优先看在线的任务
+  const switched = pickSel(); if (switched) keep("sel", APP.sel);
+  Deck.sel = APP.sel;
+  Deck.ingest(d, ok);
+  if (sceneOK()) sceneUpdate(d, APP.first || switched);
+  if (APP.first || switched) requestAnimationFrame(revealTile);
+  APP.first = false;
+  applyTheme();
+}
+
+/* ---------------- 交互 ---------------- */
+Deck.onSelect = k => { select(k); if (innerWidth < 900) setDrawer(false) };
+Deck.onRender = () => {
+  if (!APP.data) return;
+  if (pickSel()){ keep("sel", APP.sel); setTimeout(() => { Deck.render(); if (sceneOK()) sceneReplay() }) }   // 当前任务被档位筛掉了
+  renderMap(); renderTitle();
+};
+if (sceneOK()) selLead = d => (d.leads || []).find(l => leadKey(l) === APP.sel) || null;   // 办公室只摆选中的任务
+if (sceneOK()) onPersonClick = p => {                         // 抽屉开着时，点小人 → 在排班里定位到对应行
+  if (!APP.drawer || !p.z || !p.z.lead) return;
+  const l = p.z.lead, q = p.boss ? `[data-lead="${CSS.escape(leadKey(l))}"]` : `[data-key="a:${CSS.escape(p.d.id)}"]`;
+  let el = $("lanes").querySelector(q);
+  if (!el && !p.boss){ Deck.S.showAll.add(l.id); Deck.render(); el = $("lanes").querySelector(q) }
+  if (el){ revealLane(el, true); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash") }
+};
+$("theme").addEventListener("click", e => { const b = e.target.closest("button[data-theme]"); if (!b) return; APP.theme = b.dataset.theme; keep("theme", APP.theme); applyTheme() });
+$("mapbody").addEventListener("click", e => { const t = e.target.closest("[data-task]"); if (t) select(t.dataset.task) });
+$("mapbody").addEventListener("wheel", e => { const m = e.target.closest(".dtabs"); if (m && Math.abs(e.deltaY) > Math.abs(e.deltaX) && m.scrollWidth > m.clientWidth){ m.scrollLeft += e.deltaY; e.preventDefault() } }, {passive: false});
+$("otitle").addEventListener("click", e => { const b = e.target.closest("[data-nav]"); if (b) step(+b.dataset.nav) });
+$("lanesBtn").onclick = () => setDrawer(!APP.drawer);
+$("drawerX").onclick = () => setDrawer(false);
+$("zfull").onclick = () => setFull(!APP.full);
+document.addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey || (e.target.closest && e.target.closest("input,select,textarea"))) return;
+  if (e.key === "Escape"){ if (APP.full) setFull(false); else if (APP.drawer) setDrawer(false) }
+  else if (e.key === "ArrowLeft") step(-1);
+  else if (e.key === "ArrowRight") step(1);
+});
+
+if (/^\/voxel(\.html)?\/?$/.test(location.pathname)) setFull(true);    // 旧的全屏游戏视图地址仍可用
+Deck.S.off.clear();                                         // 主页面不提供档位筛选：不沿用经典看板里隐藏的档位
+setDrawer(APP.drawer);
+applyTheme();
+if (sceneOK()){ resize(); addEventListener("resize", () => resize()) }   // 尺寸观察器之外再保底：首屏即全屏时观察器可能不触发
+poll(); setInterval(poll, 3000); setInterval(applyTheme, 5000);
 </script>
 </body>
 </html>

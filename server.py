@@ -748,8 +748,14 @@ def make_handler(state, hub: "Hub | None" = None):
                     self.send(200, f.read_bytes(), "image/png", "public, max-age=86400")
                 else:
                     self.send(404, b"not found", "text/plain")
-            elif p in ("/", "/index.html"):
+            elif p in ("/", "/index.html", "/voxel", "/voxel.html"):  # /voxel：主页面的全屏办公室视图
                 self.send(200, (HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
+            elif p in ("/classic", "/classic.html"):
+                self.send(200, (HERE / "classic.html").read_bytes(), "text/html; charset=utf-8")
+            elif p in ("/office", "/office.html"):
+                self.send(200, (HERE / "office.html").read_bytes(), "text/html; charset=utf-8")
+            elif p in ("/city", "/city.html"):
+                self.send(200, (HERE / "city.html").read_bytes(), "text/html; charset=utf-8")
             else:
                 self.send(404, b"not found", "text/plain")
 
