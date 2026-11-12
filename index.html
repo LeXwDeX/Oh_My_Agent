@@ -1138,9 +1138,14 @@ function personVox(P, t){
   bx(u0 - .15, u1 + .1, -HV + v, HV + v, hb + 2.1, hb + 3.3, hc);
   bx(u0 - .15, u0 + .6, -HV + v, HV + v, L.style === 1 ? hb - .5 : hb + .7, hb + 2.1, L.hair);
   if (cap) bx(u1 + .1, u1 + .6, -1.2 + v, 1.2 + v, hb + 2.1, hb + 2.3, hc);
+  if (P.boss){                                                  // 主 agent：金色小王冠（底圈 + 三个尖）
+    const cz = hb + 3.3, cu0 = u0 + .35, cu1 = u0 + 1.55;
+    bx(cu0, cu1, -1.05 + v, 1.05 + v, cz, cz + .35, C.gold, 1, 1);
+    for (const [c, hh] of [[-.8, .55], [0, .8], [.8, .55]]) bx(cu0 + .3, cu1 - .3, c - .25 + v, c + .25 + v, cz + .35, cz + .35 + hh, C.gold, 1, 1);
+  }
   // 头顶气泡（坐 / 站时）：工作中 = 白气泡 + 工具图标（底部绿条）；其它状态 = 彩色气泡 + 白色符号
   if (rest){
-    const pz = hb + 4 + Math.sin(t * 2.2 + P.phase) * .2;
+    const pz = hb + (P.boss ? 4.9 : 4) + Math.sin(t * 2.2 + P.phase) * .2;
     const working = st === "working", bg = working ? C.white : (ST_COL[st] || "#9aa3ad"), glow = working ? .9 : .45;
     bx(-.35, .35, -1.9, 1.9, pz, pz + 3.2, bg, glow, 1);
     bx(-.25, .25, -.38, .38, pz - .45, pz, bg, glow, 1);
@@ -1339,7 +1344,7 @@ function applySky(hr, L){
 /* ============================================================
    数据 → 办公区；人员管理（入座 / 从电梯走进来 / 走回电梯离开）
    ============================================================ */
-const AG_KEEP = 15 * 60e3, ZONE_KEEP = 30 * 60e3, MAX_SUB = 36;
+const MAX_SUB = 36;                                            // 办公室最多上座的子 agent（3 个岛 × 12）
 const S = {world: null, start: performance.now(), autoFit: true, skew: 0, data: null, sig: "", slots: new Map(),
            hourMode: "auto", themeMode: "auto", hourShown: null, people: new Map(), labelEls: [], zoneEls: [], lastFrame: 0, raf: 0,
            animEnd: 0, hover: null, tween: null, down: null, layout: "jp"};
@@ -1355,9 +1360,9 @@ function officesFrom(d){
   const l = selLead(d), srcLabel = new Map((d.sources || []).map(s => [s.id, String(s.label).split(" · ")[0]]));
   const dev = l ? devOf(d, l.src) : (d.host || "本机"), hex = DEV_HEX[hashStr(dev) % DEV_HEX.length];
   if (!l) return [{id: dev, label: dev, hex, zones: []}];
-  // 已结束的任务按它最后活动的时刻取在座的人（定格在下班那一刻）
-  const live = l.status === "working" || l.status === "idle", ref = live ? d.now : l.last, key = leadKey(l);
-  const subs = l.agents.filter(a => a.status === "working" || ref - a.last < AG_KEEP)
+  // 整个团队都上座（最多 3 个岛 36 人）：在忙的优先，其余按最近活动排；已完成的坐在工位上亮“✓”，最近完成的几个去休息区
+  const key = leadKey(l);
+  const subs = l.agents.slice()
     .sort((a, b) => (a.status !== "working") - (b.status !== "working") || b.last - a.last).slice(0, MAX_SUB);
   // 槽位：已经坐着的保持原位，新人填最小空位；有空洞导致多占一列时压紧
   let sm = S.slots.get(key); if (!sm){ sm = new Map(); S.slots.set(key, sm) }
@@ -1371,7 +1376,7 @@ function officesFrom(d){
   const parts = [];
   for (const a of subs){ const s = sm.get(a.id), p = Math.floor(s / (MAXP * 2)); (parts[p] = parts[p] || []).push({id: a.id, slot: s % (MAXP * 2), status: a.status, a}) }
   const groups = Array.from({length: Math.max(1, parts.length)}, (_, i) => parts[i] || []);
-  const hidden = l.agents.filter(a => a.status === "working").length - subs.filter(a => a.status === "working").length;
+  const hidden = l.agents.length - subs.length;                 // 超出 36 人的部分只在名牌上计数
   const base = {title: l.title || l.project || l.name, name: l.name, face: l.face, status: l.status, src: srcLabel.get(l.src) || "", hex: srcHex(l.src), lead: l};
   return [{id: dev, label: dev, hex, zones: groups.map((ps, i) => ({...base, key: i ? key + "#" + i : key, part: i,
     pairs: clamp(Math.floor(Math.max(-1, ...ps.map(x => x.slot)) / 2) + 1, 1, MAXP), subs: ps, hidden: i ? 0 : hidden}))}];
@@ -1511,8 +1516,8 @@ function renderLabels(t){
 }
 function zoneLabelHTML(Z){
   if (Z.amen) return `<i style="background:#9aa3ad"></i><b>${h(Z.amen)}</b>`;
-  const z = Z.Z, busy = (z.status === "working" ? 1 : 0) + z.subs.filter(s => s.status === "working").length;
-  return `<i style="background:${ST_COL[z.status] || "#b6bec9"}"></i><b>${h(z.title)}</b><small style="color:${z.hex}">${h(z.src)}</small><small>主1 · 子${z.subs.length}${z.hidden > 0 ? `+${z.hidden}` : ""}</small>${busy ? `<em>${busy} 在忙</em>` : ""}`;
+  const z = Z.Z, ag = z.lead.agents, busy = (z.status === "working" ? 1 : 0) + ag.filter(a => a.status === "working").length;
+  return `<i style="background:${ST_COL[z.status] || "#b6bec9"}"></i><b>${h(z.title)}</b><small style="color:${z.hex}">${h(z.src)}</small><small>主1 · 子${ag.length}${z.hidden > 0 ? `（${z.hidden} 人未上座）` : ""}</small>${busy ? `<em>${busy} 在忙</em>` : ""}`;
 }
 
 function frame(ts){
