@@ -390,7 +390,7 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
   <div class="ohud">
     <div class="hud otitle" id="otitle"></div>
     <div class="hud time" id="timebar"><b id="sceneclock">—</b>
-      <button data-h="auto" class="on" title="跟随页面主题">跟随</button><button data-h="8">早上</button><button data-h="13">中午</button><button data-h="17.9">黄昏</button><button data-h="21.5">夜晚</button>
+      <button data-h="auto" class="on" title="按真实时间（页面主题：自动）">跟随</button><button data-h="8">早上</button><button data-h="13">中午</button><button data-h="17.9">黄昏</button><button data-h="21.5">夜晚</button>
     </div>
   </div>
   <div class="hud" id="loader"><span id="ltext">正在铺设办公区…</span><div class="bar"><b id="lbar"></b></div><span id="lpct">0%</span></div>
@@ -2201,7 +2201,20 @@ if (sceneOK()) onPersonClick = p => {                         // 抽屉开着时
   if (!el && !p.boss){ Deck.S.showAll.add(l.id); Deck.render(); el = $("lanes").querySelector(q) }
   if (el){ revealLane(el, true); el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash") }
 };
-$("theme").addEventListener("click", e => { const b = e.target.closest("button[data-theme]"); if (!b) return; APP.theme = b.dataset.theme; keep("theme", APP.theme); applyTheme() });
+/* 页面主题与办公室时段联动：自动 ↔ 跟随，白天 → 中午，夜晚 → 夜晚；
+   反过来选时段时，跟随 → 自动，其余按 6:00–18:00 定白天 / 夜晚（早上、中午、黄昏为白天） */
+const THEME_HOUR = {auto: "auto", light: "13", night: "21.5"};
+function syncHourToTheme(){
+  if (!sceneOK()) return;
+  const h = THEME_HOUR[APP.theme]; S.hourMode = h;
+  for (const x of $("timebar").querySelectorAll("button")) x.classList.toggle("on", x.dataset.h === h);
+}
+$("theme").addEventListener("click", e => { const b = e.target.closest("button[data-theme]"); if (!b) return; APP.theme = b.dataset.theme; keep("theme", APP.theme); applyTheme(); syncHourToTheme() });
+$("timebar").addEventListener("click", e => {
+  const b = e.target.closest("button[data-h]"); if (!b) return;
+  const h = b.dataset.h, t = h === "auto" ? "auto" : (+h >= 6 && +h < 18 ? "light" : "night");
+  if (t !== APP.theme){ APP.theme = t; keep("theme", t); applyTheme() }
+});
 $("mapbody").addEventListener("click", e => { const t = e.target.closest("[data-task]"); if (t) select(t.dataset.task) });
 $("mapbody").addEventListener("wheel", e => { const m = e.target.closest(".dtabs"); if (m && Math.abs(e.deltaY) > Math.abs(e.deltaX) && m.scrollWidth > m.clientWidth){ m.scrollLeft += e.deltaY; e.preventDefault() } }, {passive: false});
 $("otitle").addEventListener("click", e => { const b = e.target.closest("[data-nav]"); if (b) step(+b.dataset.nav) });
@@ -2218,7 +2231,7 @@ document.addEventListener("keydown", e => {
 if (/^\/voxel(\.html)?\/?$/.test(location.pathname)) setFull(true);    // 旧的全屏游戏视图地址仍可用
 Deck.S.off.clear();                                         // 主页面不提供档位筛选：不沿用经典看板里隐藏的档位
 setDrawer(APP.drawer);
-applyTheme();
+applyTheme(); syncHourToTheme();
 if (sceneOK()){ resize(); addEventListener("resize", () => { resize(); $("office").classList.toggle("lanes-open", drawerPad() > 0) }) }   // 尺寸观察器之外再保底：首屏即全屏时观察器可能不触发
 poll(); setInterval(poll, 3000); setInterval(applyTheme, 5000);
 </script>
