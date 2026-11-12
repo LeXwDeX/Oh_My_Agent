@@ -1522,7 +1522,7 @@ function popNew(prev, w){
   return fresh.length;
 }
 
-// <place-rules>（tools/test_place_rules.mjs 会抽出这一段单独测试）
+// <place-rules>（tests/place_rules.test.mjs 会抽出这一段单独测试）
 // 去处规则：每个小人只看自己的标题（主管 = 会话标题，子 agent = 子任务标题），不看所属会话。
 // 任务类型 kind 由服务端把标题交给大模型分类得到（ci / ops / review / plan / research / code / docs / other）。
 // 完成的子 agent → 休息区；工作中按类型去不同场景（主管只会去机房，其余时间守在课长席）：
