@@ -281,6 +281,9 @@ body{height:100vh;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr)
 body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
 #sky{position:absolute;inset:0;z-index:0;pointer-events:none}
 #stars{position:absolute;inset:0 0 35% 0;z-index:0;pointer-events:none;opacity:0}
+/* 龙之圣堂：背景换成地底的暗红余烬，不显示日月星辰 */
+.office.sanctum #sky{background:radial-gradient(120% 90% at 50% 56%,#4a1526 0%,#2a0d2a 32%,#110818 62%,#040308 100%)!important}
+.office.sanctum .celes,.office.sanctum #stars{display:none!important}
 #stars i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;animation:tw 3s ease-in-out infinite}
 @keyframes tw{50%{opacity:.25}}
 .celes{position:absolute;z-index:0;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;pointer-events:none}
@@ -494,9 +497,17 @@ const LAYOUTS = {
   jp:     {name: "日式岛型",   carpet: ["#c6ced8", "#bec7d2"], aisle: ["#d6dce4", "#cfd6de"], wall: "#f7f3ec", brick: false, frame: "#5b6573", pillar: "#ebe7e0", desk: "jp",     boss: "jp",     sign: "hang",  third: "copy",  sofa: "#5fa8a0"},
   loft:   {name: "Loft 长桌",  planks: ["#c9955f", "#bd8a55", "#d29f68"], aisle: ["#b9b4ad", "#b1aca5"], wall: "#f2ede6", brick: true, frame: "#2b2f3a", pillar: "#3b3f46", desk: "bench", boss: "loft", sign: "neon", third: "bar", sofa: "#8b5a3c"},
   cube:   {name: "美式格子间", carpet: ["#a3adbb", "#9ba6b4"], aisle: ["#c8ced6", "#c1c8d1"], wall: "#eef0f3", brick: false, frame: "#5b6573", pillar: "#e3e6ea", desk: "cube",   boss: "glass",  sign: "plate", third: "copy",  sofa: "#5b7fa6"},
-  nordic: {name: "北欧明亮",   planks: ["#ead6b4", "#e2cca6", "#efdcbc"], aisle: ["#efeeea", "#e8e6e1"], wall: "#ffffff", brick: false, frame: "#c9ced6", pillar: "#f4f2ee", desk: "nordic", boss: "nordic", sign: "wood", third: "booth", sofa: "#b8c4cc"}
+  nordic: {name: "北欧明亮",   planks: ["#ead6b4", "#e2cca6", "#efdcbc"], aisle: ["#efeeea", "#e8e6e1"], wall: "#ffffff", brick: false, frame: "#c9ced6", pillar: "#f4f2ee", desk: "nordic", boss: "nordic", sign: "wood", third: "booth", sofa: "#b8c4cc"},
+  magic:  {name: "龙之圣堂", icon: "🐉", planks: ["#544f65", "#4b4759", "#5d586e"], aisle: ["#7d1f33", "#6e1a2c"], wall: "#5d586e", brick: false, frame: "#2a2831", pillar: "#666078", desk: "magic", boss: "magic", sign: "banner", third: "alchemy", sofa: "#7d1f33", magic: true, glow: 1, tint: [.98, .93, 1.04], vox: 1, hour: 21.6, words: ["正在开凿地下圣堂…", "正在摆放书案与祭台…", "魔法师就位…", "完成"]}
 };
 let LY = LAYOUTS.jp;
+/* 圣堂里的发光色：紫 = 魔法，橙黄 = 火，青 = 水晶 */
+const MAGIC_COL = {arcane: "#c77dff", core: "#f5e6ff", halo: "#8a3ffc", dim: "#5a3a8c", flame: ["#fff4c2", "#ffd166", "#ff9a3c", "#e5484d"], smoke: "#4a3f4f", crystal: "#6fe3ff",
+                   gold: "#d9a441", page: "#efe6d2"};
+/* 龙之圣堂配色：灰紫石材 + 深色木头 + 猩红长毯配金，彩窗用宝石色 */
+const SANC = {st: ["#666377", "#5c596c", "#716e83"], stDk: "#3c3a4a", stLt: "#858299", floor: ["#55526a", "#4c495f", "#5e5b74"], moss: "#46563f", carpet: ["#7d1f33", "#6e1a2c"], gold: "#d2a542",
+              wood: "#6a4329", woodDk: "#452a19", iron: "#2a2831", bone: "#e6dcc6", rock: ["#3f3c50", "#353244", "#2c2a39", "#24222f"], glass: ["#c0334f", "#3d5bd0", "#8a45d8", "#2fa594", "#d0662f"]};
+const SWH = 3.0;                                              // 圣堂后墙 / 左墙的高度
 const subSeat = s => { const k = Math.floor(s / 2), b = s % 2; return {x: b ? 2.7 : .7, y: 2.85 + 1.2 * k, dir: b ? 2 : 0, k, b} };   // 以岛（顶排朝向）左上角为原点
 const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 /* 以座位为原点、朝向 dir 的局部坐标绘制：u 向前（朝桌子）、v 向左右 */
@@ -527,7 +538,7 @@ function buildOffice(off, oi, X0, opt, W0){
   const zones = off.zones, n = zones.length;
   const nt = n > 5 ? Math.ceil(n / 2) : n, nb = n - nt;                     // 上排 / 下排岛数
   const top = zones.slice(0, nt), bot = zones.slice(nt);
-  const topP = Math.max(2, ...top.map(z => z.pairs)), BD1 = bandDepth(topP), BD2 = nb ? bandDepth(Math.max(2, ...bot.map(z => z.pairs))) : 6.5;
+  const topP = Math.max(2, ...top.map(z => z.pairs)), BD1 = LY.magic ? Math.max(8.6, bandDepth(topP)) : bandDepth(topP), BD2 = nb ? bandDepth(Math.max(2, ...bot.map(z => z.pairs))) : 6.5;
   const D = Math.ceil(Math.max(15.5, BD1 + MAIN + BD2)), mainY = BD1 + MAIN / 2, ty2 = BD1 + MAIN;
   const corr = X0 + CORE + .8, HUB = [corr, mainY];                          // 进出电梯、去机房都经过这个枢纽
   const W = Math.ceil(Math.max(TX0 + (nt + 1) * TW, TX0 + nb * TW + 13, 20) + 1);          // 上排末尾多留一个共享工位岛
@@ -563,6 +574,7 @@ function buildOffice(off, oi, X0, opt, W0){
   RND = rng32(hashStr(off.id));
   const hx = off.hex;
 
+  if (LY.magic) sanctumShell(); else {
   // ---- 楼下楼体
   EM = 0;
   { // 楼体整块，只在楼梯间下行梯段处留出深 1.05 的井，让台阶能往下走
@@ -746,7 +758,9 @@ function buildOffice(off, oi, X0, opt, W0){
     add(X0 + CORE + .05, .3, 0, .3, .3, .62, C.white, t); add(X0 + CORE + .08, .33, .62, .24, .24, .3, "#a8dcff", t + .03);
     for (let s = 0; s < 3; s++) add(X0 + CORE + .05, D - 1.4 + s * .32, 0, .28, .28, .5, ["#5b9dff", "#4fbf7a", "#ffd166"][s], T0(X0 + CORE, D - 1, .3));
     extinguisher(X0 + CORE + .03, 2.9, T0(X0 + CORE, 2.9, .3), true) }
+  }
 
+  if (LY.magic) summonHall(); else {
   // ---- 大开间：任务岛
   for (const T of teams){
     const Z = T.z, tx = X0 + T.x, t = T0(tx + 1.7, Yp(T, 2), .3);
@@ -793,12 +807,13 @@ function buildOffice(off, oi, X0, opt, W0){
   }
   // 上排右侧剩余：开放洽谈桌 + 绿植
   if (TX0 + (nt + 1) * TW + 4 <= W - 1){ const x = X0 + TX0 + (nt + 1) * TW + .5; openMeet(x, 2.2, T0(x, 3, .5)); plant(X0 + W - 1.2, .5, 0, T0(X0 + W - 1, .5, .4), true) }
+  }
 
   // ---- 主通道另一侧：玻璃会议室、开放式休息区、复印角
   let ax = X0 + TX0 + nb * TW + .4; const ay = ty2 + .5, ad = Math.min(5.5, D - ty2 - 1.0), aend = X0 + W - .6;
-  if (aend - ax >= 6){ meetingRoom(ax, ay, 6, ad); ax += 6.4 }
-  if (aend - ax >= 5){ const w = Math.min(8, aend - ax - (aend - ax >= 8.5 ? 3 : 0)); lounge(ax, ay, w, ad); ax += w + .4 }
-  if (aend - ax >= 2.5) thirdAmenity(ax, ay, aend - ax);
+  if (aend - ax >= 6){ (LY.magic ? library : meetingRoom)(ax, ay, 6, ad); ax += 6.4 }
+  if (aend - ax >= 5){ const w = Math.min(8, aend - ax - (aend - ax >= 8.5 ? 3 : 0)); (LY.magic ? pews : lounge)(ax, ay, w, ad); ax += w + .4 }
+  if (aend - ax >= 2.5) (LY.magic ? storeroom : thirdAmenity)(ax, ay, aend - ax);
 
   W0.labels.push({x: X0 + CORE - .1, y: entY, z: CWH + .9, t: T0(X0 + CORE, entY, .5), off});
   W0.maxT = Math.max(W0.maxT, anim ? oi * .5 + .3 + Math.max(...dist) * .03 + 1.2 : 0);
@@ -827,8 +842,391 @@ function buildOffice(off, oi, X0, opt, W0){
     add(x + .1, y + .1, .43, .06, .02, .02, "#1d2128", t + .05); add(x + .145, y + .1, .14, .015, .02, .31, "#1d2128", t + .05);
     if (sign){ add(x - .02, y - .01, .62, .02, .16, .14, R, t + .06); add(x, y + .05, .66, .005, .06, .06, C.white, t + .07) }
   }
+  // 壁灯火把（魔法学院，朝 +y）：铁托板 + 木柄 + 火盆圈 + 三块发光火焰；cy 是墙面的 y
+  function torch(cx, cy, z, t){
+    const F = MAGIC_COL.flame;
+    add(cx - .07, cy, z - .06, .14, .03, .26, "#2b2f3a", t); add(cx - .035, cy + .03, z - .1, .07, .07, .38, "#6b4a33", t + .02); add(cx - .07, cy, z + .28, .14, .13, .06, "#2b2f3a", t + .03);
+    add(cx - .055, cy + .01, z + .34, .11, .11, .09, F[2], t + .05, 1, 1); add(cx - .04, cy + .025, z + .43, .08, .08, .09, F[1], t + .06, 1, 1); add(cx - .025, cy + .04, z + .52, .05, .05, .07, F[0], t + .07, 1, 1);
+  }
+  /* ===================== 龙之圣堂（魔法版式）=====================
+     骨架（座位、通道、去处、门口坐标）与办公室完全相同，只换造型：写字楼 → 浮岩上的地下圣堂，电梯 → 传送门，
+     茶水间 → 酒窖，卫生间 → 地牢和藏宝库，楼梯间 → 通往塔楼的石阶，机房 → 水晶密室，会议室 → 图书馆，休息区 → 礼拜堂 */
+  function flameAt(cx, cy, z, s, t){
+    const F = MAGIC_COL.flame;
+    add(cx - s * .5, cy - s * .5, z, s, s, s * .8, F[2], t, 1, 1); add(cx - s * .34, cy - s * .34, z + s * .8, s * .68, s * .68, s * .7, F[1], t + .02, 1, 1);
+    add(cx - s * .17, cy - s * .17, z + s * 1.5, s * .34, s * .34, s * .5, F[0], t + .04, 1, 1);
+  }
+  function brazierAt(cx, cy, hgt, t){
+    add(cx - .05, cy - .05, 0, .1, .1, hgt, SANC.iron, t); add(cx - .14, cy - .14, 0, .28, .28, .06, SANC.iron, t);
+    add(cx - .18, cy - .18, hgt, .36, .36, .1, SANC.iron, t + .03); flameAt(cx, cy, hgt + .1, .24, t + .06);
+  }
+  // 水晶簇：一根主晶柱逐级收尖 + 两根斜插的小晶体，整体自发光
+  function crystalAt(cx, cy, z0, hgt, col, t){
+    add(cx - .16, cy - .16, z0, .32, .32, hgt * .55, col, t, .9, 1); add(cx - .11, cy - .11, z0 + hgt * .55, .22, .22, hgt * .28, tint(col, .3), t + .03, 1, 1);
+    add(cx - .055, cy - .055, z0 + hgt * .83, .11, .11, hgt * .17, tint(col, .65), t + .05, 1, 1);
+    add(cx + .1, cy - .24, z0, .17, .17, hgt * .38, shade(col, .82), t + .02, .9, 1); add(cx - .3, cy + .05, z0, .15, .15, hgt * .28, shade(col, .7), t + .02, .9, 1);
+  }
+  function barrelAt(x, y, z, t){
+    add(x, y, z, .42, .42, .52, SANC.wood, t, EM, 0, .05); for (const zz of [.07, .38]) add(x - .012, y - .012, z + zz, .444, .444, .06, SANC.iron, t + .03);
+    add(x + .05, y + .05, z + .52, .32, .32, .02, tint(SANC.wood, .2), t + .04);
+  }
+  // 高背椅：深色木架、绒面坐垫、椅背顶两枚金饰
+  function throneAt(A, cc){
+    const dk = SANC.woodDk;
+    A(-.24, .24, -.24, .24, .34, .06, dk); A(-.2, .2, -.2, .2, .4, .035, cc); A(-.47, -.38, -.24, .24, .4, .72, dk); A(-.38, -.36, -.16, .16, .5, .44, cc);
+    for (const v of [-.24, .2]) A(-.47, -.38, v, v + .04, 1.12, .07, SANC.gold);
+    for (const [a, b] of [[-.22, -.22], [.18, -.22], [-.22, .18], [.18, .18]]) A(a, a + .04, b, b + .04, 0, .34, dk);
+  }
+  /* 龙蛋祭坛：法阵正中的三级石坛上立着一枚裂纹透光的黑色龙蛋，四角点着蜡烛——魔法师们召唤的就是它的主人 */
+  function eggAltar(cx, cy, t){
+    const sc = SANC, mc = MAGIC_COL, egg = "#2a2140";
+    add(cx - .75, cy - .75, 0, 1.5, 1.5, .25, sc.stDk, t, EM, 0, .05); add(cx - .5, cy - .5, .25, 1.0, 1.0, .125, sc.st[1], t + .03, EM, 0, .05); add(cx - .375, cy - .375, .375, .75, .75, .25, sc.st[0], t + .06, EM, 0, .05);
+    add(cx - .25, cy - .25, .625, .5, .5, .125, egg, t + .1); add(cx - .375, cy - .375, .75, .75, .75, .5, egg, t + .12); add(cx - .25, cy - .25, 1.25, .5, .5, .25, tint(egg, .08), t + .14); add(cx - .125, cy - .125, 1.5, .25, .25, .125, tint(egg, .14), t + .15);
+    for (const [a, b, z, w, d, hgt, col] of [[.375, -.12, .82, .012, .08, .32, DRAGON_COL.ember], [.375, .06, 1.0, .012, .16, .06, DRAGON_COL.ember], [-.14, .375, .9, .32, .012, .07, mc.arcane], [.06, .375, .97, .07, .012, .22, mc.arcane]]) add(cx + a, cy + b, z, w, d, hgt, col, t + .18, 1, 1);
+    for (const [a, b] of [[-.7, -.7], [.58, -.7], [-.7, .58], [.58, .58]]){ add(cx + a, cy + b, .25, .12, .12, .22, "#f2e8cf", t + .1); add(cx + a + .03, cy + b + .03, .47, .06, .06, .1, mc.flame[1], t + .12, 1, 1) }
+  }
+  // 符文方尖碑：立在召唤大厅四角
+  function obelisk(ox, oy, t){
+    const sc = SANC, mc = MAGIC_COL;
+    add(ox - .375, oy - .375, 0, .75, .75, .25, sc.stDk, t, EM, 0, .05); add(ox - .25, oy - .25, .25, .5, .5, 1.5, sc.st[1], t + .04, EM, 0, .06); add(ox - .125, oy - .125, 1.75, .25, .25, .25, sc.stLt, t + .08);
+    for (let i = 0; i < 4; i++){ add(ox + .25, oy - .06, .45 + i * .32, .012, .12, .2, i & 1 ? mc.core : mc.arcane, t + .1 + i * .02, 1, 1); add(ox - .06, oy + .25, .45 + i * .32, .12, .012, .2, i & 1 ? mc.arcane : mc.core, t + .1 + i * .02, 1, 1) }
+    add(ox - .0625, oy - .0625, 2.0, .125, .125, .25, mc.arcane, t + .12, 1, 1);
+  }
+  /* 召唤大厅（原任务岛位）：一个项目一座大法阵，不管有几个会话。第一圈站各会话的 leader，外圈按各自 leader 所在的扇区站子 agent；
+     所有人面向法阵站着施法。座位键与办公室相同，只是位置换成环上的点；外圈的圈数按人数定，圈数越少法阵越大 */
+  function summonHall(){
+    const sc = SANC, zs = off.zones, n = Math.max(1, zs.length), dA = 6.2832 / n, GAP = .84, DR = .8;
+    const x0 = X0 + TX0 - .4, x1 = X0 + W - .3, cx = (x0 + x1) / 2, cy = BD1 / 2 + .05, Rmax = Math.min(BD1 / 2 - .4, (x1 - x0) / 2 - .5);
+    const fits = (rg, R) => zs.every(Z => { let cap = 0; for (let k = 1; k <= rg; k++) cap += Math.max(1, Math.floor(dA * (R + .6 + k * DR) / GAP)); return cap >= Z.pairs * 2 });
+    let rings = 1; while (rings < 5 && !fits(rings, Math.max(1.5, Rmax - .6 - rings * DR))) rings++;
+    const R = Math.max(1.5, Rmax - .6 - rings * DR), r0 = R + .6, tC = T0(cx, cy, .3);
+    W0.geo[oi].circle = {x: cx, y: cy, r: R};
+    // 法阵石台：两层圆台，按行取弦长拼出阶梯状的圆边
+    for (const [rr, z, hgt, col] of [[R + .375, .001, .05, sc.stDk], [R + .125, .051, .03, "#2c2742"]])
+      for (let yy = -rr; yy < rr - 1e-6; yy += .25){ const hw = Math.round(Math.sqrt(Math.max(0, rr * rr - (yy + .125) * (yy + .125))) * 4) / 4; if (hw > 0) add(cx - hw, cy + yy, z, hw * 2, .25, hgt, col, T0(cx, cy + yy, .3), EM, 0, .03) }
+    eggAltar(cx, cy, tC + .2);
+    for (let q = 0, nq = Math.round(R * 5); q < nq; q++){                                      // 法阵外沿一圈高矮不一的蜡烛
+      const an = q / nq * 6.2832 + .3, px = cx + Math.cos(an) * (R + .25), py = cy + Math.sin(an) * (R + .25), hc = .125 + (q % 3) * .0625;
+      add(px - .0625, py - .0625, .051, .125, .125, hc, "#e8dcc0", tC + .3); add(px - .03, py - .03, .051 + hc, .06, .06, .09, MAGIC_COL.flame[1], tC + .32, 1, 1);
+    }
+    const put = (key, p, t) => {
+      const ddx = cx - p[0], ddy = cy - p[1], ro = Math.hypot(ddx, ddy), dir = Math.abs(ddx) > Math.abs(ddy) ? (ddx > 0 ? 0 : 2) : (ddy > 0 ? 1 : 3);
+      const xs = clamp(p[0] < cx ? cx - ro - .4 : cx + ro + .4, x0 + .15, x1 - .15);          // 站在法阵背面的人从外侧绕过去，不横穿法阵
+      W0.seats.set(key, {id: key, p, dir, pose: "stand", approach: dedupe(p[1] >= cy ? [HUB, [p[0], mainY], p] : [HUB, [xs, mainY], [xs, p[1]], p]), t, oi});
+    };
+    zs.forEach((Z, i) => {
+      const c = 1.5708 + i * dA, list = [], at = (r, o) => [cx + Math.cos(c + o) * r, cy + Math.sin(c + o) * r], lead = at(r0, 0);
+      for (let k = 1; k <= rings; k++){
+        const r = r0 + k * DR, m = Math.max(1, Math.floor(dA * r / GAP)), row = [];
+        for (let j = 0; j < m; j++) row.push((j - (m - 1) / 2) * dA / m);
+        row.sort((a, b) => Math.abs(a) - Math.abs(b) || a - b);                               // 从扇区正中往两边排，靠近自己的 leader
+        for (const o of row) list.push(at(r, o));
+      }
+      if (!Z.part){ put(Z.key + "|boss", lead, T0(lead[0], lead[1], .9)); add(lead[0] - .25, lead[1] - .25, .001, .5, .5, .014, shade(Z.hex, .8), T0(lead[0], lead[1], .5)); add(lead[0] - .125, lead[1] - .125, .015, .25, .25, .004, SANC.gold, T0(lead[0], lead[1], .55)) }
+      for (const a of Z.subs){ const p = list[Math.min(a.slot, list.length - 1)]; put(Z.key + "|" + a.id, p, T0(p[0], p[1], .9)); add(p[0] - .1875, p[1] - .1875, .001, .375, .375, .012, shade(Z.hex, .55), T0(p[0], p[1], .5)) }
+      // 队旗：立在扇区外沿，旗面用团队色
+      const lp = at(Math.min(r0 + rings * DR + .55, Rmax + .3), 0), tl = T0(lp[0], lp[1], .7);
+      add(lp[0] - .03, lp[1] - .03, 0, .06, .06, 1.5, sc.woodDk, tl); add(lp[0] + .03, lp[1] - .02, 1.0, .375, .04, .45, Z.hex, tl + .05); add(lp[0] - .04, lp[1] - .04, 1.5, .08, .08, .08, sc.gold, tl + .06);
+      W0.zoneLabels.push({x: lp[0], y: lp[1], z: 1.85, t: tl + .1, ...(Z.part ? {amen: "第 " + (Z.part + 1) + " 组"} : {Z}), oi, cx: lead[0], cy: lead[1]});
+    });
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]){ const ox = cx + sx * Math.min((x1 - x0) / 2 - .7, Rmax + 1.7), oy = cy + sy * (BD1 / 2 - .8); obelisk(ox, oy, T0(ox, oy, .4)) }
+    // 大厅两侧（法阵外圈以外）的破败陈设：左边两具石棺，一具棺盖滑开；右边一根倒塌的石柱和吊着骷髅的铁笼
+    const st = sc.st, iron = sc.iron;
+    [[x0 + .55, cy - 2.4, false], [x0 + .55, cy + .5, true]].forEach(([sx, sy, open]) => {
+      const t = T0(sx, sy, .4);
+      add(sx - .0625, sy - .0625, 0, .875, 1.75, .125, sc.stDk, t); add(sx, sy, .125, .75, 1.625, .375, st[1], t + .03, EM, 0, .06);
+      if (open){ add(sx + .0625, sy + .0625, .5, .625, 1.5, .01, "#0d0b12", t + .05); add(sx + .3125, sy - .125, .5, .75, 1.625, .125, sc.stLt, t + .06); add(sx + .25, sy + .6, .51, .12, .5, .1, sc.bone, t + .08) }
+      else { add(sx - .0625, sy - .0625, .5, .875, 1.75, .125, sc.stLt, t + .06); add(sx + .3125, sy + .25, .625, .125, 1.125, .03, sc.stDk, t + .08); add(sx + .125, sy + .5, .625, .5, .125, .03, sc.stDk, t + .08) }
+    });
+    { const px = x1 - 2.3, py = cy + 1.9, t = T0(px, py, .4);
+      add(px - .0625, py - .0625, 0, .75, .75, .25, sc.stDk, t); add(px, py, .25, .625, .625, .5, st[2], t + .03, EM, 0, .06); add(px + .125, py + .125, .75, .375, .25, .125, st[0], t + .05);   // 断柱的残桩
+      [[.9, .1, .625, .5], [1.6, .2, .5, .5], [2.15, .05, .375, .375]].forEach(([a, b, len, w], q) => { if (px + a + len < x1) add(px + a, py + b, 0, len, w, w, st[q % 3], t + .06 + q * .03, EM, 0, .06) });   // 倒在地上的柱身，一节比一节碎
+      const gx = x1 - 1.3, gy = cy - 2.2, tg = T0(gx, gy, .4);
+      add(gx, gy, 0, .125, .125, 2.375, iron, tg); add(gx - .125, gy - .125, 0, .375, .375, .125, iron, tg); add(gx - .75, gy, 2.25, .875, .125, .125, iron, tg + .04); add(gx - .66, gy + .035, 1.9, .05, .05, .35, iron, tg + .06);
+      for (const z of [1.1, 1.85]) add(gx - .875, gy - .1875, z, .5, .5, .05, iron, tg + .08);
+      for (const [a, b] of [[0, 0], [.45, 0], [0, .45], [.45, .45], [.225, 0], [.225, .45], [0, .225], [.45, .225]]) add(gx - .875 + a, gy - .1875 + b, 1.15, .05, .05, .7, iron, tg + .1);
+      add(gx - .72, gy - .04, 1.15, .1875, .1875, .1875, sc.bone, tg + .12); add(gx - .7, gy + .15, 1.2, .05, .01, .06, "#1b1216", tg + .13); add(gx - .61, gy + .15, 1.2, .05, .01, .06, "#1b1216", tg + .13);
+    }
+    // 法阵周围的旧血迹和地面裂缝
+    for (let q = 0; q < 7; q++){ const an = q * .9 + RND(), rr = R + .7 + RND() * 1.6, bx0 = cx + Math.cos(an) * rr, by0 = cy + Math.sin(an) * rr, t = T0(bx0, by0, .5); add(bx0, by0, .0005, .375, .25, .004, "#4a0f18", t); add(bx0 + .25, by0 + .125, .0005, .25, .25, .004, "#3d0c14", t); if (RND() < .5) add(bx0 - .125, by0 + .25, .0005, .125, .125, .004, "#4a0f18", t) }
+    for (let q = 0; q < 16; q++){ const px = x0 + .3 + RND() * (x1 - x0 - 1.6), py = .4 + RND() * (BD1 - 1), len = .5 + RND(), t = T0(px, py, .4); if (Math.hypot(px - cx, py - cy) < R + .5) continue; if (RND() < .5){ add(px, py, .0005, len, .04, .004, "#221f2c", t); add(px + len * .6, py + .04, .0005, .04, .3, .004, "#221f2c", t) } else { add(px, py, .0005, .04, len, .004, "#221f2c", t); add(px + .04, py + len * .4, .0005, .3, .04, .004, "#221f2c", t) } }
+  }
+  function sanctumShell(){
+    const sc = SANC, mc = MAGIC_COL, pick = a => a[Math.floor(RND() * a.length)];
+    // 砌块墙：按层切块、层间错缝，逐块抖色
+    const blocks = (x, y, z, sx, sy, sz, t, col = sc.st[0], bl = .55, ruin = false) => {
+      const along = sx >= sy, len = along ? sx : sy, nL = Math.max(1, Math.round(sz / .36)), hh = sz / nL, nB = Math.max(1, Math.round(len / bl));
+      for (let k = 0; k < nL; k++) for (let b = k % 2 ? -1 : 0; b < nB; b++){
+        if (ruin && k >= nL - 2 && RND() < (k === nL - 1 ? .34 : .12)) continue;                       // 年久失修：顶上两层随机缺块
+        const a0 = Math.max(0, (b + (k % 2 ? .5 : 0)) / nB) * len, a1 = Math.min(1, (b + 1 + (k % 2 ? .5 : 0)) / nB) * len;
+        if (a1 - a0 < 1e-4) continue;
+        if (along) add(x + a0, y, z + k * hh, a1 - a0, sy, hh, col, t + k * .012, EM, 0, .08); else add(x, y + a0, z + k * hh, sx, a1 - a0, hh, col, t + k * .012, EM, 0, .08);
+      }
+    };
+
+    // ---- 浮岩：朝镜头的两个侧面逐层内收、越往下越暗，面上凸出碎岩和发光水晶，底下挂石笋
+    EM = 0;
+    for (let k = 0; k < 5; k++){
+      const ins = k ? .25 + k * .5 : 0, z1 = -.3 - k * .46;
+      add(X0 - .25, -.25, z1 - .46, W + .29 - ins, D + .29 - ins, .46, sc.rock[Math.min(k, 3)], -1, 0, 0, .03);
+      for (let q = 0; q < W / 2.2; q++){ const w = .5 + RND() * 1.1, dd = .12 + RND() * .3; add(X0 + RND() * (W - ins - w), D + .04 - ins - .02, z1 - .46 + RND() * .12, w, dd, .2 + RND() * .26, pick(sc.rock), -1, 0, 0, .06) }
+      for (let q = 0; q < D / 2.2; q++){ const w = .5 + RND() * 1.1, dd = .12 + RND() * .3; add(X0 + W + .04 - ins - .02, RND() * (D - ins - w), z1 - .46 + RND() * .12, dd, w, .2 + RND() * .26, pick(sc.rock), -1, 0, 0, .06) }
+      for (let q = 0; q < 3; q++){
+        const col = RND() < .5 ? mc.arcane : mc.crystal, hz = .16 + RND() * .2;
+        if (RND() < .5) add(X0 + RND() * (W - ins - .3), D + .04 - ins - .04, z1 - .4 + RND() * .1, .14, .14, hz, col, -1, 1, 1);
+        else add(X0 + W + .04 - ins - .04, RND() * (D - ins - .3), z1 - .4 + RND() * .1, .14, .14, hz, col, -1, 1, 1);
+      }
+    }
+    for (let q = 0; q < 16; q++){
+      const px = X0 + RND() * (W - 3.2), py = RND() * (D - 3.2), w = .28 + RND() * .4, len = .4 + RND() * 1.3;
+      add(px, py, -2.6 - len, w, w, len, sc.rock[3], -1, 0, 0, .05); add(px + w * .25, py + w * .25, -2.6 - len - w * .8, w * .5, w * .5, w * .8, sc.rock[3], -1, 0, 0, .05);
+    }
+
+    // ---- 地面：圣堂大厅铺石板（偶有苔痕），主通道是镶金边的猩红长毯；核心筒各室各自的地面
+    EM = .3;
+    // 引擎没有点光源，就把光直接染进地砖：离火把近的偏暖，离法阵近的偏紫；按四档取整，光斑边缘是一圈圈台阶
+    const warm = [[X0 + CORE, entY - .8], [X0 + CORE, entY + .8]], ccx = (X0 + TX0 - .4 + X0 + W - .3) / 2, ccy = BD1 / 2 + .05;
+    for (let i = CORE + 1; i < W; i += 3) warm.push([X0 + i + .5, .5]);
+    const lit = (col, x, y) => {
+      let k = 0; for (const [lx, ly] of warm) k = Math.max(k, 1 - Math.hypot(x - lx, y - ly) / 2.8);
+      const kp = x > X0 + CORE ? Math.round(clamp(1 - (Math.hypot(x - ccx, y - ccy) - 2.6) / 2.4, 0, 1) * 4) / 4 : 0;
+      k = Math.round(k * 4) / 4;
+      if (k > 0) col = mixHex(col, "#d08a48", k * .36);
+      return kp > 0 ? mixHex(col, "#7a3fb8", kp * .3) : col;
+    };
+    for (let j = 0; j < D; j++) for (let i = 0; i < W; i++){
+      const c = (i + j) & 1, x = i + .5, y = j + .5;
+      let col;
+      if (x < CORE){ const r = coreAt(y); col = r === "pan" ? (c ? "#5c4a3b" : "#534336") : r === "wc" ? (c ? "#423e4d" : "#3a3745") : r === "ev" ? (c ? "#4c4167" : "#43395c") : r === "st" ? "#4a4659" : (c ? "#30405e" : "#2a3854") }
+      else if (y > BD1 && y < BD1 + MAIN) col = RND() < .1 ? sc.floor[i % 3] : sc.carpet[i & 1];                 // 长毯破了几处，露出底下的石板
+      else if (x < TX0 - .4) col = c ? "#605d76" : "#575470";
+      else { const r = RND(); col = r < .06 ? sc.moss : r < .13 ? "#33303f" : sc.floor[(i * 2 + j * 3 + (r < .5 ? 1 : 0)) % 3] }
+      add(X0 + i, j, -.3, 1, 1, .3, lit(col, X0 + x, y), T0(X0 + i, j), EM, 0, .035);
+    }
+    // 碎石和散落的骨头：堆在墙根和大厅角落
+    for (let q = 0; q < W * 1.6; q++){
+      const wall = q % 3 === 0, px = X0 + CORE + .4 + RND() * (W - CORE - 1.2), py = wall ? .05 + RND() * .5 : (RND() < .5 ? .3 + RND() * (BD1 - .8) : BD1 + MAIN + .2 + RND() * (D - BD1 - MAIN - .8)), t = T0(px, py, .3);
+      if (!wall && RND() < .8) continue;
+      if (RND() < .22){ add(px, py, 0, .125, .125, .125, sc.bone, t); add(px + .14, py + .04, 0, .25, .0625, .0625, sc.bone, t) }
+      else for (let k = 0; k < 1 + Math.floor(RND() * 3); k++){ const w = .125 * (1 + Math.floor(RND() * 2)); add(px + k * .2, py + RND() * .2, 0, w, w, .125 * (1 + Math.floor(RND() * 2)), sc.st[k % 3], t, EM, 0, .1) }
+    }
+    for (let i = CORE; i < W; i++) for (const yb of [BD1 + .07, BD1 + MAIN - .14]) add(X0 + i, yb, .001, 1, .07, .006, sc.gold, T0(X0 + i, BD1 + .5, .1));
+
+    // ---- 后墙（哥特式）：每 3 格一跨——1 格扶壁（小尖塔、火把、挂旗）+ 2 格宽的尖拱彩窗；墙顶雉堞
+    EM = .25;
+    const GZ0 = .85;
+    for (let i = 0; i < W; i++){
+      const x = X0 + i, t = T0(x, 0, .25), m = i <= CORE ? -1 : (i - CORE - 1) % 3, half = m === 1 ? 0 : m === 2 ? 1 : -1, win = half === 1 || (half === 0 && i + 1 < W);
+      if (!win) blocks(x, -.25, 0, 1, .25, SWH, t, sc.st[0], .55, true);
+      else {
+        blocks(x, -.25, 0, 1, .25, GZ0, t); blocks(x, -.25, 2.75, 1, .25, SWH - 2.75, t + .08, sc.st[0], .55, true);
+        // 尖拱：窗洞顶部分两级向窗心收窄，外侧补石块
+        add(x + (half ? .7 : 0), -.25, 2.25, .3, .25, .25, sc.st[1], t + .06, EM, 0, .06); add(x + (half ? .38 : 0), -.25, 2.5, .62, .25, .25, sc.st[2], t + .07, EM, 0, .06);
+        // 彩色玻璃：按小格拼色、自发光；铅条压在格缝上
+        const rows = [[GZ0, .35, .06, 1], [GZ0 + .35, .35, .06, 1], [GZ0 + .7, .35, .06, 1], [GZ0 + 1.05, .35, .06, 1], [2.25, .25, .3, 1], [2.5, .25, .62, 1]];
+        rows.forEach(([z, hh, a0, a1], r) => {
+          const n = Math.max(1, Math.round((a1 - a0) / .235)), cw = (a1 - a0) / n;
+          for (let q = 0; q < n; q++){
+            const a = a0 + q * cw, xa = half ? 1 - a - cw : a, core = q === n - 1 && (r === 1 || r === 2);              // 靠窗心的两格用金色，拼成一道竖纹
+            if (RND() < .26) add(x + xa, -.2, z, cw, .12, hh, "#15121c", t + .1, 0, 0); else add(x + xa, -.2, z, cw, .12, hh, core ? "#e8b84a" : sc.glass[hash3(i - half, r, q) % sc.glass.length], t + .1, .55, 1);   // 碎掉的窗格只剩黑洞
+          }
+          add(x, -.215, z - .012, 1, .15, .024, sc.iron, t + .11);
+        });
+        add(x + (half ? .94 : 0), -.25, GZ0, .06, .25, 1.4, sc.stDk, t + .09); if (half) add(x - .03, -.23, GZ0, .06, .19, 1.9, sc.stDk, t + .09);
+        add(x, -.03, GZ0 - .07, 1, .12, .07, sc.stLt, t + .1);
+      }
+      add(x, -.25, 0, 1, .29, .12, sc.stDk, t + .02);
+      for (const a of [.08, .58]) if (RND() > .4) add(x + a, -.25, SWH + .07, .34, .25, .2, sc.st[(i + (a > .3 ? 1 : 0)) % 3], t + .12, EM, 0, .06);
+      if (m === 0){
+        blocks(x + .18, -.02, 0, .64, .34, SWH + .3, t + .04, sc.st[2], .64); add(x + .14, -.06, SWH + .3, .72, .42, .08, sc.stDk, t + .12);
+        add(x + .26, 0, SWH + .38, .48, .3, .32, sc.st[0], t + .14); add(x + .34, .04, SWH + .7, .32, .22, .3, sc.st[2], t + .15); add(x + .42, .08, SWH + 1.0, .16, .14, .26, sc.stLt, t + .16);
+        add(x + .46, .11, SWH + 1.26, .08, .08, .12, sc.gold, t + .17, 1, 1);
+        torch(x + .5, .32, 1.0, t + .1);
+        add(x + .3, .325, 1.86, .4, .025, .94, sc.carpet[0], t + .14); add(x + .28, .32, 2.78, .44, .04, .05, sc.gold, t + .15);                       // 挂旗：猩红旗面 + 金杆 + 金徽 + 燕尾
+        for (const a of [.3, .56]) add(x + a, .325, 1.7, .14, .025, .16, sc.carpet[0], t + .15);
+        add(x + .44, .35, 2.2, .12, .012, .3, sc.gold, t + .16); add(x + .38, .35, 2.38, .24, .012, .08, sc.gold, t + .16);
+      }
+    }
+    // ---- 左墙：整面石墙，两座传送门（原电梯位）——石拱门洞 + 门后的虚空，拱顶一枚发光符文；门内的漩涡由 dynamic() 每帧画
+    { const spans = []; let yy = 0;
+      for (const [a, b] of [[e1 - .75, e1 + .75], [e2 - .75, e2 + .75]]){ spans.push([yy, a]); spans.push([a, b, 1]); yy = b }
+      spans.push([yy, D]);
+      for (const [a, b, gate] of spans){
+        if (!gate){
+          let s = a;
+          while (s < b - 1e-6){
+            const len = Math.min(1, b - s), ts = T0(X0, s, .25);
+            blocks(X0 - .25, s, 0, .25, len, SWH, ts, sc.st[0], .55, true); add(X0 - .25, s, 0, .29, len, .12, sc.stDk, ts + .02);
+            if (RND() > .4) add(X0 - .25, s + len * .2, SWH + .07, .25, Math.min(.34, len * .6), .2, sc.st[1], ts + .12, EM, 0, .06);
+            s += len;
+          }
+        } else {
+          const c = (a + b) / 2, t = T0(X0, c, .25);
+          blocks(X0 - .25, a, 0, .25, .2, SWH, t); blocks(X0 - .25, b - .2, 0, .25, .2, SWH, t); blocks(X0 - .25, a + .2, 2.15, .25, b - a - .4, SWH - 2.15, t, sc.st[1]);
+          add(X0 - .25, a + .2, 1.9, .25, .2, .25, sc.st[2], t + .04); add(X0 - .25, b - .4, 1.9, .25, .2, .25, sc.st[2], t + .04);
+          add(X0 - .02, a + .12, 0, .1, .12, 2.0, sc.stLt, t + .05); add(X0 - .02, b - .24, 0, .1, .12, 2.0, sc.stLt, t + .05); add(X0 - .02, a + .12, 2.0, .1, b - a - .24, .14, sc.stLt, t + .05);
+          add(X0 + .02, c - .12, 2.24, .07, .24, .24, mc.arcane, t + .12, 1, 1); add(X0 + .03, c - .05, 2.31, .07, .1, .1, mc.core, t + .13, 1, 1);
+          add(X0 - 1.0, c - .65, 0, .75, 1.3, 2.15, "#150c22", t); add(X0 - .27, a, SWH, .29, b - a, .07, sc.stDk, t + .1);
+          W0.doors.push({x: X0, y: c, open: 0, main: Math.abs(c - e1) < .01});
+        }
+      }
+    }
+    // 前、右两面剖到矮墙：石砌女墙 + 垛口
+    { const t = T0(X0 + W / 2, D - .5, .3);
+      for (let i = 0; i < W; i++){ add(X0 + i, D - .18, 0, 1, .18, LOWH, sc.st[i % 3], t, EM, 0, .06); add(X0 + i + .3, D - .18, LOWH, .4, .18, .12, sc.stDk, t + .05) }
+      for (let j = 0; j < D; j++){ add(X0 + W - .18, j, 0, .18, 1, LOWH, sc.st[(j + 1) % 3], t, EM, 0, .06); add(X0 + W - .18, j + .3, LOWH, .18, .4, .12, sc.stDk, t + .05) } }
+
+    // ---- 核心筒：石隔墙，门洞两侧立柱
+    EM = .3;
+    const tcw = T0(X0 + 4, D / 2, .2), exitY = EVE + .35;
+    const swall = (x, y, alongX, len, hgt, t, gaps = []) => {
+      let s = 0; const segs = [];
+      for (const [a, b] of gaps.slice().sort((p, q) => p[0] - q[0])){ if (a > s) segs.push([s, a]); s = Math.max(s, b) }
+      if (s < len) segs.push([s, len]);
+      for (const [a, b] of segs){
+        if (alongX){ blocks(x + a, y, 0, b - a, .15, hgt, t, sc.st[1], .5); add(x + a, y - .01, hgt, b - a, .17, .05, sc.stDk, t + .05) }
+        else { blocks(x, y + a, 0, .15, b - a, hgt, t, sc.st[1], .5); add(x - .01, y + a, hgt, .17, b - a, .05, sc.stDk, t + .05) }
+      }
+      for (const [a, b] of gaps) for (const q of [a - .1, b]) alongX ? add(x + q, y - .03, 0, .1, .21, hgt + .2, sc.stLt, t + .05) : add(x - .03, y + q, 0, .21, .1, hgt + .2, sc.stLt, t + .05);
+    };
+    swall(X0 + CORE - .15, 0, false, D, CWH, tcw, [[1.4, 2.2], [PAN + .1, PAN + .7], [WC1 + .3, WC1 + .9], [entY - .75, entY + .75], [exitY, exitY + .8], [STE + .8, STE + 1.6]]);
+    for (const yb of [PAN, WC1, WC2, EVE, STE]) swall(X0, yb - .075, true, CORE - .15, yb === STE ? LOWH : CWH, T0(X0 + 2, yb, .2));
+    for (const q of [entY - .8, entY + .8]) flameAt(X0 + CORE - .075, q, CWH + .2, .17, tcw + .25);                     // 大门两侧门柱上的火盆
+
+    // 酒窖：卧放的大酒桶、石砌炉灶、长桌木凳
+    { const t = T0(X0 + 2, 2, .3), wd = sc.wood, dk = sc.woodDk;
+      add(X0 + .2, .1, 0, 2.5, .85, .12, dk, t);
+      for (const [bx0, bz] of [[.25, .12], [1.1, .12], [1.95, .12], [.68, .86], [1.52, .86]]){
+        add(X0 + bx0, .1, bz, .72, .85, .7, wd, t + .03, EM, 0, .05);
+        for (const by of [.2, .7]) add(X0 + bx0 - .02, by, bz - .02, .76, .07, .74, sc.iron, t + .05);
+        add(X0 + bx0 + .14, .95, bz + .14, .44, .02, .44, tint(wd, .18), t + .06); add(X0 + bx0 + .32, .97, bz + .1, .08, .08, .08, sc.gold, t + .07);
+      }
+      blocks(X0 + 3.3, .08, 0, 1.3, .7, 1.0, t + .05, sc.st[2]); add(X0 + 3.5, .74, .12, .9, .06, .55, "#1b1216", t + .08); add(X0 + 3.6, .78, .12, .7, .1, .1, dk, t + .09);
+      flameAt(X0 + 3.95, .86, .22, .26, t + .1); add(X0 + 3.7, .3, 1.0, .5, .4, 1.3, sc.st[1], t + .1, EM, 0, .06);
+      add(X0 + 1.3, 1.7, .62, 1.5, .85, .07, wd, t + .12); for (const [a, b] of [[1.36, 1.76], [1.36, 2.43], [2.68, 1.76], [2.68, 2.43]]) add(X0 + a, b, 0, .08, .08, .62, dk, t + .1);
+      for (const [a, b] of [[1.5, 1.3], [2.2, 1.3], [1.5, 2.65], [2.2, 2.65]]) add(X0 + a, b, 0, .34, .3, .4, dk, t + .14, EM, 0, .06);
+      for (const [a, b] of [[1.5, 1.85], [2.05, 2.25], [2.5, 1.9]]){ add(X0 + a, b, .69, .1, .1, .13, "#8a6a4a", t + .16); add(X0 + a + .01, b + .01, .82, .08, .08, .03, "#f1ead8", t + .17) }
+      add(X0 + 1.85, 2.0, .69, .26, .16, .08, "#b8793f", t + .16); add(X0 + 2.3, 1.82, .69, .06, .06, .14, "#f2e8cf", t + .16); add(X0 + 2.31, 1.83, .83, .04, .04, .06, mc.flame[1], t + .17, 1, 1);
+      add(X0 + .2, 3.0, 0, .5, .45, .42, wd, t + .12, EM, 0, .05); add(X0 + .8, 3.05, 0, .42, .4, .34, "#8a7a5a", t + .12); barrelAt(X0 + 4.0, 2.95, 0, t + .12);
+      W0.zoneLabels.push({amen: "仓库", x: X0 + 2.4, y: .3, z: 2.0, t: t + .6, oi, cx: X0 + 2.4, cy: 1.8}); }
+    // 地牢（铁栅、稻草、骷髅、镣铐）和藏宝库（金币堆、宝石、掀开盖的宝箱）
+    { const t = T0(X0 + 2, PAN + .5, .3), y0 = PAN + .08, y1 = WC1 + .08, G = "#f0c23f";
+      for (let k = 0; k < 6; k++) add(X0 + 2.0, y0 + .04 + k * .145, 0, .05, .05, 1.05, sc.iron, t + .05 + k * .01);
+      add(X0 + 1.98, y0, 1.0, .09, .85, .06, sc.iron, t + .1); add(X0 + 1.98, y0, .45, .09, .85, .04, sc.iron, t + .1);
+      add(X0 + .2, y0 + .1, 0, 1.3, .62, .06, "#b79a4e", t + .06, EM, 0, .08);
+      add(X0 + .95, y0 + .28, .06, .22, .22, .2, sc.bone, t + .1); for (const a of [.98, 1.09]) add(X0 + a, y0 + .5, .15, .05, .012, .06, "#1b1216", t + .11);
+      add(X0 + .5, y0 + .3, .06, .36, .2, .08, sc.bone, t + .1); add(X0 + .3, y0 + .5, .06, .3, .05, .05, sc.bone, t + .1);
+      for (const a of [.2, .55]) add(X0 + .01, y0 + a, .75, .03, .05, .5, sc.iron, t + .1);
+      add(X0 + .2, y1 + .05, 0, 1.6, .72, .18, G, t + .08, .5, 0, .08); add(X0 + .45, y1 + .15, .18, 1.0, .5, .16, G, t + .1, .5, 0, .08); add(X0 + .7, y1 + .25, .34, .5, .3, .14, tint(G, .25), t + .12, .6);
+      for (const [a, b, col] of [[.32, .6, mc.crystal], [1.5, .3, "#ff5a7a"], [1.0, .62, mc.arcane], [.25, .2, "#7dff9a"]]) add(X0 + a, y1 + b, .2, .09, .09, .09, col, t + .14, 1, 1);
+      add(X0 + 2.5, y1 + .2, 0, .7, .5, .38, sc.wood, t + .1); for (const a of [2.5, 3.14]) add(X0 + a, y1 + .19, 0, .06, .52, .4, sc.gold, t + .12);
+      add(X0 + 2.56, y1 + .25, .38, .58, .4, .05, G, t + .13, 1, 1); add(X0 + 2.5, y1 + .12, .38, .7, .09, .42, sc.wood, t + .12); add(X0 + 2.5, y1 + .1, .56, .7, .03, .06, sc.gold, t + .13);
+      barrelAt(X0 + 3.7, y1 + .25, 0, t + .1); }
+    // 传送大厅：门前的符文圈、通向大门的长毯、石凳、水晶灯座、公会旗（团队色）
+    { const t = T0(X0 + 2, e1 + 1, .3);
+      add(X0 + .15, e1 - .45, .001, 4.6, .9, .012, sc.carpet[0], t); for (const yb of [e1 - .45, e1 + .39]) add(X0 + .15, yb, .013, 4.6, .06, .004, sc.gold, t + .02);
+      for (const c of [e1, e2]) for (let q = 0; q < 12; q++){ const a = q / 12 * 6.2832; add(X0 + .75 + Math.cos(a) * .52 - .05, c + Math.sin(a) * .52 - .05, .018, .1, .1, .008, q & 1 ? mc.arcane : mc.halo, t + .1 + q * .01, 1, 1) }
+      add(X0 + 2.6, e2 + .7, 0, 1.4, .42, .36, sc.st[2], t + .05, EM, 0, .06);
+      for (const [a, b, col] of [[4.2, WC2 + .25, mc.crystal], [4.2, EVE - .6, mc.arcane]]){ add(X0 + a, b, 0, .34, .34, .5, sc.stDk, t + .05); crystalAt(X0 + a + .17, b + .17, .5, .6, col, t + .08) }
+      add(X0 + 1.1, WC2 + .06, 1.42, 2.6, .06, .05, sc.gold, t + .05); add(X0 + 1.2, WC2 + .08, .7, 2.4, .04, .72, shade(hx, .8), t + .05); for (const a of [1.2, 3.5]) add(X0 + a, WC2 + .12, .7, .1, .012, .72, sc.gold, t + .06);
+      [.1, .3, .5, .3, .1].forEach((w, r) => add(X0 + 2.4 - w / 2, WC2 + .12, .86 + r * .08, w, .012, .08, sc.gold, t + .07));
+      W0.zoneLabels.push({amen: "传送大厅", x: X0 + 2.4, y: WC2 + .3, z: 2.0, t: t + .6, oi, cx: X0 + 2.4, cy: (WC2 + EVE) / 2}); }
+    // 通往塔楼的石阶：六级台阶上到平台，尽头一扇包铁木门
+    { const t = T0(X0 + 2, EVE + .7, .3), x1 = X0 + 3.6;
+      for (let k = 0; k < 6; k++) add(x1 - (k + 1) * .45, EVE + .15, 0, .45, 1.1, .15 * (k + 1), sc.st[k % 3], t + k * .02, EM, 0, .05);
+      add(X0 + .1, EVE + .15, 0, x1 - 2.7 - X0 - .1, 1.1, .9, sc.st[1], t + .14);
+      add(X0 + .02, EVE + .35, .9, .06, .7, 1.2, sc.wood, t + .2); for (const a of [.4, 1.0]) add(X0 + .08, EVE + .35, .9 + a, .02, .7, .06, sc.iron, t + .22);
+      add(X0 + .09, EVE + .9, 1.4, .03, .08, .08, sc.gold, t + .22); }
+    // 水晶密室：三座巨型水晶（原机柜位），前面是符文石台——魔法师站在台前施法
+    { const t = T0(X0 + 2, STE + 1.5, .3), y = STE + .5;
+      for (let k = 0; k < 3; k++){
+        const x = X0 + .3 + k * .78, col = k === 1 ? mc.arcane : mc.crystal;
+        add(x, y, 0, .66, .7, .3, sc.stDk, t + k * .05); add(x + .06, y + .06, .3, .54, .58, .08, sc.st[2], t + k * .05 + .02);
+        crystalAt(x + .33, y + .35, .38, 1.35, col, t + k * .05 + .06);
+        add(x + .16, y + .82, 0, .34, .2, .88, sc.st[1], t + .2); add(x + .12, y + .78, .88, .42, .28, .05, sc.stDk, t + .21); add(x + .17, y + .82, .93, .32, .2, .02, col, t + .22, 1, 1);
+        spot("srv", [x + .33, y + 1.15], 3, "stand", [[corr, STE + 1.2], [X0 + CORE + .3, STE + 1.2], [X0 + 4.3, STE + 1.2], [X0 + 4.3, y + 1.15]], t + .5);
+      }
+      add(X0 + .3, y + 1.42, .002, 2.3, .06, .008, mc.crystal, t + .1, .8, 1);
+      crystalAt(X0 + 3.7, D - 1.0, 0, .7, mc.arcane, t + .15); crystalAt(X0 + 4.2, D - .55, 0, .45, mc.crystal, t + .17);
+      W0.zoneLabels.push({amen: "水晶密室", x: X0 + 1.5, y: STE + .3, z: 2.3, t: t + .6, oi, cx: X0 + 2.4, cy: (STE + D) / 2}); }
+    // 核心筒前通道：酒桶、长矛架、木箱
+    { const t = T0(X0 + CORE + .3, 1, .3);
+      barrelAt(X0 + CORE + .06, .3, 0, t); barrelAt(X0 + CORE + .06, .8, 0, t + .03);
+      add(X0 + CORE + .02, 2.75, 0, .1, .7, .9, sc.woodDk, t);
+      for (let s = 0; s < 3; s++){ add(X0 + CORE + .12, 2.85 + s * .2, .1, .04, .04, 1.25, sc.wood, t + .05); add(X0 + CORE + .11, 2.84 + s * .2, 1.35, .06, .06, .2, "#c9d1da", t + .06) }
+      for (let s = 0; s < 2; s++) add(X0 + CORE + .05, D - 1.4 + s * .5, 0, .42, .42, .42, s ? sc.wood : sc.woodDk, T0(X0 + CORE, D - 1, .3), EM, 0, .05); }
+    EM = .3;
+  }
+  /* 图书馆（原会议室位，座位与路线不变）：两面顶天的书架，长阅览桌配高背椅，桌上摊着书、点着烛台 */
+  function library(x, y, w, d){
+    const t = T0(x + w / 2, y + d / 2, .3), sc = SANC, mc = MAGIC_COL, BK = ["#7d1f33", "#3b2a66", "#1f5a4a", "#8a6a2a", "#2a3f7a", "#5a2a4a"];
+    add(x, y, .001, w, d, .012, "#4a3324", t, EM, 0, .03); add(x + .5, y + .5, .013, w - .875, d - .875, .004, sc.carpet[1], t + .02);
+    const shelf = (sx, sy, alongX, len, hgt, tt) => {
+      if (alongX) add(sx, sy, 0, len, .3, hgt, sc.woodDk, tt); else add(sx, sy, 0, .3, len, hgt, sc.woodDk, tt);
+      for (let lv = 0; lv * .4 + .12 < hgt - .25; lv++){
+        const z = .12 + lv * .4; let a = .06;
+        while (a < len - .12){
+          const bw = .07 + RND() * .07, bh = .2 + RND() * .12, col = BK[Math.floor(RND() * BK.length)];
+          if (alongX) add(sx + a, sy + .3, z, bw, .035, bh, col, tt + .05); else add(sx + .3, sy + a, z, .035, bw, bh, col, tt + .05);
+          a += bw + .012;
+        }
+        if (alongX) add(sx, sy + .28, z - .045, len, .07, .045, sc.wood, tt + .03); else add(sx + .28, sy, z - .045, .07, len, .045, sc.wood, tt + .03);
+      }
+      if (alongX) add(sx - .03, sy - .02, hgt, len + .06, .37, .07, sc.wood, tt + .04); else add(sx - .02, sy - .03, hgt, .37, len + .06, .07, sc.wood, tt + .04);
+    };
+    shelf(x + .45, y + .08, true, w - 1.9, 1.75, t + .08); shelf(x + .06, y + .08, false, d - .3, 1.75, t + .1);
+    // 朝镜头的两面只留矮石栏
+    for (let k = 0; k < w; k += .5){ add(x + k, y + d - .125, 0, .5, .125, .375, sc.st[(k * 2) % 3 | 0], t + .05, EM, 0, .05) }
+    for (let k = 0; k < d; k += .5){ add(x + w - .125, y + k, 0, .125, .5, .375, sc.st[(k * 2 + 1) % 3 | 0], t + .05, EM, 0, .05) }
+    add(x, y + d - .14, .375, w, .155, .05, sc.stLt, t + .06); add(x + w - .14, y, .375, .155, d, .05, sc.stLt, t + .06);
+    const tx0 = x + 1.3, tx1 = x + w - .9, ty0 = y + d / 2 - .55, ty1 = y + d / 2 + .55, doorX = x + w - .9, mid = (ty0 + ty1) / 2;
+    add(tx0, ty0, .66, tx1 - tx0, ty1 - ty0, .06, sc.woodDk, t + .15); for (const a of [tx0 + .3, tx1 - .5]) add(a, ty0 + .35, 0, .2, .4, .66, sc.wood, t + .14);
+    for (let cx = tx0 + .4; cx < tx1 - .2; cx += .8){
+      throneAt(OB(cx, ty0 - .38, 1, t + .2), sc.carpet[0]); throneAt(OB(cx, ty1 + .38, 3, t + .2), sc.carpet[0]);
+      spot("meet", [cx, ty0 - .38], 1, "seat", [[doorX, mainY], [doorX, y + .6], [cx, y + .6]], t + .5);
+      spot("meet", [cx, ty1 + .38], 3, "seat", [[doorX, mainY], [doorX, y + .6], [x + 1.0, y + .6], [x + 1.0, y + d - .45], [cx, y + d - .45]], t + .5);   // 下排从桌子左端绕过去
+      for (const s of [-1, 1]) if (RND() < .7){ const yy = s < 0 ? ty0 + .1 : ty1 - .34, col = BK[Math.floor(RND() * BK.length)]; add(cx - .16, yy, .72, .32, .24, .03, col, t + .25); add(cx - .14, yy + .02, .75, .13, .2, .012, mc.page, t + .26); add(cx + .01, yy + .02, .75, .13, .2, .012, mc.page, t + .26) }
+    }
+    throneAt(OB(tx1 + .4, mid, 2, t + .2), sc.carpet[0]);
+    spot("meet", [tx1 + .4, mid], 2, "seat", [[doorX, mainY], [doorX, y + .6], [x + w - .35, y + .6], [x + w - .35, mid]], t + .5);
+    for (const a of [tx0 + .5, (tx0 + tx1) / 2, tx1 - .6]){ add(a, mid - .04, .72, .08, .08, .2, sc.gold, t + .28); add(a - .12, mid - .02, .9, .32, .04, .03, sc.gold, t + .28); for (const q of [-.12, .02, .16]){ add(a + q, mid - .02, .93, .04, .04, .1, "#f2e8cf", t + .29); add(a + q + .005, mid - .015, 1.03, .03, .03, .05, mc.flame[1], t + .3, 1, 1) } }
+    for (let s = 0; s < 3; s++) add(tx0 + 1.0 + s * .04, mid + .2 - s * .02, .72 + s * .05, .3, .22, .05, BK[(s * 2 + 1) % 6], t + .28);        // 桌上一摞书
+    W0.zoneLabels.push({amen: "图书馆", x: x + w / 2, y: y + .2, z: 2.2, t: t + .6, oi, cx: x + w / 2, cy: y + d / 2});
+  }
+  /* 礼拜堂（原休息区位）：几排教堂长椅朝着尽头的祭台，中间留一条过道；做完事的魔法师来这里坐着歇息，坐满了就站在后排 */
+  function pews(x, y, w, d){
+    const t = T0(x + w / 2, y + d / 2, .3), sc = SANC, mc = MAGIC_COL, wd = sc.wood, dk = sc.woodDk, xc = x + w / 2, rows = Math.max(1, Math.min(4, Math.floor((d - 2.0) / .95)));
+    add(xc - .375, y + .1, .001, .75, d - .2, .012, sc.carpet[0], t); for (const a of [-.375, .315]) add(xc + a, y + .1, .013, .06, d - .2, .004, sc.gold, t + .02);
+    for (let r = 0; r < rows; r++){
+      const yy = y + .8 + r * .95, tr = t + .05 + r * .04;
+      for (const [a, b] of [[x + .35, xc - .5], [xc + .5, x + w - .35]]){
+        add(a, yy - .25, .25, b - a, .45, .1, wd, tr); add(a, yy - .375, .25, b - a, .125, .625, dk, tr + .02); add(a, yy - .4, .875, b - a, .17, .05, wd, tr + .03);
+        for (const e of [a - .06, b - .06]){ add(e, yy - .375, 0, .125, .6, .625, dk, tr + .01); add(e, yy - .375, .625, .125, .25, .375, dk, tr + .02) }      // 两端的侧板
+        for (let sx = a + .4; sx <= b - .3; sx += .7) spot("lounge", [sx, yy], 1, "seat", [[xc, mainY], [xc, yy + .45], [sx, yy + .45]], tr + .4);
+      }
+    }
+    for (let sx = x + .6; sx <= x + w - .5; sx += .8) if (Math.abs(sx - xc) > .55) spot("lounge", [sx, y + .28], 1, "stand", [[sx, mainY]], t + .5);
+    // 祭台：石台铺白布，两支蜡烛，身后一块嵌着发光圣徽的石屏
+    const ya = y + .8 + rows * .95 + .1;
+    add(xc - .875, ya, 0, 1.75, .5, .625, sc.st[2], t + .15, EM, 0, .05); add(xc - .9, ya - .03, .625, 1.8, .56, .06, "#ece7d8", t + .17); for (const a of [-.9, .84]) add(xc + a, ya - .03, .3, .06, .56, .33, sc.gold, t + .18);
+    for (const a of [-.6, .52]){ add(xc + a, ya + .2, .685, .08, .08, .26, "#f2e8cf", t + .2); add(xc + a + .015, ya + .215, .945, .05, .05, .08, mc.flame[1], t + .21, 1, 1) }
+    add(xc - .5, ya + .6, 0, 1.0, .125, 1.75, sc.stDk, t + .16, EM, 0, .05); add(xc - .25, ya + .6, 1.75, .5, .125, .25, sc.stDk, t + .17);
+    add(xc - .06, ya + .585, .6, .12, .02, .9, mc.core, t + .2, 1, 1); add(xc - .3, ya + .585, 1.1, .6, .02, .12, mc.core, t + .2, 1, 1);
+    W0.zoneLabels.push({amen: "礼拜堂", x: xc, y: y + .2, z: 1.3, t: t + .6, oi, cx: xc, cy: y + d / 2});
+  }
+  // 仓库（原第三类设施位）：木箱、酒桶、麻袋
+  function storeroom(x, y, w){
+    const t = T0(x + w / 2, y + 1, .3), sc = SANC;
+    for (let i = 0; i < Math.floor((w - .3) / .62); i++){
+      const bx0 = x + .15 + i * .62, k = hash3(i, 7, oi) % 3, tt = t + i * .03;
+      if (k === 0){ barrelAt(bx0, y + .2, 0, tt); if (i % 2) barrelAt(bx0, y + .2, .54, tt + .05) }
+      else { add(bx0, y + .15, 0, .5, .5, .5, k === 1 ? sc.wood : sc.woodDk, tt, EM, 0, .05); add(bx0 - .01, y + .14, .2, .52, .52, .06, sc.iron, tt + .02); if (k === 1) add(bx0 + .06, y + .2, .5, .375, .375, .375, sc.woodDk, tt + .05, EM, 0, .05) }
+    }
+    add(x + .2, y + 1.1, 0, .5, .42, .3, "#8a7a5a", t + .1); add(x + .75, y + 1.2, 0, .44, .4, .26, "#7d6e52", t + .12);
+    W0.zoneLabels.push({amen: "仓库", x: x + w / 2, y: y + .2, z: 1.3, t: t + .6, oi, cx: x + w / 2, cy: y + 1});
+  }
   function plant(x, y, z0, t, big){
-    add(x, y, z0, .36, .36, .32, C.pot, t); add(x + .03, y + .03, z0 + .32, .3, .3, .02, "#6b4a33", t + .02);
+    add(x, y, z0, .36, .36, .32, LY.magic ? SANC.stDk : C.pot, t); add(x + .03, y + .03, z0 + .32, .3, .3, .02, "#6b4a33", t + .02);
     if (big) add(x + .16, y + .16, z0 + .34, .05, .05, .45, "#8b5e3c", t + .03);
     const n = big ? 18 : 9, hgt = big ? 7 : 4, base = big ? .55 : .34;
     for (let s = 0; s < n; s++) add(x - (big ? M : 0) + Math.floor(RND() * (big ? 5 : 3)) * M, y - (big ? M : 0) + Math.floor(RND() * (big ? 5 : 3)) * M, z0 + base + Math.floor(RND() * hgt) * M * (big ? .8 : 1), M, M, M, RND() < .5 ? C.leaf : C.leaf2, t + .04 + s * .01);
@@ -883,7 +1281,7 @@ function buildOffice(off, oi, X0, opt, W0){
     if (R() < .5) A(.35, .53, .58, .76, 0, .26, "#9aa3ad");
   }
   /* ===================== 版式相关的家具 ===================== */
-  /* 岛中线：日式 = 磨砂隔板 + 便利贴；Loft = 吊灯；北欧 = 绿植带；格子间的隔断画在各自工位里 */
+  /* 岛中线：日式 = 磨砂隔板 + 便利贴；Loft = 吊灯；北欧 = 绿植带；魔法学院 = 矮书架 + 蜡烛；格子间的隔断画在各自工位里 */
   function partitionRow(tx, ya, yb, tp){
     if (LY.desk === "jp"){
       add(tx + 1.685, ya, .73, .03, yb - ya, .28, "#dfe8ef", tp + .2); add(tx + 1.68, ya, 1.01, .04, yb - ya, .025, C.metal, tp + .22);
@@ -897,7 +1295,7 @@ function buildOffice(off, oi, X0, opt, W0){
       for (let s = 0; s < 8; s++) add(tx + 1.6 + Math.floor(RND() * 2) * M, ya + .2 + RND() * (yb - ya - .45), .83 + Math.floor(RND() * 2) * M, M, M, M, RND() < .5 ? C.leaf : C.leaf2, tp + .25);
     }
   }
-  /* 团队名牌：日式吊牌 / Loft 霓虹灯牌 / 北欧木牌 / 格子间立在岛尾柜上的桌牌。返回标签高度 */
+  /* 团队名牌：日式吊牌 / Loft 霓虹灯牌 / 北欧木牌 / 魔法学院挂旗 / 格子间立在岛尾柜上的桌牌。返回标签高度 */
   function teamSign(tx, sy, col, ts, ea, eb){
     if (LY.sign === "plate"){
       const yc = (ea + eb) / 2;
@@ -965,6 +1363,7 @@ function buildOffice(off, oi, X0, opt, W0){
     A(-.22, .22, -.22, .22, .38, .07, cc); A(-.42, -.33, -.2, .2, .45, .36, cc);
     for (const [a, b] of [[-.2, -.2], [.15, -.2], [-.2, .15], [.15, .15]]) A(a, a + .05, b, b + .05, 0, .38, wood);
   }
+  /* 魔法学院：深色实木书桌——摊开的魔导书（工作时书页发淡紫光）、蜡烛、药水瓶（颜色随 seed）、卷轴或羽毛笔墨水瓶；木椅配紫色坐垫 */
   /* 主管席的版式变体 */
   function bossVariant(A, on){
     const R = rng32(17);
@@ -1163,7 +1562,7 @@ function toolIcon(tool){
    正常人比例：站高约 1.3 格（头 3 微体素），和 0.68 高的办公桌、0.35 高的沙发坐面相称。
    姿势：坐（工位 / 会议椅 / 沙发）、站（机房控制台前）、走路。 */
 function personVox(P, t){
-  const L = P.look, f = DIRS[P.dir], s = [-f[1], f[0]], T = P.t0;
+  const MG = !!LY.magic, L = MG ? wizLook(P) : P.look, f = DIRS[P.dir], s = [-f[1], f[0]], T = P.t0, legc = MG ? shade(L.shirt, .8) : L.pants;   // 魔法学院：长袍到脚，腿用袍色
   const bx = (u0, u1, v0, v1, a, b, hx, e = .3, m = 0) => {
     const xs = [P.x + (f[0] * u0 + s[0] * v0) * M, P.x + (f[0] * u1 + s[0] * v1) * M], ys = [P.y + (f[1] * u0 + s[1] * v0) * M, P.y + (f[1] * u1 + s[1] * v1) * M];
     const x0 = Math.min(...xs), y0 = Math.min(...ys);
@@ -1176,19 +1575,23 @@ function personVox(P, t){
   let tb;
   if (sit){
     tb = 4;
-    bx(-.6, 2.5, -1.0, 1.0, 3.3, tb, L.pants);
-    bx(1.85, 2.5, -.95, -.1, 0, 3.3, L.pants); bx(1.85, 2.5, .1, .95, 0, 3.3, L.pants);
+    bx(-.6, 2.5, -1.0, 1.0, 3.3, tb, legc);
+    bx(1.85, 2.5, -.95, -.1, 0, 3.3, legc); bx(1.85, 2.5, .1, .95, 0, 3.3, legc);
   } else {
     tb = 4.5;
     const sw = wsw * .9;
-    bx(-.4 + sw, .4 + sw, -.95, -.1, 0, tb, L.pants); bx(-.4 - sw, .4 - sw, .1, .95, 0, tb, L.pants);
+    bx(-.4 + sw, .4 + sw, -.95, -.1, 0, tb, legc); bx(-.4 - sw, .4 - sw, .1, .95, 0, tb, legc);
+    if (MG) bx(-.95, .95, -1.3, 1.3, tb - 2.4, tb + .3, legc);                                 // 袍摆：略宽，盖住腿的上半段
   }
   // 躯干（闲坐时略往后靠）；主管是深色西装 + 领带
   const lean = sit && !work ? -.25 : 0, TH = 2.9;
   bx(-.7 + lean, .7 + lean, -1.1, 1.1, tb, tb + TH, L.shirt);
-  if (P.boss) bx(.7 + lean, .76 + lean, -.2, .2, tb + .6, tb + TH, C.tie);
+  if (P.boss) bx(.7 + lean, .76 + lean, -.2, .2, tb + .6, tb + TH, MG ? MAGIC_COL.gold : C.tie);
   // 手臂：工作时双臂前伸（交替起落 = 打字 / 操作控制台），否则垂在两侧（走路时前后摆）
-  if (work){
+  if (work && MG && stand){                                     // 施法：双臂举向法阵，随咒语一高一低
+    const up = Math.sin(t * 3 + P.phase) * .3;
+    for (const [v0, v1, o] of [[-1.6, -1.13, up], [1.13, 1.6, -up]]){ bx(-.2, 1.5, v0, v1, tb + 1.9, tb + 2.5, L.shirt); bx(1.0, 1.6, v0, v1, tb + 2.5, tb + 3.6 + o, L.shirt); bx(1.05, 1.55, v0 + .05, v1 - .05, tb + 3.6 + o, tb + 4.0 + o, L.skin) }
+  } else if (work){
     const ph = Math.sin(t * 15 + P.phase) > 0 ? .25 : 0;
     bx(-.3 + lean, 2.2, -1.6, -1.13, tb + 1.2 + ph, tb + 1.75 + ph, L.shirt);
     bx(-.3 + lean, 2.2, 1.13, 1.6, tb + 1.45 - ph, tb + 2.0 - ph, L.shirt);
@@ -1204,14 +1607,18 @@ function personVox(P, t){
   for (const c of [-.65, .65]) bx(u1, u1 + .06, c - .2 + v, c + .2 + v, hb + (shut ? 1.2 : 1.0), hb + (shut ? 1.38 : 1.6), C.dark);
   // 头发：头顶一块（前沿略探出 = 刘海）+ 后脑一块（长发垂到肩）；帽子款把头顶换成彩色并加帽檐
   const HV = HW + .15, cap = L.style === 2, hc = cap ? L.accent : L.hair;
-  bx(u0 - .15, u1 + .1, -HV + v, HV + v, hb + 2.1, hb + 3.3, hc);
-  bx(u0 - .15, u0 + .6, -HV + v, HV + v, L.style === 1 ? hb - .5 : hb + .7, hb + 2.1, L.hair);
-  if (cap) bx(u1 + .1, u1 + .6, -1.2 + v, 1.2 + v, hb + 2.1, hb + 2.3, hc);
-  if (P.boss){                                                  // 主 agent：金色小王冠（底圈 + 三个尖）
-    const cz = hb + 3.3, cu0 = u0 + .35, cu1 = u0 + 1.55;
-    bx(cu0, cu1, -1.05 + v, 1.05 + v, cz, cz + .35, C.gold, 1, 1);
-    for (const [c, hh] of [[-.8, .55], [0, .8], [.8, .55]]) bx(cu0 + .3, cu1 - .3, c - .25 + v, c + .25 + v, cz + .35, cz + .35 + hh, C.gold, 1, 1);
+  if (MG) wizardHead(bx, L, P.boss, hb, u0, u1, HW, v);          // 魔法学院：巫师帽 / 兜帽 / 长发 + 头环，主 agent 是大巫师帽
+  else {
+    bx(u0 - .15, u1 + .1, -HV + v, HV + v, hb + 2.1, hb + 3.3, hc);
+    bx(u0 - .15, u0 + .6, -HV + v, HV + v, L.style === 1 ? hb - .5 : hb + .7, hb + 2.1, L.hair);
+    if (cap) bx(u1 + .1, u1 + .6, -1.2 + v, 1.2 + v, hb + 2.1, hb + 2.3, hc);
+    if (P.boss){                                                  // 主 agent：金色小王冠（底圈 + 三个尖）
+      const cz = hb + 3.3, cu0 = u0 + .35, cu1 = u0 + 1.55;
+      bx(cu0, cu1, -1.05 + v, 1.05 + v, cz, cz + .35, C.gold, 1, 1);
+      for (const [c, hh] of [[-.8, .55], [0, .8], [.8, .55]]) bx(cu0 + .3, cu1 - .3, c - .25 + v, c + .25 + v, cz + .35, cz + .35 + hh, C.gold, 1, 1);
+    }
   }
+  if (MG && stand && st === "working") wizardStaff(bx, L, tb, P.boss, s[0] + s[1] > 0 ? 1 : -1);   // 机房控制台前手持法杖
   // 头顶气泡（坐 / 站时）：工作中 = 白气泡 + 工具图标（底部绿条）；其它状态 = 彩色气泡 + 白色符号
   if (rest){
     const pz = hb + (P.boss ? 4.9 : 4) + Math.sin(t * 2.2 + P.phase) * .2;
@@ -1239,6 +1646,338 @@ function personVox(P, t){
 }
 
 /* ============================================================
+   魔法学院版式：魔法师外观 + 召唤巨龙（法阵 / 施法光粒 / 龙 / 吐火）
+   动态体素全部每帧按 S.summon 重算、无状态（粒子用 fract(t * 速度 + 相位)）；非魔法版式不会走到这里
+   ============================================================ */
+/* 魔法师头饰（替换发型 / 帽子 / 王冠）。帽尖向后垂，避开头顶气泡（气泡占 u∈±.35、头顶以上 4 个微体素起）：
+   0 = 尖顶巫师帽（宽帽檐 + 三层逐级收窄的帽尖，帽带用 accent）；1 = 兜帽（袍色）；2 = 长发 + 金色细头环；
+   主 agent = 深紫大巫师帽 + 金色帽带 + 帽尖一颗发光金星 */
+function wizardHead(bx, L, boss, hb, u0, u1, HW, v){
+  const HV = HW + .15, G = MAGIC_COL.gold, back = z0 => bx(u0 - .15, u0 + .6, -HV + v, HV + v, z0, hb + 2.1, L.hair);
+  if (boss){
+    const hp = "#e9e4d6", t0 = u0 - 1.2, t1 = u0 - .6;
+    back(hb + .7);
+    bx(u0 - .7, u1 + .7, -HW - .75 + v, HW + .75 + v, hb + 2.1, hb + 2.45, hp);                              // 帽檐
+    bx(u0 + .05, u1 - .2, -1.35 + v, 1.35 + v, hb + 2.45, hb + 3.7, hp);                                       // 帽身，逐层收窄并向后垂；帽尖要比头顶气泡（顶在 hb+8.7）更高
+    bx(u0, u1 - .15, -1.42 + v, 1.42 + v, hb + 2.45, hb + 2.9, G); bx(u1 - .2, u1 - .05, -.3 + v, .3 + v, hb + 2.4, hb + 3.0, G, 1, 1);   // 金色帽带 + 扣
+    bx(u0 - .2, u0 + .9, -1.0 + v, 1.0 + v, hb + 3.7, hb + 5.0, hp);
+    bx(u0 - .5, u0 + .4, -.65 + v, .65 + v, hb + 5.0, hb + 6.4, hp);
+    bx(u0 - .85, u0 - .05, -.42 + v, .42 + v, hb + 6.4, hb + 7.8, hp);
+    bx(t0, t1, -.25 + v, .25 + v, hb + 7.8, hb + 8.8, hp);
+    bx(t0, t1, -.3 + v, .3 + v, hb + 8.8, hb + 9.4, G, 1, 1); bx(t0, t1, -.7 + v, .7 + v, hb + 8.95, hb + 9.25, G, 1, 1);   // 帽尖上的发光金星（十字）
+    bx(t0 - .45, t1 + .45, -.3 + v, .3 + v, hb + 8.95, hb + 9.25, G, 1, 1); bx(t0 + .1, t1 - .1, -.12 + v, .12 + v, hb + 9.4, hb + 9.9, G, 1, 1);
+  } else if (L.style === 0){
+    const hc = shade(L.shirt, .55);
+    back(hb + .7);
+    bx(u0 - .5, u1 + .5, -HW - .55 + v, HW + .55 + v, hb + 2.1, hb + 2.45, hc);                                // 宽帽檐
+    bx(u0 + .05, u1 - .25, -1.3 + v, 1.3 + v, hb + 2.45, hb + 3.35, hc);                                        // 帽尖三层，逐级收窄并向后垂
+    bx(u0, u1 - .2, -1.36 + v, 1.36 + v, hb + 2.45, hb + 2.8, L.accent);                                       // 帽带
+    bx(u0 - .15, u0 + .9, -.85 + v, .85 + v, hb + 3.35, hb + 4.1, hc);
+    bx(u0 - .35, u0 + .45, -.5 + v, .5 + v, hb + 4.1, hb + 4.8, hc);
+    bx(u0 - .65, u0 - .05, -.25 + v, .25 + v, hb + 4.8, hb + 5.35, hc);
+  } else if (L.style === 1){
+    const hd = shade(L.shirt, .8);
+    bx(u0 - .4, u1 + .1, -HV - .2 + v, HV + .2 + v, hb + 2.0, hb + 3.5, hd);                                   // 头顶
+    bx(u0 - .4, u0 + .7, -HV - .2 + v, HV + .2 + v, hb - 1.0, hb + 2.0, hd);                                   // 后脑垂到肩
+    bx(u0 - .75, u0 + .05, -.9 + v, .9 + v, hb + 3.5, hb + 4.1, hd);                                           // 兜帽尖
+    for (const sg of [-1, 1]) bx(u0 - .4, u1 - .5, sg < 0 ? -HW - .2 + v : HW - .1 + v, sg < 0 ? -HW + .1 + v : HW + .2 + v, hb + .2, hb + 2.0, hd);   // 两颊
+  } else {
+    bx(u0 - .15, u1 + .1, -HV + v, HV + v, hb + 2.1, hb + 3.3, L.hair);                                        // 头顶（刘海）
+    back(hb - 1.1);                                                                                              // 长发垂到背
+    for (const sg of [-1, 1]) bx(u0 - .15, u0 + .9, sg < 0 ? -HV + v : HV - .35 + v, sg < 0 ? -HV + .35 + v : HV + v, hb - .3, hb + 2.1, L.hair);   // 鬓发
+    bx(u1, u1 + .12, -HW - .1 + v, HW + .1 + v, hb + 1.85, hb + 2.1, G);                                       // 金色细头环：前 / 两侧 / 后
+    for (const sg of [-1, 1]) bx(u0 - .1, u1, sg < 0 ? -HW - .12 + v : HW + v, sg < 0 ? -HW + v : HW + .12 + v, hb + 1.85, hb + 2.1, G);
+    bx(u0 - .12, u0, -HW - .1 + v, HW + .1 + v, hb + 1.85, hb + 2.1, G);
+    bx(u1 + .05, u1 + .2, -.2 + v, .2 + v, hb + 1.75, hb + 2.15, MAGIC_COL.crystal, 1, 1);                     // 额前小宝石
+  }
+}
+/* 机房控制台前站着干活的魔法师手持法杖：杖贴在朝镜头一侧的手臂外侧（sg = 那一侧 v 的符号），杖头宝石发光 */
+function wizardStaff(bx, L, tb, boss, sg){
+  const v0 = sg * 1.6, v1 = sg * 2.0, gem = boss ? MAGIC_COL.core : L.accent;
+  bx(1.35, 1.75, v0, v1, 0, tb + 9.6, "#6b4a33"); bx(1.3, 1.8, v0 + sg * .05, v1 - sg * .05, tb + 1.0, tb + 1.35, MAGIC_COL.gold);
+  bx(1.25, 1.85, v0 - sg * .1, v1 + sg * .1, tb + 9.6, tb + 10.1, MAGIC_COL.gold); bx(1.4, 1.7, v0 + sg * .05, v1 - sg * .05, tb + 10.1, tb + 11.1, gem, 1, 1);
+}
+
+/* 圣堂里按身份定袍色：leader 白袍；子 agent 按任务类别——编码红袍、运维黄袍、CI 橙袍、评审紫袍、方案蓝袍、调研绿袍、文档褐袍，其余灰袍 */
+const ROBE = {lead: "#ebe6d6", code: "#a8242e", ops: "#d9ad2b", ci: "#c9702a", review: "#6d3fb0", plan: "#2f5fb8", research: "#2f8a6a", docs: "#8a6a48", other: "#5d6276"};
+function wizLook(P){
+  const k = P.boss ? "lead" : (P.d && P.d.kind) || "code";
+  if (P.robeKey !== k){ P.robeKey = k; P.robe = {...P.look, shirt: ROBE[k] || ROBE.other} }
+  return P.robe;
+}
+
+// <summon>
+/* 召唤进度目标值：没人施法 = 0；一个人施法龙就探头（.45）；施法的人越多越深，封顶 1 */
+function summonTarget(working, total){ if (!(working > 0)) return 0; const span = Math.max(1, Math.min(total, 5) - 1); return Math.min(1, .45 + .55 * (working - 1) / span) }
+/* 阶段：0 无 / 1 只有龙爪扒墙 / 2 龙头探入 / 3 可以吐火 */
+function summonStage(level){ return level < .05 ? 0 : level < .3 ? 1 : level < .8 ? 2 : 3 }
+/* 吐火包络：阶段 3 时每 10 秒喷 3 秒，起止各 .4 秒渐变；返回 0..1 */
+function fireAt(level, t){ if (level < .8) return 0; const u = ((t % 10) + 10) % 10; if (u >= 3) return 0; return Math.min(1, u / .4, (3 - u) / .4) }
+// </summon>
+
+/* 黑龙配色集中在这里。龙身带一点自发光（E），不然夜色里的黑龙只剩一团黑 */
+const DRAGON_COL = {eye: "#ff2d2d", pupil: "#2a0508", ember: "#ff6a1f", wing: "#1e1f2e", membrane: "#3a2238", membrane2: "#33203a", smoke: "#3a3540",
+                    line: "#0b0a11", dark: "#181624", mid: "#262438", light: "#3a3752", hi: "#58547a", bellyD: "#30283b", bellyL: "#4f4260", gum: "#4a1f2e", tooth: "#d8cfe0"};
+/* 黑龙头的体素模型：在整数网格上雕出来（一格 = DRAGON_VOX），只算一次。比例取自侧面像素画——颅骨到吻尖是逐渐收窄压低的楔形，
+   眉骨隆起压着眼窝，嘴里掏空，上下两排牙；脑后七对角由粗到细向后上方掠出去。上色按部位分明暗档，不逐颗随机。
+   返回 {skull, jaw}，元素是 [w, f, u, 颜色, 是否自发光]（w 横向、f 朝前、u 向上，原点在下颌铰链） */
+const DRAGON_VOX = M * 1.25;
+let DRAGON_HEAD = null;
+function dragonHead(){
+  if (DRAGON_HEAD) return DRAGON_HEAD;
+  const C0 = DRAGON_COL, skull = new Map(), jaw = new Map();
+  // 按部位取固定的明暗档；侧面和暗部每隔几格压一道斜向的鳞纹。不逐颗随机取色——那样皮肤会一块一块像长了斑
+  const tone = (f, u, w, kind) => {
+    const band = ((f + 2 * u) % 5 + 5) % 5 === 0;
+    return kind === "hi" ? C0.hi : kind === "light" ? C0.light : kind === "mid" ? (band ? C0.dark : C0.mid) : kind === "belly" ? (((f % 3) + 3) % 3 ? C0.bellyL : C0.bellyD) : (band ? C0.line : C0.dark);
+  };
+  const put = (m, f, u, w, col) => { f = Math.round(f); u = Math.round(u); w = Math.round(w); m.set(f + "," + u + "," + w, [w, f, u, col]); if (w) m.set(f + "," + u + "," + -w, [-w, f, u, col]) };
+  // 上颅与吻部：f 从吻尖（21）到后脑（-7）
+  for (let f = 21; f >= -7; f--){
+    const s = (21 - f) / 28, bot = Math.round(-4 + s * 7.5), brow = f >= 2 && f <= 12 ? Math.sin((12 - f) / 10 * Math.PI) * 3.2 : 0, nose = f >= 15 ? Math.sin((21 - f) / 6 * Math.PI) * 1.2 : 0;
+    const top = Math.round(Math.pow(s, .82) * 15 + brow + nose), mw = Math.round(1.8 + Math.pow(s, .88) * 5.5);
+    for (let u = bot; u <= top; u++) for (let w = 0; w <= mw; w++){
+      const yr = (u - bot) / Math.max(1, top - bot), lim = mw - (yr > .75 ? Math.floor((yr - .75) * 6) : 0);
+      if (w > lim) continue;
+      if (f > 3 && u <= bot + 1 && w < mw - 1){ if (u === bot + 1) put(skull, f, u, w, C0.gum); continue }               // 掏空口腔，上膛是暗红的
+      if (f >= 15 && f <= 18 && u >= -2 && u <= 0 && w >= mw - 1){ put(skull, f, u, w, C0.line); continue }               // 鼻孔
+      if (f >= 3 && f <= 10 && u >= 4 && u <= 9 && w >= mw - 2){ if (w < mw) put(skull, f, u, w, C0.line); continue }     // 深眼窝
+      put(skull, f, u, w, tone(f, u, w, u >= top - 2 && w <= 3 ? "hi" : u >= top - 4 && w <= 4 ? "light" : w >= lim - 1 ? "mid" : "dark"));
+    }
+    if (f >= 5 && f <= 19 && f % 3 === 0){ const fw = Math.max(1, mw - 1); put(skull, f, bot - 1, fw, C0.tooth); if (f === 18 || f === 9) put(skull, f, bot - 2, fw, C0.tooth) }   // 上排牙，两对加长的犬齿
+  }
+  for (let f = 11; f >= 2; f--){ const by = 7 + Math.floor((11 - f) * .45); put(skull, f, by, 5, tone(f, by, 5, "hi")); put(skull, f, by + 1, 4, tone(f, by + 1, 4, "light")) }   // 眉骨
+  // 角：一串由粗到细的球，沿方向掠出去并略带弯
+  const horn = (f0, u0, w0, df, du, dw, len, r0, curve) => {
+    for (let i = 0; i < len; i++){
+      const t = i / len, hf = f0 + df * i, hu = u0 + du * i + i * i * curve, hw = w0 + dw * i, r = r0 * (1 - t * .82), n = Math.ceil(r);
+      for (let a = -n; a <= n; a++) for (let b = -n; b <= n; b++) for (let c = -n; c <= n; c++){
+        if (a * a + b * b + c * c > r * r + .25 || Math.round(hw + c) < 0) continue;
+        put(skull, hf + a, hu + b, hw + c, tone(Math.round(hf + a), Math.round(hu + b), Math.round(hw + c), b >= 0 && t < .85 ? (t < .55 && b > 0 ? "hi" : "light") : t < .85 ? "mid" : "dark"));
+      }
+    }
+  };
+  horn(1, 11, 3.2, -.76, .72, .2, 26, 2.3, .008); horn(5, 10, 1.6, -.68, .78, .12, 19, 1.7, .006); horn(8, 8, 1.2, -.62, .8, .05, 12, 1.3, .005);
+  horn(-3, 11, 3, -.88, .44, .26, 21, 1.8, -.006); horn(-5, 8, 3.8, -.94, .24, .3, 18, 1.6, -.008); horn(-3, 4, 4.5, -.96, .05, .36, 14, 1.4, -.005); horn(-2, 1, 4.2, -.92, -.1, .34, 10, 1.2, -.004);
+  // 下颌：单独一组，摆放时绕铰链转动
+  for (let f = 19; f >= -2; f--){
+    const s = (19 - f) / 21, bot = Math.round(-7 + s * 6.2), top = Math.round(-4.8 + s * 6.8), mw = Math.round(1.5 + Math.pow(s, .9) * 4.3);
+    for (let u = bot; u <= top; u++) for (let w = 0; w <= mw; w++){
+      if (u === bot && w === mw && mw > 2) continue;
+      if (f > 2 && u === top && w < mw - 1){ put(jaw, f, u - 1, w, C0.gum); continue }
+      put(jaw, f, u, w, tone(f, u, w, u === bot ? "belly" : w === mw ? "mid" : "dark"));
+    }
+    if (f >= 6 && f <= 18 && f % 3 === 1){ const fw = Math.max(1, mw - 1); put(jaw, f, top + 1, fw, C0.tooth); if (f === 16) put(jaw, f, top + 2, fw, C0.tooth) }   // 下排牙与上排错开
+  }
+  // 只留表面一层：六个方向都被挡住的体素看不见，不用画
+  const shell = m => [...m.values()].filter(([w, f, u]) => !(m.has((f + 1) + "," + u + "," + w) && m.has((f - 1) + "," + u + "," + w) && m.has(f + "," + (u + 1) + "," + w) && m.has(f + "," + (u - 1) + "," + w) && m.has(f + "," + u + "," + (w + 1)) && m.has(f + "," + u + "," + (w - 1))));
+  // 红瞳：眼窝里一只前尖后宽的斜眼，两格厚，从侧面和上方都看得见；外层中间留一道竖瞳
+  const eyes = [];
+  for (const [f, u] of [[9, 5], [8, 5], [7, 5], [6, 5], [5, 5], [4, 5], [8, 6], [7, 6], [6, 6], [5, 6], [4, 6], [6, 7], [5, 7], [4, 7], [4, 8]]) for (const w of [-5, -4, 4, 5]){
+    const slit = Math.abs(w) === 5 && f === 6 && u <= 6;
+    eyes.push([w, f, u, slit ? C0.pupil : C0.eye, slit ? 0 : 1]);
+  }
+  return DRAGON_HEAD = {skull: shell(skull).concat(eyes), jaw: shell(jaw)};
+}
+const RING_RAMP = Array.from({length: 9}, (_, i) => mixHex(MAGIC_COL.dim, MAGIC_COL.arcane, i / 8));   // 法阵外环：暗紫 → 亮紫（预先量化，避免每帧生成新颜色串）
+const fract1 = x => x - Math.floor(x), smooth01 = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x) };
+const rand01 = (i, k) => (hash3(i, k, 77) >>> 8) / 16777216;                       // 按序号稳定的 0..1 伪随机
+const summonAt = () => { const g = S.world && S.world.geo[0], c = g && g.circle; return c ? {g, x: c.x, y: c.y, r: c.r} : null };   // 法阵圆心与半径由召唤大厅定
+
+/* 每帧入口：统计施法的人 → 平滑召唤进度 → 画法阵 / 光粒 / 龙 */
+function summonVox(t, dt){
+  const at = summonAt(); if (!at) return;
+  let working = 0, total = 0;
+  for (const p of S.people.values()){ total++; if (p.status === "working") working++ }
+  const target = S.summonForce != null ? S.summonForce : t < S.world.maxT ? 0 : summonTarget(working, total);   // 学院还在铺设时不召唤，等"完成"之后龙再来；强制值（?summon=）不受限
+  S.summon = lerp(S.summon, target, Math.min(1, dt * .8));
+  const s = S.summon;
+  circleVox(t, s); moteVox(t);
+  if (summonStage(s) > 0) dragonVox(t, s, fireAt(s, t));
+}
+
+/* 法阵：贴在石台上的发光薄片，每帧按角度重新摆放。外环顺时针、内环符文和六芒星逆时针慢转；
+   s=0 时只有暗紫外环，s 越大越亮越完整，s>.5 时法阵里升起稀疏的光粒。方块边长都是微体素的整数倍 */
+function circleVox(t, s){
+  const at = summonAt(); if (!at) return;
+  const cx = at.x, cy = at.y, R = at.r, mc = MAGIC_COL, Z = .085, H = .012, q = clamp(s, 0, 1), pulse = .5 + .5 * Math.sin(t * 2.2), TAU = 6.2832;
+  const sq = (px, py, sz, col) => add(px - sz / 2, py - sz / 2, Z, sz, sz, H, col, -1, 1, 1);
+  const rc = q < .02 ? mc.dim : RING_RAMP[clamp(Math.round(1 + q * 6 + pulse), 0, 8)], n0 = Math.round(R * 19);
+  for (let i = 0; i < n0; i++){ const a = i / n0 * TAU - t * .2; sq(cx + R * Math.cos(a), cy + R * Math.sin(a), .25, rc) }
+  const m1 = Math.round(R * 12), n1 = Math.round(m1 * clamp((q - .08) / .25, 0, 1));
+  for (let i = 0; i < n1; i++){ const a = i / m1 * TAU + t * .3; sq(cx + (R - .4) * Math.cos(a), cy + (R - .4) * Math.sin(a), .125, i % 4 ? mc.arcane : mc.core) }
+  const rh = R - .75, per = Math.max(4, Math.round(rh * 5)), nh = Math.round(6 * per * clamp((q - .2) / .45, 0, 1)), V = j => [cx + rh * Math.cos(1.5708 + j * 1.0472 + t * .3), cy + rh * Math.sin(1.5708 + j * 1.0472 + t * .3)];
+  let n = 0;
+  for (let tri = 0; tri < 2; tri++) for (let e = 0; e < 3; e++){
+    const A = V(tri + 2 * e), B = V(tri + 2 * ((e + 1) % 3));
+    for (let k = 0; k < per; k++, n++) if (n < nh) sq(lerp(A[0], B[0], k / per), lerp(A[1], B[1], k / per), k ? .125 : .25, k ? mc.arcane : mc.core);
+  }
+  if (q > .5) for (let i = 0; i < 12; i++){
+    const p = fract1(t * .4 + rand01(i, 1)), a = rand01(i, 2) * TAU, r = (.2 + .7 * rand01(i, 3)) * R, sz = p < .7 ? .125 : .0625;
+    add(cx + r * Math.cos(a) - sz / 2, cy + r * Math.sin(a) - sz / 2, .2 + p * 2.6, sz, sz, sz, i & 1 ? mc.core : mc.arcane, -1, 1, 1);
+  }
+}
+
+/* 施法光粒：每个 working 的人 3 颗小发光方块，从头顶上方沿抛物线飞向法阵中心 */
+function moteVox(t){
+  const at = summonAt(); if (!at) return;
+  for (const P of S.people.values()){
+    if (P.status !== "working") continue;
+    const col = tint(P.look.shirt, .35), ph = P.phase / 6.2832, arc = Math.min(1.6, .6 + .04 * Math.hypot(at.x - P.x, at.y - P.y));
+    for (let k = 0; k < 3; k++){
+      const u = fract1(t * .4 + ph + k / 3), sz = .09 * (1 - u * u * u);
+      add(lerp(P.x, at.x, u) - sz / 2, lerp(P.y, at.y, u) - sz / 2, lerp(1.6, .3, u) + 4 * u * (1 - u) * arc - sz / 2, sz, sz, sz, col, -1, 1, 1);
+    }
+  }
+}
+
+/* 龙爪的体素模型（只算一次）：手背是个扁椭球，三根手指是由粗到细的体素管，从墙外搭上墙头再向室内弯下去，末端骨白色利爪；前臂垂在墙外。
+   返回 [w, f, u, 颜色]（w 横向、f 朝室内、u 向上，原点在墙头） */
+let DRAGON_CLAW = null;
+function dragonClaw(){
+  if (DRAGON_CLAW) return DRAGON_CLAW;
+  const C0 = DRAGON_COL, m = new Map(), key = (w, f, u) => w + "," + f + "," + u;
+  const ball = (cw, cf, cu, r, kind) => {
+    const n = Math.ceil(r);
+    for (let a = -n; a <= n; a++) for (let b = -n; b <= n; b++) for (let c = -n; c <= n; c++){
+      if (a * a + b * b + c * c > r * r + .25) continue;
+      const w = Math.round(cw + a), f = Math.round(cf + b), u = Math.round(cu + c), old = m.get(key(w, f, u));
+      if (!old || kind === "bone" || old[3] !== "bone") m.set(key(w, f, u), [w, f, u, kind]);
+    }
+  };
+  const tube = (pts, r0, r1, kind) => {
+    const ls = []; let tot = 0, acc = 0;
+    for (let i = 1; i < pts.length; i++){ ls.push(Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2])); tot += ls[i - 1] }
+    for (let i = 1; i < pts.length; i++){
+      const n = Math.ceil(ls[i - 1] * 1.5);
+      for (let q = 0; q <= n; q++){ const tt = q / n; ball(lerp(pts[i - 1][0], pts[i][0], tt), lerp(pts[i - 1][1], pts[i][1], tt), lerp(pts[i - 1][2], pts[i][2], tt), lerp(r0, r1, (acc + ls[i - 1] * tt) / tot), kind) }
+      acc += ls[i - 1];
+    }
+  };
+  tube([[0, -9, 1], [0, -10.5, -4], [0, -10, -10]], 3.2, 3.6, "skin");
+  for (let a = -6; a <= 6; a++) for (let b = -3; b <= 3; b++) for (let c = -2; c <= 3; c++) if (a * a / 36 + b * b / 10 + c * c / 7 <= 1) m.set(key(a, b - 8, c + 2), [a, b - 8, c + 2, "skin"]);
+  for (const i of [-1, 0, 1]){
+    const x = i * 3.9, ln = i ? 0 : 1.5;
+    tube([[x * .9, -6, 2.2], [x, -1, 2.6], [x, 2.5 + ln, 1.6], [x, 4 + ln, -1.2], [x, 3.8 + ln, -3.6]], 1.6, 1.1, "skin");
+    tube([[x, 3.8 + ln, -3.6], [x, 3.4 + ln, -5.2], [x, 2.6 + ln, -6.8]], 1.0, .35, "bone");
+    ball(x * .92, -4.5, 4.3, .9, "spike");
+  }
+  const out = [];
+  for (const [w, f, u, kind] of m.values()){
+    const has = (a, b, c) => m.has(key(w + a, f + b, u + c));
+    if (has(1, 0, 0) && has(-1, 0, 0) && has(0, 1, 0) && has(0, -1, 0) && has(0, 0, 1) && has(0, 0, -1)) continue;
+    const band = ((f + 2 * w) % 5 + 5) % 5 === 0;                                        // 朝上的一层亮一档，其余暗，每隔几格一道鳞纹
+    out.push([w, f, u, kind === "bone" ? C0.tooth : kind === "spike" ? C0.line : !has(0, 0, 1) ? (band ? C0.mid : C0.light) : band ? C0.line : C0.dark]);
+  }
+  return DRAGON_CLAW = out;
+}
+/* 脖子的一圈体素：椭圆截面的外壳。元素是 [i 横向, j 背腹向, 部位]，部位 0 = 两侧、1 = 背、2 = 腹甲 */
+const NECK_RINGS = new Map();
+function neckRing(rx, rz){
+  let r = NECK_RINGS.get(rx * 16 + rz); if (r) return r;
+  const inside = (i, j) => i * i / (rx * rx) + j * j / (rz * rz) <= 1; r = [];
+  for (let i = -rx; i <= rx; i++) for (let j = -rz; j <= rz; j++) if (inside(i, j) && !(inside(i + 1, j) && inside(i - 1, j) && inside(i, j + 1) && inside(i, j - 1))) r.push([i, j, j > rz * .4 ? 1 : j < -rz * .35 && Math.abs(i) < rx * .78 ? 2 : 0]);
+  NECK_RINGS.set(rx * 16 + rz, r); return r;
+}
+
+/* 传送门（原电梯门位）：门洞里一面紫色光幕 + 盘旋的光点；有人进出时转得更快、更亮 */
+function portalVox(d, t){
+  const mc = MAGIC_COL, x = d.x - .1;
+  add(x, d.y - .55, 0, .04, 1.1, 1.95, d.open > .5 ? mc.halo : "#3a1f6e", -1, 1, 1);
+  for (let i = 0; i < 12; i++){
+    const a = t * (1.2 + d.open * 2.5) + i * 1.15, r = .08 + .42 * (i / 11), sz = .15 - .07 * (i / 11);
+    add(x + .04, d.y + Math.cos(a) * r - sz / 2, 1.0 + Math.sin(a) * r * 1.7 - sz / 2, .03, sz, sz, i % 3 ? mc.arcane : mc.core, -1, 1, 1);
+  }
+}
+
+/* 黑龙：趴在圣堂后墙外，被法阵召来。stage 1 只有龙爪扒上墙头；stage 2 双翼从墙后升起、头从墙头探出，
+   召唤越深头探得越远、悬到书案上方俯视；fire>0 时张嘴朝法阵喷火。全部是轴对齐方块，每帧按姿态重新摆放。约 400 盒 */
+function dragonVox(t, s, fire){
+  const at = summonAt(); if (!at) return;
+  const g = at.g, dx = at.x, D = DRAGON_COL, Z = SWH + .27, E = .4, V = DRAGON_VOX;
+  // ---- 龙爪：两只扒在墙头（体素模型见 dragonClaw），召唤初期从墙外升上来；不转动，只平移，所以体素严丝合缝
+  const rise = 1 - smooth01((s - .05) / .25), CL = dragonClaw();
+  for (const sg of [-1, 1]){
+    const cx = dx + sg * 3.4, oy = -1.1 * rise + Math.sin(t * 1.3 + sg * 2) * .02, oz = Z - 1.9 * rise;
+    for (const [w, f, u, col] of CL) add(cx + sg * w * V - V / 2, oy + f * V - V / 2, oz + u * V - V / 2, V, V, V, col, -1, .3, 0);
+  }
+  if (summonStage(s) < 2) return;
+  // ---- 双翼：从墙后升起，缓慢扇动。翼膜的轮廓是「翼肘 → 四个指尖 → 翼根」，指尖之间向翼肘凹进去一块（扇贝边）；
+  //      按行扫描把轮廓填成一条条体素高的横条，边缘自然是台阶状。翼骨是压在膜前的一串体素
+  const wr = smooth01((s - .3) / .35), flap = Math.sin(t * .9) * .5 + Math.sin(t * 2.3) * .08, wy = -3.3, drop = -7.5 * (1 - wr);
+  const bone = (a, b, w, col) => { const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / V); for (let i = 0; i <= n; i++){ const tt = i / n; add(Math.round(lerp(a[0], b[0], tt) / V) * V - w / 2, wy + V, Math.round(lerp(a[1], b[1], tt) / V) * V - w / 2, w, w, w, col, -1, E, 0) } };
+  for (const sg of [-1, 1]){
+    const R = [dx + sg * 1.4, 1.2 + drop], El = [dx + sg * 4.6, 6.4 + drop + flap * .3];
+    const F = [[9.0, 5.7 + flap], [8.5, 3.3 + flap * .7], [6.8, 1.5 + flap * .4], [4.2, .6]].map(p => [dx + sg * p[0], p[1] + drop]);
+    const poly = [El];
+    F.forEach((p, i) => { poly.push(p); if (i < 3){ const q = F[i + 1]; poly.push([lerp((p[0] + q[0]) / 2, El[0], .22), lerp((p[1] + q[1]) / 2, El[1], .22)]) } });
+    poly.push(R);
+    let z0 = Infinity, z1 = -Infinity; for (const q of poly){ z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]) }
+    for (let row = Math.floor(z0 / V); row * V < z1; row++){
+      const zc = (row + .5) * V, xs = [];
+      for (let i = 0; i < poly.length; i++){ const a = poly[i], b = poly[(i + 1) % poly.length]; if ((a[1] > zc) !== (b[1] > zc)) xs.push(a[0] + (zc - a[1]) / (b[1] - a[1]) * (b[0] - a[0])) }
+      xs.sort((a, b) => a - b);
+      for (let i = 0; i + 1 < xs.length; i += 2){ const xa = Math.round(xs[i] / V) * V, xb = Math.round(xs[i + 1] / V) * V; if (xb > xa) add(xa, wy, row * V, xb - xa, V, V, row % 4 ? D.membrane : D.membrane2, -1, E, 0) }
+    }
+    bone(R, El, V * 3, D.wing); for (const p of F) bone(El, p, V * 2, D.wing);
+    add(El[0] - V, wy + V, El[1] + V, V * 2, V * 2, V * 3, D.tooth, -1, .3, 0); for (const p of F) add(p[0] - V / 2, wy + V, p[1] - V * 2, V, V, V * 2, D.tooth, -1, .3, 0);   // 翼爪
+  }
+  // ---- 头的位姿：k 为探入深度。刚出现时头埋在墙后只露出角和眼睛，随 k 抬高、前伸到书案上方；始终略微低头俯视，喷火时压得更低
+  const k = smooth01((s - .3) / .7), up = smooth01((s - .3) / .12), bob = Math.sin(t * 1.1) * .1, sway = Math.sin(t * .6) * .3 * k;
+  const open = .1 + .5 * fire + .04 * Math.sin(t * 1.7), th = .6 * Math.pow(1 - k, 1.5) + .2 + fire * .2, c = Math.cos(th), sn = Math.sin(th);
+  const ax = dx + sway, ay = lerp(-2.6, at.y - at.r - 1.6, k), az = lerp(SWH - .5, 5.0, smooth01(k * 1.5)) + bob - 2.4 * (1 - up);
+  const Hp = (lx, ly, lz) => [ax + lx, ay + ly * c + lz * sn, az - ly * sn + lz * c];                        // 头部局部坐标（x 横向、y 朝前、z 向上）→ 世界，绕头心俯仰
+  // ---- 脖子：沿二次贝塞尔曲线每隔一格摆一圈体素环（椭圆截面，由粗到细）。背侧暗、两侧带鳞纹，腹侧是一节节灰紫腹甲，隔几圈一根向后倾的背刺；
+  //      喷火时靠近头的那段腹甲透出火光。环随曲线转向，方块本身不转，略放大一点盖住弯道外侧的缝
+  { const P0 = [dx, -3.0, .5], P2 = Hp(0, -6 * V, 3 * V), P1 = [dx + sway * .5, lerp(-3.0, -1.6, k), lerp(SWH + 1.5, SWH + 3.4, k) - 2.4 * (1 - up)], NS = 32, pts = [], ns = V * 1.18;
+    let len = 0;
+    for (let i = 0; i <= NS; i++){ const u = i / NS, a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, d = u * u, q = [a * P0[0] + b * P1[0] + d * P2[0], a * P0[1] + b * P1[1] + d * P2[1], a * P0[2] + b * P1[2] + d * P2[2], 0]; if (i) len += Math.hypot(q[1] - pts[i - 1][1], q[2] - pts[i - 1][2]); q[3] = len; pts.push(q) }
+    const steps = Math.ceil(len / (V * .92)), hotCol = fire > 0 ? mixHex(D.bellyL, D.ember, Math.round(fire * 4) / 4 * .85) : null;
+    for (let st = 0, seg = 1; st <= steps; st++){
+      const sd = Math.min(len, st * V * .92); while (seg < NS && pts[seg][3] < sd) seg++;
+      const A = pts[seg - 1], B = pts[seg], tt = (sd - A[3]) / Math.max(1e-6, B[3] - A[3]), u = (seg - 1 + tt) / NS;
+      const ty = B[1] - A[1], tz = B[2] - A[2], tl = Math.hypot(ty, tz) || 1, ny = -tz / tl, nz = ty / tl;
+      const qx = lerp(A[0], B[0], tt) + Math.sin(t * .8 + u * 8) * .12 * (1 - u), qy = lerp(A[1], B[1], tt), qz = lerp(A[2], B[2], tt);
+      const rz = Math.round(lerp(4.5, 3.2, u)), hot = hotCol && u > .68;
+      for (const [i, j, part] of neckRing(Math.round(lerp(5.5, 4, u)), rz)){
+        const band = ((st + 2 * i) % 5 + 5) % 5 === 0, col = part === 2 ? (hot ? hotCol : (st / 3 | 0) & 1 ? D.bellyL : D.bellyD) : part === 1 ? (band ? D.line : D.dark) : band ? D.dark : D.mid;
+        add(qx + i * V - ns / 2, qy + ny * j * V - ns / 2, qz + nz * j * V - ns / 2, ns, ns, ns, col, -1, hot && part === 2 ? 1 : .3, hot && part === 2 ? 1 : 0);
+      }
+      if (st % 7 === 3 && u > .1 && u < .96) for (let q = 1, sl = 3 + Math.round(Math.sin(u * Math.PI) * 3); q <= sl; q++){
+        const jj = rz + q, back = q * .55;
+        add(qx - ns / 2, qy + (ny * jj - ty / tl * back) * V - ns / 2, qz + (nz * jj - tz / tl * back) * V - ns / 2, ns, ns, ns, q > sl * .6 ? D.line : D.mid, -1, .3, 0);
+      }
+    }
+  }
+  // ---- 头：整数网格上雕好的体素模型（见 dragonHead），这里只做摆放——整体随头的俯仰转过去，下颌再绕铰链张开；方块本身保持轴对齐，略放大一点盖住转动后的缝
+  const HM = dragonHead(), vs = V * 1.16, ja = open * .8, jc = Math.cos(ja), js = Math.sin(ja);
+  for (const [w, f, u, col, em] of HM.skull){ const p = Hp(w * V, f * V, u * V); add(p[0] - vs / 2, p[1] - vs / 2, p[2] - vs / 2, vs, vs, vs, col, -1, em ? 1 : .3, em ? 1 : 0) }
+  for (const [w, f, u, col] of HM.jaw){ const p = Hp(w * V, (f * jc + u * js) * V, (u * jc - f * js) * V); add(p[0] - vs / 2, p[1] - vs / 2, p[2] - vs / 2, vs, vs, vs, col, -1, .3, 0) }
+  if (fire > 0){ const p = Hp(0, 5 * V, -1 * V); add(p[0] - 2 * V, p[1] - 2.5 * V, p[2] - 1.5 * V, 4 * V, 5 * V, 3 * V, D.ember, -1, 1, 1) }   // 喉咙深处的火光
+  const mouth = Hp(0, 15 * V, -3 * V);
+  if (fire > 0) fireVox(t, fire, mouth, at);
+  else for (let i = 0; i < 4; i++){                                                                              // 不喷火时鼻孔冒两缕黑烟
+    const p = fract1(t * .45 + i * .25), q = Hp((i & 1 ? 2 : -2) * V, 20 * V, 0), sz = .1 + .22 * p;
+    add(q[0] - sz / 2 + Math.sin(t * 2 + i) * .08 * p, q[1] - sz / 2 + p * .3, q[2] + p * 1.3, sz, sz, sz, D.smoke, -1, 0, 0);
+  }
+}
+
+/* 吐火：约 60 颗粒子从嘴喷向法阵中心，p = fract(t * 1.1 + 相位)；位置 = 嘴到目标按 p 插值 + 随 p 变大的锥形散布 + 抖动，
+   边长 .12→.4，颜色随 p：近白黄 → 黄 → 橙 → 红，末段是不发光的暗烟并上飘；粒子数量乘以 fire。落点处一块闪烁的橙色光斑 */
+function fireVox(t, fire, m0, at){
+  const F = MAGIC_COL.flame, dy = at.y - m0[1], dz = .1 - m0[2], L = Math.hypot(dy, dz) || 1, wy = dz / L, wz = -dy / L, N = Math.ceil(90 * fire);
+  for (let i = 0; i < N; i++){
+    const p = fract1(t * 1.1 + rand01(i, 1)), r = p * (.08 + .5 * rand01(i, 2)), a = rand01(i, 3) * 6.2832 + p * 2, sz = p < .8 ? lerp(.16, .6, p) : lerp(.5, .28, (p - .8) / .2), q = Math.pow(p, .85);   // 烟（p ≥ .8）边飘边散，边长收小
+    const smoke = p >= .8, lift = smoke ? (p - .8) / .2 * 1.1 : 0, jx = Math.sin(t * 18 + i * 2.3) * .05 * p, jy = Math.cos(t * 19 + i * 1.3) * .05 * p, jz = Math.cos(t * 21 + i * 1.7) * .05 * p;
+    const x = lerp(m0[0], at.x, q) + Math.cos(a) * r + jx, y = lerp(m0[1], at.y, q) + Math.sin(a) * r * wy + jy, z = lerp(m0[2], .1, q) + Math.sin(a) * r * wz + jz + lift;
+    const col = p < .14 ? F[0] : p < .4 ? F[1] : p < .65 ? F[2] : p < .8 ? F[3] : MAGIC_COL.smoke;
+    add(x - sz / 2, y - sz / 2, z - sz / 2, sz, sz, sz, col, -1, smoke ? 0 : 1, smoke ? 0 : 1);
+  }
+  const fl = (.85 + .15 * Math.sin(t * 31) + .08 * Math.sin(t * 17.3)) * fire;                                  // 落点光斑：三层方块，红 / 橙 / 黄
+  [[.55, F[3], .026, .03], [.36, F[2], .03, .035], [.18, F[1], .036, .04]].forEach(([r, col, z, h]) => add(at.x - r * fl, at.y - r * fl, z, r * fl * 2, r * fl * 2, h, col, -1, 1, 1));
+}
+
+/* ============================================================
    WebGL2 渲染器
    ============================================================ */
 const canvas = $("gl");
@@ -1250,7 +1989,7 @@ const VS = `#version 300 es
 layout(location=0) in vec3 aC; layout(location=1) in vec3 aN; layout(location=2) in vec2 aUV;
 layout(location=3) in vec3 iP; layout(location=4) in vec3 iS; layout(location=5) in vec3 iCol; layout(location=6) in vec3 iX; layout(location=7) in float iH;
 uniform mat4 uVP; uniform float uTime;
-out vec3 vCol; out vec3 vN; out vec2 vE; out vec2 vD; out float vEm; out float vMode; out float vZ; out float vHL; out vec3 vW;
+out vec3 vCol; out vec3 vN; out vec2 vE; out vec2 vD; out float vEm; out float vMode; out float vZ; out float vHL; out vec3 vW; out float vSeed;
 void main(){
   float t0 = iX.x;
   float s = 1.0, dz = 0.0;
@@ -1269,12 +2008,14 @@ void main(){
   vN = aN; vCol = iCol; vEm = iX.y; vMode = iX.z; vZ = p.z; vHL = iH; vW = p;
   vD = abs(aN.x) > 0.5 ? iS.yz : (abs(aN.y) > 0.5 ? iS.xz : iS.xy);
   vE = aUV * vD;
+  vSeed = fract(sin(dot(iCol, vec3(12.9898, 78.233, 37.719)) + dot(iS, vec3(3.1, 5.7, 7.3))) * 43758.5453);   // 按方块的颜色和尺寸取种子：方块移动时花纹跟着走，不闪
 }`;
 const FS = `#version 300 es
 precision highp float;
-in vec3 vCol; in vec3 vN; in vec2 vE; in vec2 vD; in float vEm; in float vMode; in float vZ; in float vHL; in vec3 vW;
+in vec3 vCol; in vec3 vN; in vec2 vE; in vec2 vD; in float vEm; in float vMode; in float vZ; in float vHL; in vec3 vW; in float vSeed;
 uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uSky; uniform vec3 uGnd; uniform vec3 uWin; uniform float uNight;
 uniform float uIn; uniform vec3 uLamp; uniform vec4 uRoom[8]; uniform int uRoomN;
+uniform float uEmMin; uniform vec3 uTint; uniform float uVox;
 /* 室内灯：只照办公室地板以上、朝向室内的面（沿法线外推一点再判断，外墙外侧面不算），楼下和窗外保持夜色 */
 float indoor(vec3 n){
   vec3 q = vW + n * 0.06;
@@ -1293,7 +2034,7 @@ void main(){
   vec3 base = isWin ? mix(uWin, vCol, 0.18) : vCol;
   float ndl = max(dot(n, uSun), 0.0);
   vec3 amb = mix(uGnd, uSky, n.z * 0.5 + 0.5);
-  vec3 lit = amb + uSunCol * ndl;
+  vec3 lit = (amb + uSunCol * ndl) * uTint;
   float k = uIn > 0.0 ? uIn * indoor(n) : 0.0;
   if (k > 0.0){
     // 顶灯：室内去掉月光的冷色，按缺多少光补暖光；水平面上按 4 格间距有一圈圈灯下光斑
@@ -1310,7 +2051,16 @@ void main(){
   c *= 1.0 - 0.17 * (1.0 - smoothstep(0.0, w, min(d.x, d.y)));
   if (vEm > 0.0){
     vec3 glow = isWin ? vec3(1.0, 0.86, 0.58) : (vMode > 0.5 && vMode < 1.5) ? vCol * 1.3 : vCol * vec3(1.08, 0.97, 0.82) + vec3(0.14, 0.10, 0.04);
-    c = mix(c, glow, clamp(vEm * uNight, 0.0, 1.0));
+    // 白天也发光只放给自发光体素（法阵、火焰、水晶）；墙、地板、家具的 em 只是夜里透出的暖光
+    float en = (vMode > 0.5 && vMode < 1.5) ? max(uNight, uEmMin) : uNight;
+    c = mix(c, glow, clamp(vEm * en, 0.0, 1.0));
+  }
+  if (uVox > 0.0){
+    // 微体素质感：每个面按 1/8 格切成小方块，逐块轻微改变明暗（像素画里一格一色的颗粒感）；镜头拉近后显出方块之间的缝
+    vec2 g = vE * 8.0, cell = floor(g + 0.001), f = g - cell, e = min(f, 1.0 - f);
+    float r = fract(sin(dot(cell, vec2(127.1, 311.7)) + vSeed * 91.7 + dot(n, vec3(1.3, 2.7, 4.1))) * 43758.5453);
+    c *= 0.9 + 0.2 * r;
+    c *= 1.0 - 0.2 * (uVox - 1.0) * (1.0 - smoothstep(0.0, 0.1, min(e.x, e.y)));
   }
   c = mix(c, c * 1.12 + vec3(0.08, 0.09, 0.1), vHL * 0.9);
   o = vec4(c, 1.0);
@@ -1319,7 +2069,7 @@ function shader(type, src){ const s = gl.createShader(type); gl.shaderSource(s, 
 const prog = gl.createProgram();
 gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
 if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-const U = {}; for (const n of ["uVP", "uTime", "uSun", "uSunCol", "uSky", "uGnd", "uWin", "uNight", "uIn", "uLamp", "uRoom", "uRoomN"]) U[n] = gl.getUniformLocation(prog, n);
+const U = {}; for (const n of ["uVP", "uTime", "uSun", "uSunCol", "uSky", "uGnd", "uWin", "uNight", "uIn", "uLamp", "uRoom", "uRoomN", "uEmMin", "uTint", "uVox"]) U[n] = gl.getUniformLocation(prog, n);
 const cube = [], idx = [];
 const FACES = [[[1,0,0], (u, v) => [1, u, v]], [[-1,0,0], (u, v) => [0, u, v]], [[0,1,0], (u, v) => [u, 1, v]], [[0,-1,0], (u, v) => [u, 0, v]], [[0,0,1], (u, v) => [u, v, 1]], [[0,0,-1], (u, v) => [u, v, 0]]];
 FACES.forEach(([nrm, fn], f) => { for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) cube.push(...fn(u, v), ...nrm, u, v); idx.push(f * 4, f * 4 + 1, f * 4 + 2, f * 4, f * 4 + 2, f * 4 + 3) });
@@ -1378,6 +2128,7 @@ const viewCx = () => (cssW - Math.max(0, fitPadRight() || 0)) / 2;
 function fitTarget(){
   const c = S.world; if (!c) return null;
   const pts = []; for (const x of [0, c.MW]) for (const y of [0, c.MD]) for (const z of [-2.6, 4]) pts.push([x, y, z]);
+  if ((LAYOUTS[S.layout] || {}).magic) for (const x of [-1, c.MW + 1]) pts.push([x, -3.4, 7.8]);   // 墙后的黑龙和双翼也要取进画面
   const xs = pts.map(p => dot(p, RV)), ys = pts.map(p => dot(p, UV));
   const w = Math.max(...xs) - Math.min(...xs), hgt = Math.max(...ys) - Math.min(...ys);
   const top = 54, bot = 58, pr = Math.max(0, fitPadRight() || 0);
@@ -1476,9 +2227,11 @@ function skyPos(s){
 const COOL_MS = 60 * 60e3;                                     // 结束（完成 / 失败 / 中止）超过 1 小时的子 agent 下班：从工位或休息区走回电梯离开
 const S = {world: null, start: performance.now(), autoFit: true, skew: 0, data: null, sig: "", slots: new Map(), held: new Map(),
            hourMode: "auto", themeMode: "auto", hourShown: null, people: new Map(), labelEls: [], zoneEls: [], lastFrame: 0, raf: 0,
-           animEnd: 0, hover: null, tween: null, down: null, layout: "jp"};
+           animEnd: 0, hover: null, tween: null, down: null, layout: "jp", summon: 0, summonForce: null};
 // 版式：链接参数 ?layout= 优先，其次本地记忆
 try { const q = new URLSearchParams(location.search).get("layout"), m = localStorage.getItem("office.layout"); S.layout = LAYOUTS[q] ? q : LAYOUTS[m] ? m : "jp" } catch {}
+// 魔法学院的召唤进度：?summon=0..1 强制使用该值（演示 / 截图用），否则按施法人数算
+try { const q = new URLSearchParams(location.search).get("summon"); if (q !== null && q.trim() !== "" && isFinite(+q)) S.summonForce = clamp(+q, 0, 1) } catch {}
 
 /* 任务键：同一 id 可能出现在不同档位 / 设备上 */
 function leadKey(l){ return l.src + "|" + l.id }
@@ -1745,11 +2498,13 @@ function dynamic(t, dt){
   stepPeople(dt);
   for (const p of S.people.values()){ HL = S.hover === p.key ? 1 : 0; personVox(p, t) }
   HL = 0;
+  if (LY.magic) summonVox(t, dt);                              // 魔法学院：法阵 / 施法光粒 / 巨龙
   // 电梯门：有人在门口附近就打开
   for (const d of S.world.doors){
     let near = false;
     if (d.main) for (const p of S.people.values()) if ((p.state === "in" || p.state === "out") && Math.hypot(p.x - d.x, p.y - d.y) < 1.4) near = true;
     d.open = lerp(d.open, near ? 1 : 0, Math.min(1, dt * 6));
+    if (LY.magic){ portalVox(d, t); continue }
     const half = .6 * (1 - d.open);
     add(d.x - .02, d.y - .6, 0, .1, half, 1.82, C.steel, -1, .2); add(d.x - .02, d.y + .6 - half, 0, .1, half, 1.82, C.steel, -1, .2);
     if (half > .05){ add(d.x + .07, d.y - .6 + half - .02, .2, .02, .02, 1.4, C.metal, -1); add(d.x + .07, d.y + .6 - half, .2, .02, .02, 1.4, C.metal, -1) }
@@ -1781,6 +2536,7 @@ function zoneLabelHTML(Z){
   return `<i style="background:${ST_COL[z.status] || "#b6bec9"}"></i><b>${h(z.title)}</b><small style="color:${z.hex}">${h(z.src)}</small><small>主1 · 子${ag.length}${z.hidden > 0 ? `（${z.hidden} 人未上座）` : ""}</small>${busy ? `<em>${busy} 在忙</em>` : ""}`;
 }
 
+const LOAD_WORDS = ["正在铺设办公区…", "正在摆放工位…", "员工入座…", "完成"];   // 默认加载文案
 function frame(ts){
   S.raf = 0;
   if (document.hidden || !S.world) return;
@@ -1792,8 +2548,8 @@ function frame(ts){
     for (const k of ["tx", "ty", "zoom"]) cam[k] = lerp(S.tween.a[k], S.tween.b[k], e);
     if (p >= 1) S.tween = null;
   }
-  const hr = currentHour(), L = lightAt(hr);
-  applySky(hr, L);
+  const ly = LAYOUTS[S.layout] || LAYOUTS.jp, hr = currentHour(), L = lightAt(ly.hour != null ? ly.hour : hr);   // 地下圣堂不见天日：固定用夜间光照
+  applySky(hr, L); $("office").classList.toggle("sanctum", !!ly.magic);
   const [pn, pic] = phaseOf(hr), hh = Math.floor(hr), mm = Math.floor((hr - hh) * 60);
   $("sceneclock").textContent = `${pic} ${pn} ${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
   const nDyn = dynamic(t, dt);
@@ -1808,6 +2564,8 @@ function frame(ts){
   gl.uniform3fv(U.uSky, rgbOf(L.sky)); gl.uniform3fv(U.uGnd, rgbOf(L.gnd));
   gl.uniform3fv(U.uWin, rgbOf(mixHex(mixHex(L.bot, L.top, .4), "#ffffff", .25)));
   gl.uniform1f(U.uNight, L.night);
+  gl.uniform1f(U.uEmMin, ly.glow || 0); gl.uniform3fv(U.uTint, ly.tint || [1, 1, 1]);
+  gl.uniform1f(U.uVox, ly.vox ? 1 + clamp((M * cam.zoom - 5) / 7, 0, 1) : 0);   // 0 = 关；1..2 = 开，小数部分是方块缝的深浅（镜头越近越明显）
   setIndoorLight(L);
   gl.bindVertexArray(staticVAO); gl.drawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0, staticCount);
   if (nDyn){ gl.bindVertexArray(dynVAO); gl.drawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0, nDyn) }
@@ -1815,7 +2573,8 @@ function frame(ts){
   renderLabels(t);
   const p = clamp(t / S.world.maxT, 0, 1);
   $("lbar").style.width = (p * 100).toFixed(1) + "%"; $("lpct").textContent = Math.round(p * 100) + "%";
-  $("ltext").textContent = p < .5 ? "正在铺设办公区…" : p < .85 ? "正在摆放工位…" : p < 1 ? "员工入座…" : "完成";
+  const wd = ly.words || LOAD_WORDS;
+  $("ltext").textContent = p < .5 ? wd[0] : p < .85 ? wd[1] : p < 1 ? wd[2] : wd[3];
   $("loader").classList.toggle("done", p >= 1);
   S.raf = requestAnimationFrame(frame);
 }
@@ -1838,7 +2597,7 @@ function sceneUpdate(d, replay){
 function sceneReplay(){
   if (!S.data) return;
   const offices = officesFrom(S.data);
-  S.sig = staticSig(offices); S.start = performance.now(); S.autoFit = true; S.tween = null;
+  S.sig = staticSig(offices); S.start = performance.now(); S.autoFit = true; S.tween = null; S.summon = 0;   // 重新铺设后巨龙也重新召唤
   build(offices, true); S.animEnd = S.world.maxT; S.people.clear(); syncPeople(offices, true); schedule();
   $("oempty").style.display = offices[0].zones.length ? "none" : "block";
 }
@@ -1921,7 +2680,7 @@ canvas.addEventListener("wheel", e => { if (!e.ctrlKey) return; e.preventDefault
 $("zin").onclick = () => zoomBy(1.25, viewCx(), cssH / 2);
 $("zout").onclick = () => zoomBy(.8, viewCx(), cssH / 2);
 $("zfit").onclick = () => { S.autoFit = true; S.tween = null; fit() };
-$("lay").innerHTML = Object.entries(LAYOUTS).map(([k, v]) => `<option value="${k}"${k === S.layout ? " selected" : ""}>🏢 ${v.name}</option>`).join("");
+$("lay").innerHTML = Object.entries(LAYOUTS).map(([k, v]) => `<option value="${k}"${k === S.layout ? " selected" : ""}>${v.icon || "🏢"} ${v.name}</option>`).join("");
 $("lay").onchange = e => { S.layout = e.target.value; try { localStorage.setItem("office.layout", S.layout) } catch {} $("replay").onclick() };
 $("replay").onclick = () => sceneReplay();
 $("timebar").addEventListener("click", e => {
