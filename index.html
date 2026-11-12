@@ -34,8 +34,6 @@ const IC = Object.fromEntries(Object.entries(IC_P).map(([k, p]) => [k, `<svg cla
 }
 /* ============ 原泳道看板样式（颜色全部走主题变量） ============ */
 *{box-sizing:border-box}
-.viewlink{font-size:11px;letter-spacing:.16em;color:var(--dim);text-decoration:none;border:1px solid currentColor;border-radius:4px;padding:2px 6px;vertical-align:middle;margin-left:8px;font-weight:400}
-.viewlink:hover{color:var(--text)}
 .eyebrow{font-size:11px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase}
 .dim{color:var(--dim)} .faint{color:var(--faint)}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
@@ -356,7 +354,7 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
 <header id="top">
   <div>
     <div class="eyebrow" id="eyebrow">AGENT DECK · 值班台</div>
-    <h1>谁在值班 <a class="viewlink" href="/classic" title="原版泳道看板">CLASSIC <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></a></h1>
+    <h1>谁在值班</h1>
   </div>
   <section class="stats" id="stats"></section>
   <div class="clockbox">
@@ -2280,7 +2278,8 @@ return API;
    体素场景（第一段脚本）不可用时（无 WebGL2），其余部分照常工作
    ============================================================ */
 const APP = {theme: "auto", sel: null, drawer: false, full: false, first: true, data: null};
-try { APP.theme = localStorage.getItem("deck.theme") || "auto"; APP.sel = localStorage.getItem("deck.sel"); APP.drawer = localStorage.getItem("deck.drawer") === "1" } catch {}
+try { APP.theme = localStorage.getItem("deck.theme") || "auto"; APP.sel = localStorage.getItem("deck.sel"); const lanes = localStorage.getItem("deck.lanes"); localStorage.removeItem("deck.drawer");
+      APP.drawer = lanes == null ? innerWidth >= 900 : lanes === "1" } catch {}   // 泳道默认打开（窄屏会盖住办公室，仍默认收起）；之后按用户的开关记忆
 if (!["auto", "light", "night"].includes(APP.theme)) APP.theme = "auto";
 const keep = (k, v) => { try { v == null ? localStorage.removeItem("deck." + k) : localStorage.setItem("deck." + k, v) } catch {} };
 const MAP_KEEP = 30 * 60e3;                                // 与办公室一致：任务结束 30 分钟内仍在任务栏上
@@ -2402,8 +2401,8 @@ function syncDrawerPad(animate){
   const b = fitTarget(); if (!b) return;
   if (animate) S.tween = {a: {...cam}, b, t0: performance.now(), dur: 420}; else { S.tween = null; Object.assign(cam, b) }
 }
-function setDrawer(on){
-  APP.drawer = on; keep("drawer", on ? "1" : "0");
+function setDrawer(on, save = true){   // save=false：默认值或自动收起，不写入记忆
+  APP.drawer = on; if (save) keep("lanes", on ? "1" : "0");
   $("drawer").classList.toggle("open", on); $("lanesBtn").classList.toggle("on", on); $("lanesBtn").setAttribute("aria-expanded", String(on));
   syncDrawerPad(true);                                         // 办公室移到抽屉左侧的剩余区域居中
   if (on && Deck.S.data) requestAnimationFrame(() => { Deck.render(); revealLane($("lanes").querySelector(".blk.sel"), false) });   // 时间轴刻度按抽屉宽度重排，并定位到当前任务
@@ -2431,7 +2430,7 @@ async function poll(){
 }
 
 /* ---------------- 交互 ---------------- */
-Deck.onSelect = k => { const l = APP.data && (APP.data.leads || []).find(x => leadKey(x) === k); if (l) select(projKey(APP.data, l)); if (innerWidth < 900) setDrawer(false) };   // 点排班里的会话 → 切到它所在的项目
+Deck.onSelect = k => { const l = APP.data && (APP.data.leads || []).find(x => leadKey(x) === k); if (l) select(projKey(APP.data, l)); if (innerWidth < 900) setDrawer(false, false) };   // 点排班里的会话 → 切到它所在的项目
 Deck.isSel = (src, id) => { const l = APP.data && (APP.data.leads || []).find(x => x.src === src && x.id === id); return !!l && projKey(APP.data, l) === APP.sel };   // 排班 / 日志高亮当前项目的所有会话
 Deck.onRender = () => {
   if (!APP.data) return;
@@ -2476,7 +2475,7 @@ document.addEventListener("keydown", e => {
 
 if (/^\/voxel(\.html)?\/?$/.test(location.pathname)) setFull(true);    // 旧的全屏游戏视图地址仍可用
 Deck.S.off.clear();                                         // 主页面不提供档位筛选：不沿用经典看板里隐藏的档位
-setDrawer(APP.drawer);
+setDrawer(APP.drawer, false);
 applyTheme(); syncHourToTheme();
 if (sceneOK()){ resize(); addEventListener("resize", () => { resize(); $("office").classList.toggle("lanes-open", drawerPad() > 0) }) }   // 尺寸观察器之外再保底：首屏即全屏时观察器可能不触发
 poll(); setInterval(poll, 3000); setInterval(applyTheme, 5000);
