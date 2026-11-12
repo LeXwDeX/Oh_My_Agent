@@ -1716,7 +1716,69 @@ function fireAt(level, t){ if (level < .8) return 0; const u = ((t % 10) + 10) %
 // </summon>
 
 /* 黑龙配色集中在这里。龙身带一点自发光（E），不然夜色里的黑龙只剩一团黑 */
-const DRAGON_COL = {scale: "#33364f", scale2: "#282a3e", ridge: "#171722", shine: "#565a7c", belly: "#6b5a72", horn: "#3b3d57", tip: "#8f90ac", bone: "#d8d2c4", eye: "#f4d53a", pupil: "#14121c", ember: "#ff6a1f", mouth: "#4a1620", wing: "#1e1f2e", membrane: "#3a2238", smoke: "#3a3540"};
+const DRAGON_COL = {scale: "#2f2d45", scale2: "#252338", ridge: "#15131f", shine: "#5a5680", belly: "#5d4e6c", horn: "#4a4768", tip: "#8f8aa8", bone: "#d8d2c4", eye: "#ff2d2d", pupil: "#2a0508", ember: "#ff6a1f", mouth: "#4a1620", wing: "#1e1f2e", membrane: "#3a2238", smoke: "#3a3540",
+                    line: "#0b0a11", dark: "#181624", mid: "#262438", light: "#3a3752", hi: "#58547a", bellyD: "#30283b", bellyL: "#4f4260", gum: "#4a1f2e", tooth: "#d8cfe0"};
+/* 黑龙头的体素模型：在整数网格上雕出来（一格 = DRAGON_VOX），只算一次。比例取自侧面像素画——颅骨到吻尖是逐渐收窄压低的楔形，
+   眉骨隆起压着眼窝，嘴里掏空，上下两排牙；脑后七对角由粗到细向后上方掠出去。上色按部位分明暗档，不逐颗随机。
+   返回 {skull, jaw}，元素是 [w, f, u, 颜色, 是否自发光]（w 横向、f 朝前、u 向上，原点在下颌铰链） */
+const DRAGON_VOX = M * 1.25;
+let DRAGON_HEAD = null;
+function dragonHead(){
+  if (DRAGON_HEAD) return DRAGON_HEAD;
+  const C0 = DRAGON_COL, skull = new Map(), jaw = new Map();
+  // 按部位取固定的明暗档；侧面和暗部每隔几格压一道斜向的鳞纹。不逐颗随机取色——那样皮肤会一块一块像长了斑
+  const tone = (f, u, w, kind) => {
+    const band = ((f + 2 * u) % 5 + 5) % 5 === 0;
+    return kind === "hi" ? C0.hi : kind === "light" ? C0.light : kind === "mid" ? (band ? C0.dark : C0.mid) : kind === "belly" ? (((f % 3) + 3) % 3 ? C0.bellyL : C0.bellyD) : (band ? C0.line : C0.dark);
+  };
+  const put = (m, f, u, w, col) => { f = Math.round(f); u = Math.round(u); w = Math.round(w); m.set(f + "," + u + "," + w, [w, f, u, col]); if (w) m.set(f + "," + u + "," + -w, [-w, f, u, col]) };
+  // 上颅与吻部：f 从吻尖（21）到后脑（-7）
+  for (let f = 21; f >= -7; f--){
+    const s = (21 - f) / 28, bot = Math.round(-4 + s * 7.5), brow = f >= 2 && f <= 12 ? Math.sin((12 - f) / 10 * Math.PI) * 3.2 : 0, nose = f >= 15 ? Math.sin((21 - f) / 6 * Math.PI) * 1.2 : 0;
+    const top = Math.round(Math.pow(s, .82) * 15 + brow + nose), mw = Math.round(1.8 + Math.pow(s, .88) * 5.5);
+    for (let u = bot; u <= top; u++) for (let w = 0; w <= mw; w++){
+      const yr = (u - bot) / Math.max(1, top - bot), lim = mw - (yr > .75 ? Math.floor((yr - .75) * 6) : 0);
+      if (w > lim) continue;
+      if (f > 3 && u <= bot + 1 && w < mw - 1){ if (u === bot + 1) put(skull, f, u, w, C0.gum); continue }               // 掏空口腔，上膛是暗红的
+      if (f >= 15 && f <= 18 && u >= -2 && u <= 0 && w >= mw - 1){ put(skull, f, u, w, C0.line); continue }               // 鼻孔
+      if (f >= 3 && f <= 10 && u >= 4 && u <= 9 && w >= mw - 2){ if (w < mw) put(skull, f, u, w, C0.line); continue }     // 深眼窝
+      put(skull, f, u, w, tone(f, u, w, u >= top - 2 && w <= 3 ? "hi" : u >= top - 4 && w <= 4 ? "light" : w >= lim - 1 ? "mid" : "dark"));
+    }
+    if (f >= 5 && f <= 19 && f % 3 === 0){ const fw = Math.max(1, mw - 1); put(skull, f, bot - 1, fw, C0.tooth); if (f === 18 || f === 9) put(skull, f, bot - 2, fw, C0.tooth) }   // 上排牙，两对加长的犬齿
+  }
+  for (let f = 11; f >= 2; f--){ const by = 7 + Math.floor((11 - f) * .45); put(skull, f, by, 5, tone(f, by, 5, "hi")); put(skull, f, by + 1, 4, tone(f, by + 1, 4, "light")) }   // 眉骨
+  // 角：一串由粗到细的球，沿方向掠出去并略带弯
+  const horn = (f0, u0, w0, df, du, dw, len, r0, curve) => {
+    for (let i = 0; i < len; i++){
+      const t = i / len, hf = f0 + df * i, hu = u0 + du * i + i * i * curve, hw = w0 + dw * i, r = r0 * (1 - t * .82), n = Math.ceil(r);
+      for (let a = -n; a <= n; a++) for (let b = -n; b <= n; b++) for (let c = -n; c <= n; c++){
+        if (a * a + b * b + c * c > r * r + .25 || Math.round(hw + c) < 0) continue;
+        put(skull, hf + a, hu + b, hw + c, tone(Math.round(hf + a), Math.round(hu + b), Math.round(hw + c), b >= 0 && t < .85 ? (t < .55 && b > 0 ? "hi" : "light") : t < .85 ? "mid" : "dark"));
+      }
+    }
+  };
+  horn(1, 11, 3.2, -.76, .72, .2, 26, 2.3, .008); horn(5, 10, 1.6, -.68, .78, .12, 19, 1.7, .006); horn(8, 8, 1.2, -.62, .8, .05, 12, 1.3, .005);
+  horn(-3, 11, 3, -.88, .44, .26, 21, 1.8, -.006); horn(-5, 8, 3.8, -.94, .24, .3, 18, 1.6, -.008); horn(-3, 4, 4.5, -.96, .05, .36, 14, 1.4, -.005); horn(-2, 1, 4.2, -.92, -.1, .34, 10, 1.2, -.004);
+  // 下颌：单独一组，摆放时绕铰链转动
+  for (let f = 19; f >= -2; f--){
+    const s = (19 - f) / 21, bot = Math.round(-7 + s * 6.2), top = Math.round(-4.8 + s * 6.8), mw = Math.round(1.5 + Math.pow(s, .9) * 4.3);
+    for (let u = bot; u <= top; u++) for (let w = 0; w <= mw; w++){
+      if (u === bot && w === mw && mw > 2) continue;
+      if (f > 2 && u === top && w < mw - 1){ put(jaw, f, u - 1, w, C0.gum); continue }
+      put(jaw, f, u, w, tone(f, u, w, u === bot ? "belly" : w === mw ? "mid" : "dark"));
+    }
+    if (f >= 6 && f <= 18 && f % 3 === 1){ const fw = Math.max(1, mw - 1); put(jaw, f, top + 1, fw, C0.tooth); if (f === 16) put(jaw, f, top + 2, fw, C0.tooth) }   // 下排牙与上排错开
+  }
+  // 只留表面一层：六个方向都被挡住的体素看不见，不用画
+  const shell = m => [...m.values()].filter(([w, f, u]) => !(m.has((f + 1) + "," + u + "," + w) && m.has((f - 1) + "," + u + "," + w) && m.has(f + "," + (u + 1) + "," + w) && m.has(f + "," + (u - 1) + "," + w) && m.has(f + "," + u + "," + (w + 1)) && m.has(f + "," + u + "," + (w - 1))));
+  // 红瞳：眼窝里一只前尖后宽的斜眼，两格厚，从侧面和上方都看得见；外层中间留一道竖瞳
+  const eyes = [];
+  for (const [f, u] of [[9, 5], [8, 5], [7, 5], [6, 5], [5, 5], [4, 5], [8, 6], [7, 6], [6, 6], [5, 6], [4, 6], [6, 7], [5, 7], [4, 7], [4, 8]]) for (const w of [-5, -4, 4, 5]){
+    const slit = Math.abs(w) === 5 && f === 6 && u <= 6;
+    eyes.push([w, f, u, slit ? C0.pupil : C0.eye, slit ? 0 : 1]);
+  }
+  return DRAGON_HEAD = {skull: shell(skull).concat(eyes), jaw: shell(jaw)};
+}
 const RING_RAMP = Array.from({length: 9}, (_, i) => mixHex(MAGIC_COL.dim, MAGIC_COL.arcane, i / 8));   // 法阵外环：暗紫 → 亮紫（预先量化，避免每帧生成新颜色串）
 const fract1 = x => x - Math.floor(x), smooth01 = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x) };
 const rand01 = (i, k) => (hash3(i, k, 77) >>> 8) / 16777216;                       // 按序号稳定的 0..1 伪随机
@@ -1818,13 +1880,12 @@ function dragonVox(t, s, fire){
     }
   }
   // ---- 头的位姿：k 为探入深度。刚出现时头埋在墙后只露出角和眼睛，随 k 抬高、前伸到书案上方；始终略微低头俯视，喷火时压得更低
-  const k = smooth01((s - .3) / .7), up = smooth01((s - .3) / .12), K = 1.8, bob = Math.sin(t * 1.1) * .1, sway = Math.sin(t * .6) * .3 * k;
-  const open = .1 + .5 * fire + .04 * Math.sin(t * 1.7), th = .6 * Math.pow(1 - k, 1.5) + .34 + fire * .14, c = Math.cos(th), sn = Math.sin(th);
+  const k = smooth01((s - .3) / .7), up = smooth01((s - .3) / .12), V = DRAGON_VOX, bob = Math.sin(t * 1.1) * .1, sway = Math.sin(t * .6) * .3 * k;
+  const open = .1 + .5 * fire + .04 * Math.sin(t * 1.7), th = .6 * Math.pow(1 - k, 1.5) + .2 + fire * .2, c = Math.cos(th), sn = Math.sin(th);
   const ax = dx + sway, ay = lerp(-2.6, at.y - at.r - 1.6, k), az = lerp(SWH - .5, 5.0, smooth01(k * 1.5)) + bob - 2.4 * (1 - up);
   const Hp = (lx, ly, lz) => [ax + lx, ay + ly * c + lz * sn, az - ly * sn + lz * c];                        // 头部局部坐标（x 横向、y 朝前、z 向上）→ 世界，绕头心俯仰
-  const hb = (lx, ly, lz, sx, sy, sz, col, e = E, m = 0) => { const p = Hp(lx * K, ly * K, lz * K); Bc(p[0], p[1], p[2], sx * K, sy * K, sz * K, col, e, m) };
   // ---- 脖子：沿二次贝塞尔曲线排 16 节方块（由粗到细），背侧暗色脊板 + 隔节一根背刺，腹侧暗红鳞板；喷火时靠近头的几节腹板透出火光
-  const P0 = [dx, -3.0, .5], P2 = Hp(0, -.75 * K, -.05 * K), P1 = [dx + sway * .5, lerp(-3.0, -1.6, k), lerp(SWH + 1.5, SWH + 3.4, k) - 2.4 * (1 - up)], n = 16;
+  const P0 = [dx, -3.0, .5], P2 = Hp(0, -6 * V, 3 * V), P1 = [dx + sway * .5, lerp(-3.0, -1.6, k), lerp(SWH + 1.5, SWH + 3.4, k) - 2.4 * (1 - up)], n = 16;
   for (let i = 0; i < n; i++){
     const u = i / (n - 1), a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, d = u * u, sz = lerp(1.35, .9, u);
     const px = a * P0[0] + b * P1[0] + d * P2[0] + Math.sin(t * .8 + i * .5) * .12 * (1 - u), py = a * P0[1] + b * P1[1] + d * P2[1], pz = a * P0[2] + b * P1[2] + d * P2[2];
@@ -1835,30 +1896,15 @@ function dragonVox(t, s, fire){
     Bc(px, py - ny * sz * .34, pz - nz * sz * .34, sz * .72, sz * .62, sz * .62, hot ? mixHex(D.belly, D.ember, fire * .8) : D.belly, hot ? 1 : E, hot ? 1 : 0);
     if (i & 1){ Bc(px, py + ny * (sz * .5 + .2), pz + nz * (sz * .5 + .2), .24, .24, .24, D.ridge); Bc(px, py + ny * (sz * .5 + .44), pz + nz * (sz * .5 + .44), .13, .13, .13, D.tip, .3) }
   }
-  // ---- 头：俯视是个楔形——宽而高的颅骨向前三级收窄成短吻，眉骨斜压着侧面的黄色竖瞳，一对大角向两侧后方张开，脑后再掠出一排冠刺
-  hb(0, -.15, 0, 1.3, 1.1, .9, D.scale); hb(0, -.15, .48, .8, 1.0, .08, D.shine);
-  hb(0, .6, -.04, 1.1, .5, .74, D.scale);
-  hb(0, 1.1, -.12, .86, .55, .58, D.scale2); hb(0, 1.6, -.2, .68, .5, .46, D.scale); hb(0, 2.0, -.27, .5, .34, .34, D.scale2);
-  hb(0, 1.3, .16, .2, 1.5, .08, D.shine);                                                                         // 吻背的亮脊
-  hb(0, .1, -.5 - open * .4, 1.1, .7, .34, D.scale2); hb(0, 1.15, -.56 - open, .64, 1.6, .2, D.belly);          // 颌关节 + 下颌
-  if (open > .06){ hb(0, 1.15, -.44 - open / 2, .56, 1.4, open, D.mouth, .2); hb(0, .6, -.44 - open / 2, .5, .4, open * .8, D.ember, 1, 1) }
-  for (const sg of [-1, 1]){
-    hb(sg * .5, .66, .36, .34, .62, .16, D.ridge); hb(sg * .6, .12, .48, .28, .6, .16, D.ridge);                  // 眉骨：前低后高
-    hb(sg * .56, .6, .14, .06, .34, .16, D.eye, 1, 1); hb(sg * .58, .62, .14, .04, .08, .16, D.pupil); hb(sg * .4, .86, .14, .24, .04, .12, D.eye, 1, 1);   // 侧面的竖瞳；正面也露一线
-    hb(sg * .16, 2.05, -.1, .12, .16, .1, D.ridge); hb(sg * .16, 2.18, -.12, .08, .04, .08, D.ember, 1, 1);     // 鼻孔
-    [1.0, 1.3, 1.6, 1.9].forEach((ly, q) => hb(sg * (.42 - q * .06), ly, -.48, .06, .1, q === 3 ? .28 : .16, D.bone, .3));   // 上颌尖牙，最前一对是獠牙
-    for (const ly of [1.0, 1.45]) hb(sg * .28, ly, -.42 - open, .06, .08, .14, D.bone, .3);
-    for (let q = 0; q < 5; q++){ const w = .26 - q * .04; hb(sg * (.6 + q * .13), -.5 - q * .42, .4 + q * .2, w, .5, w, q >= 4 ? D.tip : q >= 2 ? D.horn : D.ridge, q >= 4 ? .3 : E) }   // 大角：向后、向外、向上
-    hb(sg * .74, -.2, -.24, .18, .6, .18, D.horn); hb(sg * .86, -.7, -.16, .12, .5, .12, D.tip, .3);             // 颊刺
-  }
-  for (let i = 0; i < 5; i++){                                                                                     // 脑后的冠刺：中间最长
-    const m = Math.abs(i - 2), lx = (i - 2) * .17, len = 5 - m;
-    for (let q = 0; q < len; q++){ const w = Math.max(.07, .16 - q * .02); hb(lx * (1 + q * .1), -.8 - q * .4, .34 + q * (.14 + (2 - m) * .05), w, .44, w, q >= len - 1 ? D.tip : D.horn, q >= len - 1 ? .3 : E) }
-  }
-  const mouth = Hp(0, 2.15 * K, (-.42 - open * .5) * K);
+  // ---- 头：整数网格上雕好的体素模型（见 dragonHead），这里只做摆放——整体随头的俯仰转过去，下颌再绕铰链张开；方块本身保持轴对齐，略放大一点盖住转动后的缝
+  const HM = dragonHead(), vs = V * 1.16, ja = open * .8, jc = Math.cos(ja), js = Math.sin(ja);
+  for (const [w, f, u, col, em] of HM.skull){ const p = Hp(w * V, f * V, u * V); add(p[0] - vs / 2, p[1] - vs / 2, p[2] - vs / 2, vs, vs, vs, col, -1, em ? 1 : .3, em ? 1 : 0) }
+  for (const [w, f, u, col] of HM.jaw){ const p = Hp(w * V, (f * jc + u * js) * V, (u * jc - f * js) * V); add(p[0] - vs / 2, p[1] - vs / 2, p[2] - vs / 2, vs, vs, vs, col, -1, .3, 0) }
+  if (fire > 0){ const p = Hp(0, 5 * V, -1 * V); add(p[0] - 2 * V, p[1] - 2.5 * V, p[2] - 1.5 * V, 4 * V, 5 * V, 3 * V, D.ember, -1, 1, 1) }   // 喉咙深处的火光
+  const mouth = Hp(0, 15 * V, -3 * V);
   if (fire > 0) fireVox(t, fire, mouth, at);
   else for (let i = 0; i < 4; i++){                                                                              // 不喷火时鼻孔冒两缕黑烟
-    const p = fract1(t * .45 + i * .25), q = Hp((i & 1 ? .16 : -.16) * K, 2.15 * K, -.05 * K), sz = .1 + .22 * p;
+    const p = fract1(t * .45 + i * .25), q = Hp((i & 1 ? 2 : -2) * V, 20 * V, 0), sz = .1 + .22 * p;
     add(q[0] - sz / 2 + Math.sin(t * 2 + i) * .08 * p, q[1] - sz / 2 + p * .3, q[2] + p * 1.3, sz, sz, sz, D.smoke, -1, 0, 0);
   }
 }
