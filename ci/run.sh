@@ -24,7 +24,7 @@ docker run --rm -v "$PWD":/src:ro -w /src -e PYTHONDONTWRITEBYTECODE=1 "$PY_IMG"
   python -m unittest discover -s tests -v
 
 step "前端：去处规则单测（node --test）"
-docker run --rm -v "$PWD":/src:ro -w /src "$NODE_IMG" node --test tests/
+docker run --rm -v "$PWD":/src:ro -w /src "$NODE_IMG" node --test tests/*.test.mjs
 
 step "compose 配置校验"
 for f in docker-compose.yml docker-compose.local.yml deploy/linux/docker-compose.push.yml; do

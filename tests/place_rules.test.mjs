@@ -1,5 +1,5 @@
 // 去处规则单测：从 index.html 抽出 <place-rules> 段落单独执行，不需要浏览器。
-// 运行：node --test tests/
+// 运行：node --test tests/*.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
