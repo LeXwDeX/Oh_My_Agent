@@ -40,9 +40,7 @@ h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-
 .ticker{margin-top:14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;align-items:center;height:32px;overflow:hidden}
 .ticker .lab{flex:none;padding-right:14px;color:var(--work);font-size:11px;letter-spacing:.16em;border-right:1px solid var(--line);margin-right:14px}
 .ticker .track{flex:1;overflow:hidden;mask-image:linear-gradient(90deg,#000 85%,transparent)}
-.ticker .run{display:inline-flex;gap:26px;white-space:nowrap;animation:tick 70s linear infinite}
-.ticker:hover .run{animation-play-state:paused}
-@keyframes tick{to{transform:translateX(-50%)}}
+.ticker .run{display:inline-flex;gap:26px;white-space:nowrap;will-change:transform}
 .tk .t{color:var(--faint);margin-right:6px}
 
 /* stats */
@@ -464,21 +462,49 @@ function renderLog(){
   $("logn").textContent=`${ev.length} 条 · 最新在前`;
   patch($("log"),ev.slice(0,250).map(e=>`<div class="ev ${now()-e.at<120e3?"hl":""}" data-key="${h(e.src+"|"+e.lid+"|"+(e.aid||"")+"|"+e.kind+"|"+e.at)}"><span class="t">${hm(e.at,true)}</span><span class="k ${KIND_LABEL[e.kind]?e.kind:""}">${h(KIND_LABEL[e.kind]||e.kind)}</span><span class="w" title="${h(e.task||"")}">${evLine(e)}</span></div>`).join("")
     || `<div class="empty">暂无事件</div>`);
-  const tk=ev.slice(0,14).map(e=>`<span class="tk"><span class="t">${hm(e.at,true)}</span><b style="color:${e.job==="lead"?sHex(e.src):jobColor(e.job)}">${h(e.who)}</b> ${h(VERB[e.kind]||e.kind)} · <span class="dim">${h(e.job==="lead"?"会话":e.job)}</span></span>`).join("");
+  const tkId=e=>e.src+"|"+e.lid+"|"+(e.aid||"")+"|"+e.kind+"|"+e.at;
+  const tk=ev.slice(0,14).map(e=>`<span class="tk" data-ev="${h(tkId(e))}"><span class="t">${hm(e.at,true)}</span><b style="color:${e.job==="lead"?sHex(e.src):jobColor(e.job)}">${h(e.who)}</b> ${h(VERB[e.kind]||e.kind)} · <span class="dim">${h(e.job==="lead"?"会话":e.job)}</span></span>`).join("");
   // 鼠标悬停时冻结跑马灯内容；只有事件真的变了才更新，避免停住时内容跳动
-  const tkKey=ev.slice(0,14).map(e=>e.src+e.lid+(e.aid||"")+e.kind+e.at).join("|");
-  if(!document.querySelector(".ticker").matches(":hover") && tkKey!==S.tkKey){
+  const tkKey=ev.slice(0,14).map(tkId).join("\n");
+  if(!TK.hover && tkKey!==S.tkKey){
     S.tkKey=tkKey;
-    patch($("ticker"), tk ? tk + tk : `<span class="dim">等待事件…</span>`);
-    restartTicker($("ticker"));
+    setTicker(tk ? tk + tk : `<span class="dim">等待事件…</span>`, Math.min(ev.length,14));
   }
 }
-/* translateX(-50%) 的百分比在合成层动画开始时按当时宽度定死（页面刚加载时内容为空、宽度为 0，
-   之后填进内容也一直位移 0，要等悬停暂停/恢复才重新计算）。内容变化后重启动画，并保留进度。 */
-function restartTicker(run){
-  const old=run.getAnimations()[0], t=old?old.currentTime:0;
-  run.style.animation="none"; void run.offsetWidth; run.style.animation="";
-  const an=run.getAnimations()[0]; if(an&&t) an.currentTime=t;
+/* ---------- 跑马灯 ----------
+   位移按像素自己算：量出一圈的长度（两份内容首条之间的距离，含间距），用 Web Animations 匀速滚动，悬停时暂停。
+   以前用 CSS 的 translateX(-50%)：位移 = 进度 × 当前宽度，内容一换（悬停时攒下的更新在鼠标移开后一次补上）
+   所有条目就整体横跳一截；-50% 又比真正的一圈少半个间距，每圈接缝处还会跳 13px。 */
+const TK={speed:50, period:0, anim:null, hover:false};   // speed：px/s
+// <ticker> 纯函数，tests/ticker.test.mjs 抽这一段跑
+/* 换内容后应滚到的位移（0 ≤ 结果 < period）。off：换之前已滚过的像素；seen：换之前可见条目的 [id, left]（从左到右）；
+   leftOf(id)：换之后同一条的 left，已不在则返回 null。第一条还在的留在原地不动；一条都不剩就沿用原位移。 */
+function tkOffset(off, period, seen, leftOf){
+  if(!(period>0)) return 0;
+  for(const [id,left] of seen){ const nl=leftOf(id); if(nl!=null){ off+=nl-left; break } }
+  return ((off%period)+period)%period;
+}
+// </ticker>
+/* html：新内容（有事件时是同一串条目重复两份）；n：一份里的条目数，0 表示没有事件、不滚动 */
+function setTicker(html, n){
+  const run=$("ticker"), box=run.parentElement.getBoundingClientRect();
+  const off=TK.anim ? (TK.anim.currentTime/1000*TK.speed)%TK.period : 0;
+  const seen=[...run.children].filter(k=>k.dataset.ev).map(k=>[k.dataset.ev,k.getBoundingClientRect()])
+    .filter(([,r])=>r.right>box.left&&r.left<box.right).map(([id,r])=>[id,r.left]);
+  patch(run, html);
+  const kids=run.children, L=k=>k.getBoundingClientRect().left;
+  const period=n ? L(kids[n])-L(kids[0]) : 0;
+  const next=tkOffset(off, period, seen, id=>{ for(const k of kids) if(k.dataset.ev===id) return L(k); return null });
+  if(TK.anim) TK.anim.cancel();
+  TK.anim=null; TK.period=period;
+  if(!(period>0)) return;
+  TK.anim=run.animate([{transform:"translateX(0)"},{transform:`translateX(${-period}px)`}],{duration:period/TK.speed*1000, iterations:Infinity});
+  TK.anim.currentTime=next/TK.speed*1000;
+  if(TK.hover) TK.anim.pause();
+}
+{ const el=document.querySelector(".ticker");
+  el.addEventListener("mouseenter",()=>{ TK.hover=true; if(TK.anim) TK.anim.pause() });
+  el.addEventListener("mouseleave",()=>{ TK.hover=false; if(TK.anim) TK.anim.play() });
 }
 
 /* 回复浮层：悬停 ↳ 行显示全文，点击固定（再点/点别处/Esc 关闭）；浮层挂在 body 上，不占泳道高度 */
