@@ -385,6 +385,14 @@ def archived_ids() -> set[str]:
     return out - keep
 
 
+def project_of(cwd: str) -> str:
+    """项目名：cwd 最后一段目录；工作树（<仓库>/.claude/worktrees/<名字>[/...]）归到所属仓库名，与 Claude App 侧边栏一致。"""
+    i = cwd.find("/.claude/worktrees/")
+    if i > 0 and Path(cwd[:i]).name:
+        return Path(cwd[:i]).name
+    return Path(cwd).name
+
+
 def entry_match(rule, entry) -> bool:
     if rule is None:
         return True
@@ -466,7 +474,7 @@ def scan(sources: list[dict], hours: float) -> dict:
                     status = "done" if info["stop"] in ("end_turn", "stop_sequence", None) else "stopped"
 
                 cwd = (r or {}).get("cwd") or info["cwd"] or ""
-                project = Path(cwd).name if cwd else pdir.name
+                project = project_of(cwd) if cwd else pdir.name
                 if "scratch-workspaces" in cwd:
                     project = "scratch"
                 title = (r or {}).get("name") or info["title"] or project

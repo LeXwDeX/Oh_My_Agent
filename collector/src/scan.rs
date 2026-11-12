@@ -157,6 +157,14 @@ fn path_name(p: &str) -> String {
     p.split('/').rfind(|c| !c.is_empty() && *c != ".").unwrap_or("").to_owned()
 }
 
+/// 项目名：cwd 最后一段目录；工作树（`<仓库>/.claude/worktrees/<名字>[/...]`）归到所属仓库名，与 Claude App 侧边栏一致
+fn project_of(cwd: &str) -> String {
+    match cwd.find("/.claude/worktrees/") {
+        Some(i) if !path_name(&cwd[..i]).is_empty() => path_name(&cwd[..i]),
+        _ => path_name(cwd),
+    }
+}
+
 /// os.path.expanduser：只展开 "~" 与 "~/..."
 pub fn expand_user(dir: &str) -> PathBuf {
     if dir == "~" || dir.starts_with("~/") {
@@ -950,7 +958,7 @@ impl Scanner {
 
                     let cwd = or_chain(&[rget("cwd"), Some(&info.cwd)]);
                     let cwd_s = cwd.as_ref().and_then(Value::as_str).unwrap_or("");
-                    let mut project = if cwd.is_some() { path_name(cwd_s) } else { pdir_name.clone() };
+                    let mut project = if cwd.is_some() { project_of(cwd_s) } else { pdir_name.clone() };
                     if cwd_s.contains("scratch-workspaces") {
                         project = "scratch".into();
                     }
@@ -1264,6 +1272,10 @@ mod tests {
         assert_eq!(path_name("/a/b/"), "b");
         assert_eq!(path_name("/a/./"), "a");
         assert_eq!(path_name("/"), "");
+        assert_eq!(project_of("/x/plinth/.claude/worktrees/review-4e223e"), "plinth");
+        assert_eq!(project_of("/x/plinth/.claude/worktrees/review-4e223e/sub"), "plinth");
+        assert_eq!(project_of("/x/Oh_My_Agent"), "Oh_My_Agent");
+        assert_eq!(project_of("/.claude/worktrees/a"), "a");
         assert_eq!(parse_lines(b"{\"a\":1}\n[1]\n{bad\n{\"b\":", true).len(), 1);
         assert_eq!(parse_lines(b"{\"a\":1}\n{\"b\":2}", false).len(), 2);
     }
