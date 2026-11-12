@@ -335,6 +335,7 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
 .ctl button{width:36px;height:36px;border-radius:9px;border:2px solid #34405f;background:#1e2740eb;box-shadow:0 3px 0 #0f1526;font:15px var(--sans);cursor:pointer;color:#eef2ff;padding:0;display:grid;place-items:center}
 .ctl button .ic{width:16px;height:16px}
 .ctl button:hover{background:#2a3655}
+.ctl button.on{background:#3b4a7a;border-color:#7aa2ff}
 .ctl button:active{transform:translateY(2px);box-shadow:none}
 #nogl,.oempty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:12px 18px;display:none;z-index:3;text-align:center;font-size:13px}
 
@@ -400,6 +401,7 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
     <button id="zin" title="放大"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M8 3v10M3 8h10"/></svg></button>
     <button id="zout" title="缩小"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 8h10"/></svg></button>
     <button id="zfit" title="适配全部"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9.5 2.5h4v4M13.5 2.5L9.3 6.7M6.5 13.5h-4v-4M2.5 13.5l4.2-4.2"/></svg></button>
+    <button id="pix" title="像素风"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2z"/><path fill="currentColor" opacity=".45" d="M9 9h5v5H9z"/></svg></button>
     <button id="zfull" title="全屏办公室"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg></button>
   </div>
   <div class="hud" id="nogl">当前浏览器不支持 WebGL2，无法显示体素办公室。</div>
@@ -1249,7 +1251,7 @@ canvas.addEventListener("webglcontextrestored", () => location.reload());
 const VS = `#version 300 es
 layout(location=0) in vec3 aC; layout(location=1) in vec3 aN; layout(location=2) in vec2 aUV;
 layout(location=3) in vec3 iP; layout(location=4) in vec3 iS; layout(location=5) in vec3 iCol; layout(location=6) in vec3 iX; layout(location=7) in float iH;
-uniform mat4 uVP; uniform float uTime;
+uniform mat4 uVP; uniform float uTime; uniform vec4 uClip;
 out vec3 vCol; out vec3 vN; out vec2 vE; out vec2 vD; out float vEm; out float vMode; out float vZ; out float vHL; out vec3 vW;
 void main(){
   float t0 = iX.x;
@@ -1266,6 +1268,7 @@ void main(){
   gl_Position = uVP * vec4(p, 1.0);
   float thin = min(min(iS.x, iS.y), iS.z);
   gl_Position.z -= (1.0 - smoothstep(0.004, 0.06, thin)) * 0.00015;
+  gl_Position.xy = gl_Position.xy * uClip.xy + uClip.zw * gl_Position.w;
   vN = aN; vCol = iCol; vEm = iX.y; vMode = iX.z; vZ = p.z; vHL = iH; vW = p;
   vD = abs(aN.x) > 0.5 ? iS.yz : (abs(aN.y) > 0.5 ? iS.xz : iS.xy);
   vE = aUV * vD;
@@ -1275,6 +1278,7 @@ precision highp float;
 in vec3 vCol; in vec3 vN; in vec2 vE; in vec2 vD; in float vEm; in float vMode; in float vZ; in float vHL; in vec3 vW;
 uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uSky; uniform vec3 uGnd; uniform vec3 uWin; uniform float uNight;
 uniform float uIn; uniform vec3 uLamp; uniform vec4 uRoom[8]; uniform int uRoomN;
+uniform float uEmMin; uniform vec3 uTint; uniform float uPx; uniform float uLv;
 /* 室内灯：只照办公室地板以上、朝向室内的面（沿法线外推一点再判断，外墙外侧面不算），楼下和窗外保持夜色 */
 float indoor(vec3 n){
   vec3 q = vW + n * 0.06;
@@ -1293,7 +1297,7 @@ void main(){
   vec3 base = isWin ? mix(uWin, vCol, 0.18) : vCol;
   float ndl = max(dot(n, uSun), 0.0);
   vec3 amb = mix(uGnd, uSky, n.z * 0.5 + 0.5);
-  vec3 lit = amb + uSunCol * ndl;
+  vec3 lit = (amb + uSunCol * ndl) * uTint;
   float k = uIn > 0.0 ? uIn * indoor(n) : 0.0;
   if (k > 0.0){
     // 顶灯：室内去掉月光的冷色，按缺多少光补暖光；水平面上按 4 格间距有一圈圈灯下光斑
@@ -1305,21 +1309,27 @@ void main(){
   }
   vec3 c = base * lit;
   if (n.z < 0.5 && vZ > -0.35) c *= mix(0.86, 1.0, smoothstep(0.0, 0.6, vZ));
-  float w = min(0.035, 0.16 * min(vD.x, vD.y));
+  float w = min(max(0.035, uPx), 0.16 * min(vD.x, vD.y));      // 像素风下描边至少一个像素宽，否则低分辨率里会闪
   vec2 d = min(vE, vD - vE);
   c *= 1.0 - 0.17 * (1.0 - smoothstep(0.0, w, min(d.x, d.y)));
   if (vEm > 0.0){
     vec3 glow = isWin ? vec3(1.0, 0.86, 0.58) : (vMode > 0.5 && vMode < 1.5) ? vCol * 1.3 : vCol * vec3(1.08, 0.97, 0.82) + vec3(0.14, 0.10, 0.04);
-    c = mix(c, glow, clamp(vEm * uNight, 0.0, 1.0));
+    c = mix(c, glow, clamp(vEm * max(uNight, uEmMin), 0.0, 1.0));
   }
   c = mix(c, c * 1.12 + vec3(0.08, 0.09, 0.1), vHL * 0.9);
+  if (uLv > 0.0){
+    // 像素风：每通道压到 uLv 级色阶，用 4×4 Bayer 有序抖动代替渐变
+    const float B[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+    ivec2 q = ivec2(gl_FragCoord.xy) & 3;
+    c = floor(c * uLv + (B[q.x + q.y * 4] + 0.5) / 16.0) / uLv;
+  }
   o = vec4(c, 1.0);
 }`;
 function shader(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s }
 const prog = gl.createProgram();
 gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
 if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-const U = {}; for (const n of ["uVP", "uTime", "uSun", "uSunCol", "uSky", "uGnd", "uWin", "uNight", "uIn", "uLamp", "uRoom", "uRoomN"]) U[n] = gl.getUniformLocation(prog, n);
+const U = {}; for (const n of ["uVP", "uTime", "uSun", "uSunCol", "uSky", "uGnd", "uWin", "uNight", "uIn", "uLamp", "uRoom", "uRoomN", "uClip", "uEmMin", "uTint", "uPx", "uLv"]) U[n] = gl.getUniformLocation(prog, n);
 const cube = [], idx = [];
 const FACES = [[[1,0,0], (u, v) => [1, u, v]], [[-1,0,0], (u, v) => [0, u, v]], [[0,1,0], (u, v) => [u, 1, v]], [[0,-1,0], (u, v) => [u, 0, v]], [[0,0,1], (u, v) => [u, v, 1]], [[0,0,-1], (u, v) => [u, v, 0]]];
 FACES.forEach(([nrm, fn], f) => { for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) cube.push(...fn(u, v), ...nrm, u, v); idx.push(f * 4, f * 4 + 1, f * 4 + 2, f * 4, f * 4 + 2, f * 4 + 3) });
@@ -1340,6 +1350,42 @@ function makeVAO(buf){
 const staticBuf = gl.createBuffer(), dynBuf = gl.createBuffer();
 const staticVAO = makeVAO(staticBuf), dynVAO = makeVAO(dynBuf);
 let staticCount = 0;
+
+/* ---------------- 像素风：场景先画到低分辨率离屏缓冲（无抗锯齿），再用最近邻放大到画布 ----------------
+   一个低分辨率像素 = pix 个 CSS 像素。离屏缓冲尺寸向上取整，多出的不足一格用 uClip 把画面缩到左下角对齐，
+   这样每个像素都是整倍数放大，不会出现宽窄不一的列。拾取、标签仍按 CSS 尺寸算，不受影响。 */
+const BVS = `#version 300 es
+void main(){ vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+const BFS = `#version 300 es
+precision highp float;
+uniform sampler2D uTex; uniform vec2 uInv;
+out vec4 o;
+void main(){ o = texture(uTex, gl_FragCoord.xy * uInv); }`;
+const blitProg = gl.createProgram();
+gl.attachShader(blitProg, shader(gl.VERTEX_SHADER, BVS)); gl.attachShader(blitProg, shader(gl.FRAGMENT_SHADER, BFS)); gl.linkProgram(blitProg);
+if (!gl.getProgramParameter(blitProg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(blitProg));
+const BU = {uTex: gl.getUniformLocation(blitProg, "uTex"), uInv: gl.getUniformLocation(blitProg, "uInv")};
+const LOWRES = {fb: null, tex: null, rb: null, w: 0, h: 0};
+function lowTarget(pix){
+  const w = Math.ceil(cssW / pix), hgt = Math.ceil(cssH / pix);
+  if (LOWRES.fb && LOWRES.w === w && LOWRES.h === hgt) return;
+  if (!LOWRES.fb){ LOWRES.fb = gl.createFramebuffer(); LOWRES.tex = gl.createTexture(); LOWRES.rb = gl.createRenderbuffer() }
+  LOWRES.w = w; LOWRES.h = hgt;
+  gl.bindTexture(gl.TEXTURE_2D, LOWRES.tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, hgt, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+  gl.bindRenderbuffer(gl.RENDERBUFFER, LOWRES.rb); gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, w, hgt);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, LOWRES.fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, LOWRES.tex, 0);
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, LOWRES.rb);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+/* 像素倍率（0 = 关）：链接参数 ?pix=N 优先，其次手动开关（本地记忆），否则跟版式走 */
+function pixOf(){
+  if (S.pixQ != null) return S.pixQ;
+  const ly = LAYOUTS[S.layout] || LAYOUTS.jp;
+  return S.pixPref === "on" ? (ly.pix || 3) : S.pixPref === "off" ? 0 : (ly.pix || 0);
+}
 
 /* ---------------- 相机：正交 2:1 等距 ---------------- */
 const PITCH = Math.PI / 6, YAW = Math.PI / 4;
@@ -1378,6 +1424,7 @@ const viewCx = () => (cssW - Math.max(0, fitPadRight() || 0)) / 2;
 function fitTarget(){
   const c = S.world; if (!c) return null;
   const pts = []; for (const x of [0, c.MW]) for (const y of [0, c.MD]) for (const z of [-2.6, 4]) pts.push([x, y, z]);
+  if ((LAYOUTS[S.layout] || {}).magic) for (const x of [0, c.MW]) pts.push([x, -2.4, 5.2]);   // 趴在后墙外的巨龙也要取进画面
   const xs = pts.map(p => dot(p, RV)), ys = pts.map(p => dot(p, UV));
   const w = Math.max(...xs) - Math.min(...xs), hgt = Math.max(...ys) - Math.min(...ys);
   const top = 54, bot = 58, pr = Math.max(0, fitPadRight() || 0);
@@ -1781,6 +1828,7 @@ function zoneLabelHTML(Z){
   return `<i style="background:${ST_COL[z.status] || "#b6bec9"}"></i><b>${h(z.title)}</b><small style="color:${z.hex}">${h(z.src)}</small><small>主1 · 子${ag.length}${z.hidden > 0 ? `（${z.hidden} 人未上座）` : ""}</small>${busy ? `<em>${busy} 在忙</em>` : ""}`;
 }
 
+const PIX_LEVELS = 7, LOAD_WORDS = ["正在铺设办公区…", "正在摆放工位…", "员工入座…", "完成"];   // 像素风每通道色阶数；默认加载文案
 function frame(ts){
   S.raf = 0;
   if (document.hidden || !S.world) return;
@@ -1797,7 +1845,12 @@ function frame(ts){
   const [pn, pic] = phaseOf(hr), hh = Math.floor(hr), mm = Math.floor((hr - hh) * 60);
   $("sceneclock").textContent = `${pic} ${pn} ${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
   const nDyn = dynamic(t, dt);
-  gl.viewport(0, 0, canvas.width, canvas.height);
+  const ly = LAYOUTS[S.layout] || LAYOUTS.jp, pix = pixOf(), clip = [1, 1, 0, 0];
+  if (pix){
+    lowTarget(pix);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, LOWRES.fb); gl.viewport(0, 0, LOWRES.w, LOWRES.h);
+    clip[0] = cssW / (LOWRES.w * pix); clip[1] = cssH / (LOWRES.h * pix); clip[2] = clip[0] - 1; clip[3] = clip[1] - 1;
+  } else { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, canvas.width, canvas.height) }
   gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.enable(gl.DEPTH_TEST);
   gl.useProgram(prog);
@@ -1808,14 +1861,24 @@ function frame(ts){
   gl.uniform3fv(U.uSky, rgbOf(L.sky)); gl.uniform3fv(U.uGnd, rgbOf(L.gnd));
   gl.uniform3fv(U.uWin, rgbOf(mixHex(mixHex(L.bot, L.top, .4), "#ffffff", .25)));
   gl.uniform1f(U.uNight, L.night);
+  gl.uniform4fv(U.uClip, clip); gl.uniform1f(U.uEmMin, ly.glow || 0); gl.uniform3fv(U.uTint, ly.tint || [1, 1, 1]);
+  gl.uniform1f(U.uPx, pix ? pix / cam.zoom : 0); gl.uniform1f(U.uLv, pix ? PIX_LEVELS : 0);
   setIndoorLight(L);
   gl.bindVertexArray(staticVAO); gl.drawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0, staticCount);
   if (nDyn){ gl.bindVertexArray(dynVAO); gl.drawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0, nDyn) }
   gl.bindVertexArray(null);
+  if (pix){
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.disable(gl.DEPTH_TEST);
+    gl.useProgram(blitProg); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, LOWRES.tex); gl.uniform1i(BU.uTex, 0);
+    gl.uniform2f(BU.uInv, cssW / (canvas.width * LOWRES.w * pix), cssH / (canvas.height * LOWRES.h * pix));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
   renderLabels(t);
   const p = clamp(t / S.world.maxT, 0, 1);
   $("lbar").style.width = (p * 100).toFixed(1) + "%"; $("lpct").textContent = Math.round(p * 100) + "%";
-  $("ltext").textContent = p < .5 ? "正在铺设办公区…" : p < .85 ? "正在摆放工位…" : p < 1 ? "员工入座…" : "完成";
+  const wd = ly.words || LOAD_WORDS;
+  $("ltext").textContent = p < .5 ? wd[0] : p < .85 ? wd[1] : p < 1 ? wd[2] : wd[3];
   $("loader").classList.toggle("done", p >= 1);
   S.raf = requestAnimationFrame(frame);
 }
@@ -1921,8 +1984,13 @@ canvas.addEventListener("wheel", e => { if (!e.ctrlKey) return; e.preventDefault
 $("zin").onclick = () => zoomBy(1.25, viewCx(), cssH / 2);
 $("zout").onclick = () => zoomBy(.8, viewCx(), cssH / 2);
 $("zfit").onclick = () => { S.autoFit = true; S.tween = null; fit() };
-$("lay").innerHTML = Object.entries(LAYOUTS).map(([k, v]) => `<option value="${k}"${k === S.layout ? " selected" : ""}>🏢 ${v.name}</option>`).join("");
-$("lay").onchange = e => { S.layout = e.target.value; try { localStorage.setItem("office.layout", S.layout) } catch {} $("replay").onclick() };
+$("lay").innerHTML = Object.entries(LAYOUTS).map(([k, v]) => `<option value="${k}"${k === S.layout ? " selected" : ""}>${v.icon || "🏢"} ${v.name}</option>`).join("");
+$("lay").onchange = e => { S.layout = e.target.value; try { localStorage.setItem("office.layout", S.layout) } catch {} syncPix(); $("replay").onclick() };
+S.pixQ = null; S.pixPref = "auto";
+try { const q = new URLSearchParams(location.search).get("pix"); if (q !== null && q !== "" && isFinite(+q)) S.pixQ = clamp(Math.round(+q), 0, 8); const m = localStorage.getItem("office.pix"); if (m === "on" || m === "off") S.pixPref = m } catch {}
+const syncPix = () => $("pix").classList.toggle("on", pixOf() > 0);
+$("pix").onclick = () => { S.pixPref = pixOf() ? "off" : "on"; S.pixQ = null; try { localStorage.setItem("office.pix", S.pixPref) } catch {} syncPix(); schedule() };
+syncPix();
 $("replay").onclick = () => sceneReplay();
 $("timebar").addEventListener("click", e => {
   const b = e.target.closest("button[data-h]"); if (!b) return;
