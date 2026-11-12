@@ -237,10 +237,12 @@ body{height:100vh;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr)
 .tb-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;overflow-x:auto;scrollbar-width:none;padding:1px}
 .tb-main::-webkit-scrollbar{display:none}
 .tb-main .seg{flex:none;background:var(--panel)}
-.seg.theme button{padding:5px 10px;font-size:12px;display:inline-flex;align-items:center;gap:5px}
+/* 主题切换与版式下拉并排，统一 30px 高 */
+.seg.theme{height:30px;box-sizing:border-box}
+.seg.theme button{height:100%;padding:0 10px;font-size:12px;display:inline-flex;align-items:center;gap:5px}
 .seg.theme button .ic{width:12px;height:12px}
-.laysel{flex:none;display:flex;align-items:center;gap:4px;padding:1px 4px 1px 10px;border:1px solid var(--line2);border-radius:7px;background:var(--panel);font-size:11px;color:var(--dim)}
-.laysel select{background:transparent;color:var(--text);border:0;font:inherit;font-size:12px;padding:4px 2px;cursor:pointer;outline:none}
+.laysel{flex:none;display:flex;align-items:center;gap:4px;height:30px;box-sizing:border-box;padding:0 4px 0 10px;border:1px solid var(--line2);border-radius:7px;background:var(--panel);font-size:11px;color:var(--dim)}
+.laysel select{height:100%;background:transparent;color:var(--text);border:0;font:inherit;font-size:12px;padding:0 2px;cursor:pointer;outline:none}
 .laysel select option{color:#1e2740;background:#fff}
 .tb-lanes{flex:none;display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--line2);border-radius:9px;background:var(--panel);font:700 12.5px var(--sans);color:var(--text)}
 .tb-lanes small{font:400 11px var(--mono);color:var(--dim)}
