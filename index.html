@@ -1522,18 +1522,40 @@ function popNew(prev, w){
   return fresh.length;
 }
 
-// 去处规则：完成的子 agent → 休息区；讨论类（advisor / Plan / reviewer…）工作时 → 会议室；运维类（ops / deploy / helper…）工作时 → 机房；其余 → 自己的工位
+// <place-rules>（tests/place_rules.test.mjs 会抽出这一段单独测试）
+// 去处规则：每个小人只看自己的标题（主管 = 会话标题，子 agent = 子任务标题），不看所属会话。
+// 任务类型 kind 由服务端把标题交给大模型分类得到（ci / ops / review / plan / research / code / docs / other）。
+// 完成的子 agent → 休息区；工作中按类型去不同场景（主管只会去机房，其余时间守在课长席）：
+//   干活的 code / docs / other → 自己的工位；查资料的 research、评审的 review、讨论的 plan → 会议室；运维的 ci / ops → 机房。
+// 还没分类出结果（或服务端没配大模型）时退回本地规则：标题里有独立的 CI 词 → 机房；子 agent 再按类型名判断。
 const MEET_RE = /advis|plan|review|brain|consult|architect|discuss|debate|judge|critic|verif|reason|council/i;
 const OPS_RE = /ops|deploy|infra|sre|\bci\b|release|docker|k8s|kube|monitor|admin|helper|maint/i;
+// 标题里的 CI 必须是独立的词：「CI 修复」「ci: 缓存」「跑CI」「CI/CD」算，「decision」「CICD」「Circle」不算
+const CI_RE = /(^|[^a-z0-9])ci([^a-z0-9]|$)/i;
 const PLACE_ZH = {meet: "在会议室开会", lounge: "在休息区休息", srv: "在机房操作"};
-const placeKind = sp => sp.boss ? null : sp.status === "finished" ? "lounge" : sp.status === "working" && MEET_RE.test(sp.type || "") ? "meet" : sp.status === "working" && OPS_RE.test(sp.type || "") ? "srv" : null;
+const KIND_ZH = {ci: "CI", ops: "运维部署", review: "评审核对", plan: "方案讨论", research: "调研探索", code: "编码实现", docs: "文档写作", other: "其他"};
+const MEET_KINDS = new Set(["research", "review", "plan"]);
+const ownTitle = sp => (sp.boss ? sp.title : sp.task) || "";
+const isCiTask = sp => sp.kind ? sp.kind === "ci" : CI_RE.test(ownTitle(sp));
+const placeKind = sp => {
+  if (!sp.boss && sp.status === "finished") return "lounge";
+  if (sp.status !== "working") return null;
+  if (sp.kind){
+    if (sp.kind === "ci" || sp.kind === "ops") return "srv";
+    return !sp.boss && MEET_KINDS.has(sp.kind) ? "meet" : null;
+  }
+  if (isCiTask(sp)) return "srv";
+  if (sp.boss) return null;
+  return MEET_RE.test(sp.type || "") ? "meet" : OPS_RE.test(sp.type || "") ? "srv" : null;
+};
+// </place-rules>
 
 // 人员同步：首次（或铺设动画未完）直接就位；之后新人从电梯走进来，换去处的人沿通道走过去，离开的人走回电梯
 function syncPeople(offices, settle){
   const w = S.world, plan = new Map();
   offices.forEach((o, oi) => { for (const z of o.zones){
-    if (!z.part) plan.set(z.key + "|boss", {boss: true, name: z.name, type: "lead", status: z.status, d: z.lead, z, oi});
-    for (const s of z.subs) plan.set(z.key + "|" + s.id, {boss: false, name: s.a.name, type: s.a.type, status: s.status, d: s.a, z, oi});
+    if (!z.part) plan.set(z.key + "|boss", {boss: true, name: z.name, type: "lead", status: z.status, title: z.lead.title, kind: z.lead.kind || null, d: z.lead, z, oi});
+    for (const s of z.subs) plan.set(z.key + "|" + s.id, {boss: false, name: s.a.name, type: s.a.type, status: s.status, task: s.a.task, kind: s.a.kind || null, d: s.a, z, oi});
   }});
   for (const [k, p] of S.people){
     if (plan.has(k) && w.seats.has(k)) continue;
@@ -1714,7 +1736,7 @@ function showTip(p, sx, sy){
   const walking = p.state === "in" ? "（正在走过去）" : p.state === "out" ? "（正在离开）" : "";
   tip.innerHTML = `<h4><i style="background:${ST_COL[p.status] || "#9aa3ad"}"></i>${p.boss ? IC.star : ""}${h(p.name)} <small>${p.boss ? "主 agent" : h(d.type || "子 agent")} · ${h(ST_ZH[p.status] || p.status)}${walking}</small></h4>`
     + row(p.boss ? "任务" : "子任务", p.boss ? p.z.title : d.task) + (p.boss ? "" : row("所属任务", p.z.title))
-    + row("位置", p.state === "in" || p.state === "out" ? "" : PLACE_ZH[p.at && p.at.kind] || (p.boss ? "在课长席" : "在工位")) + row("档位", p.z.src) + row("模型", d.model) + row("工具", p.status === "working" && d.tool ? toolName(d.tool) : "")
+    + row("位置", p.state === "in" || p.state === "out" ? "" : PLACE_ZH[p.at && p.at.kind] || (p.boss ? "在课长席" : "在工位")) + row("任务类型", KIND_ZH[p.boss ? p.z.lead.kind : d.kind] || "") + row("档位", p.z.src) + row("模型", d.model) + row("工具", p.status === "working" && d.tool ? toolName(d.tool) : "")
     + (d.start && d.last ? row("用时", dur(d.last - d.start) + (p.status === "working" ? "" : " · " + dur(now - d.last) + " 前")) : "")
     + (d.reply ? `<div class="r">${h(d.reply)}</div>` : "");
   tip.style.display = "block";

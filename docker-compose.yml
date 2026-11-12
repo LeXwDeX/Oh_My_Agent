@@ -1,7 +1,7 @@
 # Agent Deck · hub（服务端）：只接收各设备推送的状态并提供页面，不读宿主机任何文件。
 #   启动：docker compose up -d
 #   各设备用 push 模式推送：python3 server.py --mode push --push-url https://<你的域名> --name <设备名>
-# 全部配置写在本文件 environment 中，不使用 .env；运行时不需要任何密钥。
+# 配置写在本文件 environment 中；唯一的可选密钥（任务分类用的大模型接口）放同目录 .env（0600，不进仓库），没有也能运行。
 services:
   agent-deck:
     build: .
@@ -12,6 +12,9 @@ services:
       - "127.0.0.1:7788:7788"   # 本机回环，供宿主机 nginx 反代（域名访问）
       # 需要在内网用 http://<内网IP>:7788 直接打开时，再加一行（只绑内网网卡 IP，不要用 0.0.0.0）：
       # - "<内网IP>:7788:7788"
+    env_file:                 # 可选：DECK_LLM_URL（OpenAI 兼容接口，形如 https://<网关>/v1）、DECK_LLM_KEY、DECK_LLM_MODEL、DECK_LLM_EFFORT
+      - path: .env            # 配了就按标题用大模型给小人分类（工位 / 会议室 / 机房），没配退回本地规则
+        required: false
     environment:
       DECK_MODE: "hub"
       DECK_HOST: "0.0.0.0"
