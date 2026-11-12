@@ -242,7 +242,7 @@ body{height:100vh;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr)
 .tb-lanes.on .ar{transform:rotate(180deg)}
 
 /* 排班抽屉：从办公室右侧推出，内容就是原来的泳道图 */
-.drawer{position:absolute;top:0;right:0;bottom:0;width:min(760px,94%);z-index:6;display:flex;flex-direction:column;border-radius:14px 0 0 14px;border-right:0;box-shadow:-14px 0 34px #0006;transform:translateX(104%);visibility:hidden;transition:transform .32s cubic-bezier(.2,.8,.2,1),visibility 0s .32s}
+.drawer{position:absolute;top:0;right:0;bottom:0;width:clamp(420px,56%,760px);max-width:100%;z-index:6;display:flex;flex-direction:column;border-radius:14px 0 0 14px;border-right:0;box-shadow:-14px 0 34px #0006;transform:translateX(104%);visibility:hidden;transition:transform .32s cubic-bezier(.2,.8,.2,1),visibility 0s .32s}
 .drawer.open{transform:none;visibility:visible;transition:transform .32s cubic-bezier(.2,.8,.2,1),visibility 0s}
 .drawer .lanesbody{flex:1;min-height:0;overflow:auto}
 .drawer .ph .x{font-size:14px;color:var(--dim);padding:2px 6px;border-radius:6px}
@@ -311,7 +311,9 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
 #loader .bar b{display:block;height:100%;width:0;background:linear-gradient(90deg,#5b9dff,#4fbf7a)}
 #loader.done{opacity:0;pointer-events:none}
 #hint{position:absolute;left:12px;bottom:12px;z-index:4;padding:6px 11px;font-size:12px;color:#aab4cc}
-.ctl{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;z-index:4}
+.ctl{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;z-index:4;transition:right .32s cubic-bezier(.2,.8,.2,1)}
+.office.lanes-open .ctl{right:calc(clamp(420px,56%,760px) + 12px)}
+.office.lanes-open #loader{left:calc((100% - clamp(420px,56%,760px)) / 2)}
 .ctl button{width:36px;height:36px;border-radius:9px;border:2px solid #34405f;background:#1e2740eb;box-shadow:0 3px 0 #0f1526;font:15px var(--sans);cursor:pointer;color:#eef2ff;padding:0}
 .ctl button:hover{background:#2a3655}
 .ctl button:active{transform:translateY(2px);box-shadow:none}
@@ -1281,17 +1283,21 @@ function camTarget(x, y, z, zoom, down = 0){
   const g = [x - DV[0] * z / DV[2], y - DV[1] * z / DV[2]], v = [UV[0] - DV[0] * UV[2] / DV[2], UV[1] - DV[1] * UV[2] / DV[2]], k = down * cssH / zoom;
   return {tx: g[0] + v[0] * k, ty: g[1] + v[1] * k, zoom};
 }
-function fit(){
-  const c = S.world; if (!c) return;
+let fitPadRight = () => 0;                                    // 页面层挂钩：右侧被排班抽屉占住的宽度（像素），办公室在剩下的区域里居中
+const viewCx = () => (cssW - Math.max(0, fitPadRight() || 0)) / 2;
+/* 适配视图：只算目标相机（供动画过渡用），fit() 直接套用 */
+function fitTarget(){
+  const c = S.world; if (!c) return null;
   const pts = []; for (const x of [0, c.MW]) for (const y of [0, c.MD]) for (const z of [-2.6, 4]) pts.push([x, y, z]);
   const xs = pts.map(p => dot(p, RV)), ys = pts.map(p => dot(p, UV));
   const w = Math.max(...xs) - Math.min(...xs), hgt = Math.max(...ys) - Math.min(...ys);
-  const top = 54, bot = 58;
-  cam.zoom = clamp(Math.min((cssW - 24) / w, (cssH - top - bot) / hgt), 4, 90);
-  const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2 + (top - bot) / 2 / cam.zoom;
+  const top = 54, bot = 58, pr = Math.max(0, fitPadRight() || 0);
+  const zoom = clamp(Math.min((cssW - pr - 24) / w, (cssH - top - bot) / hgt), 4, 90);
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2 + pr / 2 / zoom, cy = (Math.max(...ys) + Math.min(...ys)) / 2 + (top - bot) / 2 / zoom;
   const p = [RV[0] * cx + UV[0] * cy, RV[1] * cx + UV[1] * cy, RV[2] * cx + UV[2] * cy], t = p[2] / DV[2];
-  cam.tx = p[0] - DV[0] * t; cam.ty = p[1] - DV[1] * t;
+  return {tx: p[0] - DV[0] * t, ty: p[1] - DV[1] * t, zoom};
 }
+function fit(){ const f = fitTarget(); if (f) Object.assign(cam, f) }
 function resize(){
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const box = $("office"); cssW = Math.max(1, box.clientWidth); cssH = Math.max(1, box.clientHeight);
@@ -1333,12 +1339,25 @@ function applySky(hr, L){
   const sky = `linear-gradient(180deg,${L.top} 0%,${L.bot} 78%)`;
   if (sky !== lastSky){ $("sky").style.background = sky; lastSky = sky }
   $("stars").style.opacity = L.night.toFixed(3);
-  const f = (hr - 6) / 13, sun = $("sun");
+  const f = (hr - 6) / 13, sun = $("sun"), g = (((hr - 19) % 24) + 24) % 24 / 11, moon = $("moon");
   sun.style.opacity = (f > -.05 && f < 1.05 ? 1 - L.night : 0).toFixed(3);
-  sun.style.left = (8 + 84 * clamp(f, 0, 1)) + "%"; sun.style.top = (42 - 20 * Math.sin(clamp(f, 0, 1) * Math.PI)) + "%";   // 最高处也在左上角名牌栏之下
-  const g = (((hr - 19) % 24) + 24) % 24 / 11, moon = $("moon");
   moon.style.opacity = (g <= 1 ? L.night : 0).toFixed(3);
-  moon.style.left = (8 + 84 * clamp(g, 0, 1)) + "%"; moon.style.top = (40 - 16 * Math.sin(clamp(g, 0, 1) * Math.PI)) + "%";
+  const sp = skyPos(clamp(f, 0, 1)), mp = skyPos(clamp(g, 0, 1));
+  sun.style.left = sp[0] + "px"; sun.style.top = sp[1] + "px";
+  moon.style.left = mp[0] + "px"; moon.style.top = mp[1] + "px";
+}
+/* 日月位置（s：0 升起 → 1 落下）：在楼顶“最高角 → 最右角”这条斜线上方的天空里走，正午最高；
+   这样不会被楼挡住，也远离左上角的名牌栏。楼不在视野里时退回固定弧线。 */
+function skyPos(s){
+  const right = cssW - Math.max(0, fitPadRight() || 0) - 34, w = S.world;
+  let T = [cssW * .5, 60], R = [right, cssH * .45];
+  if (w){
+    const cs = [[0, 0], [w.MW, 0], [0, w.MD], [w.MW, w.MD]].map(([x, y]) => project(x, y, WALLH + .2));
+    T = cs.reduce((a, b) => b[1] < a[1] ? b : a); R = cs.reduce((a, b) => b[0] > a[0] ? b : a);
+  }
+  const x1 = Math.min(right, R[0] + 10), x0 = Math.min(x1, T[0] + (R[0] - T[0]) * .3), x = lerp(x0, x1, s);
+  const k = R[0] - T[0] > 1 ? (R[1] - T[1]) / (R[0] - T[0]) : 0, roof = T[1] + (x - T[0]) * k;
+  return [x.toFixed(1), Math.max(30, roof - 38 - 64 * Math.sin(s * Math.PI)).toFixed(1)];
 }
 
 /* ============================================================
@@ -1656,8 +1675,8 @@ function zoomBy(f, sx, sy){
 }
 // 普通滚轮不缩放（留给网页上下滚动）；只接管触控板双指捏合（浏览器以 ctrlKey + wheel 上报），否则会缩放整页
 canvas.addEventListener("wheel", e => { if (!e.ctrlKey) return; e.preventDefault(); zoomBy(Math.exp(-e.deltaY * .01), ...loc(e)) }, {passive: false});
-$("zin").onclick = () => zoomBy(1.25, cssW / 2, cssH / 2);
-$("zout").onclick = () => zoomBy(.8, cssW / 2, cssH / 2);
+$("zin").onclick = () => zoomBy(1.25, viewCx(), cssH / 2);
+$("zout").onclick = () => zoomBy(.8, viewCx(), cssH / 2);
 $("zfit").onclick = () => { S.autoFit = true; S.tween = null; fit() };
 $("lay").innerHTML = Object.entries(LAYOUTS).map(([k, v]) => `<option value="${k}"${k === S.layout ? " selected" : ""}>🏢 ${v.name}</option>`).join("");
 $("lay").onchange = e => { S.layout = e.target.value; try { localStorage.setItem("office.layout", S.layout) } catch {} $("replay").onclick() };
@@ -2087,9 +2106,18 @@ function renderTitle(){
 }
 
 /* ---------------- 排班抽屉 / 全屏 ---------------- */
+function drawerPad(){ if (!APP.drawer) return 0; const w = $("drawer").offsetWidth; return $("office").clientWidth - w >= 320 ? w : 0 }   // 剩余不足 320px 时仍按覆盖处理，办公室不挤得太小
+function syncDrawerPad(animate){
+  $("office").classList.toggle("lanes-open", drawerPad() > 0);
+  if (!sceneOK() || !S.world) return;
+  S.autoFit = true;
+  const b = fitTarget(); if (!b) return;
+  if (animate) S.tween = {a: {...cam}, b, t0: performance.now(), dur: 420}; else { S.tween = null; Object.assign(cam, b) }
+}
 function setDrawer(on){
   APP.drawer = on; keep("drawer", on ? "1" : "0");
   $("drawer").classList.toggle("open", on); $("lanesBtn").classList.toggle("on", on); $("lanesBtn").setAttribute("aria-expanded", String(on));
+  syncDrawerPad(true);                                         // 办公室移到抽屉左侧的剩余区域居中
   if (on && Deck.S.data) requestAnimationFrame(() => { Deck.render(); revealLane($("lanes").querySelector(".blk.sel"), false) });   // 时间轴刻度按抽屉宽度重排，并定位到当前任务
 }
 function setFull(on){
@@ -2121,6 +2149,7 @@ Deck.onRender = () => {
   if (pickSel()){ keep("sel", APP.sel); setTimeout(() => { Deck.render(); if (sceneOK()) sceneReplay() }) }   // 当前任务被档位筛掉了
   renderMap(); renderTitle();
 };
+if (sceneOK()) fitPadRight = drawerPad;
 if (sceneOK()) selLead = d => (d.leads || []).find(l => leadKey(l) === APP.sel) || null;   // 办公室只摆选中的任务
 if (sceneOK()) onPersonClick = p => {                         // 抽屉开着时，点小人 → 在排班里定位到对应行
   if (!APP.drawer || !p.z || !p.z.lead) return;
@@ -2147,7 +2176,7 @@ if (/^\/voxel(\.html)?\/?$/.test(location.pathname)) setFull(true);    // 旧的
 Deck.S.off.clear();                                         // 主页面不提供档位筛选：不沿用经典看板里隐藏的档位
 setDrawer(APP.drawer);
 applyTheme();
-if (sceneOK()){ resize(); addEventListener("resize", () => resize()) }   // 尺寸观察器之外再保底：首屏即全屏时观察器可能不触发
+if (sceneOK()){ resize(); addEventListener("resize", () => { resize(); $("office").classList.toggle("lanes-open", drawerPad() > 0) }) }   // 尺寸观察器之外再保底：首屏即全屏时观察器可能不触发
 poll(); setInterval(poll, 3000); setInterval(applyTheme, 5000);
 </script>
 </body>
