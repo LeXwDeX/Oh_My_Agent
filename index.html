@@ -535,6 +535,7 @@ function buildOffice(off, oi, X0, opt, W0){
   // 核心筒分段（y）
   const PAN = 3.6, WC1 = PAN + 1.0, WC2 = WC1 + 1.0, EVE = WC2 + 4.4, STE = EVE + 1.5, SVE = D;
   const e1 = WC2 + 1.2, e2 = WC2 + 3.1, entY = e1 + .1;                      // 两部电梯；门禁入口与电梯 1 对齐
+  const PIT = [.1, 3.6, EVE + .76, EVE + 1.4];                                // 楼梯间下行梯段的地板洞口（x0, x1 相对 X0；y0, y1）
   const dedupe = path => path.filter((q, i) => i === 0 || Math.hypot(q[0] - path[i - 1][0], q[1] - path[i - 1][1]) > 1e-3);
   W0.entry[oi] = dedupe([[X0 + .2, e1], [X0 + 3.4, e1], [X0 + 3.4, entY], [corr, entY], HUB]);
   W0.spots[oi] = {meet: [], lounge: [], srv: []};
@@ -564,7 +565,11 @@ function buildOffice(off, oi, X0, opt, W0){
 
   // ---- 楼下楼体
   EM = 0;
-  add(X0 - .25, -.25, -2.6, W + .25, D + .25, 2.3, "#d7dce2", -1);
+  { // 楼体整块，只在楼梯间下行梯段处留出深 1.05 的井，让台阶能往下走
+    const [a, b, c, d] = PIT, F = "#d7dce2";
+    add(X0 - .25, -.25, -2.6, a + .25, D + .25, 2.3, F, -1); add(X0 + b, -.25, -2.6, W - b, D + .25, 2.3, F, -1);
+    add(X0 + a, -.25, -2.6, b - a, c + .25, 2.3, F, -1); add(X0 + a, d, -2.6, b - a, D + .25 - d, 2.3, F, -1);
+    add(X0 + a, c, -2.6, b - a, d - c, 1.55, F, -1) }
   add(X0 + W, -.25, -.55, .04, D + .29, .25, hx, -1); add(X0 - .25, D, -.55, W + .29, .04, .25, hx, -1);
   for (let j = 0; j < D; j++) add(X0 + W, j + .1, -1.6, .03, .8, .7, C.glass, -1, RND() < .45 ? .8 : 0, 2);
   for (let i = 0; i < W; i++) add(X0 + i + .1, D, -1.6, .8, .03, .7, C.glass, -1, RND() < .45 ? .8 : 0, 2);
@@ -579,7 +584,12 @@ function buildOffice(off, oi, X0, opt, W0){
       col = r === "pan" ? (c ? "#e9d8ba" : "#dfcba8") : r === "wc" ? (c ? "#eef3f7" : "#dde6ee") : r === "ev" ? (c ? "#f2eee7" : "#e7e1d6") : r === "st" ? "#c9ced6" : (c ? "#cfd4dc" : "#c3c9d2");
     } else if (y > BD1 && y < BD1 + MAIN) col = c ? LY.aisle[0] : LY.aisle[1];
     else col = LY.planks ? LY.planks[(i + (j % 2) * 2) % 3] : (c ? LY.carpet[0] : LY.carpet[1]);
-    add(X0 + i, j, -.3, 1, 1, .3, col, T0(X0 + i, j), EM, 0, .012);
+    // 楼梯间下行梯段处挖洞：把这块瓦片切成洞口四周的几条
+    const [ha, hb, hc, hd] = PIT, a = Math.max(i, ha), b = Math.min(i + 1, hb), cc = Math.max(j, hc), dd = Math.min(j + 1, hd);
+    if (a < b && cc < dd){
+      for (const [px, py, pw, ph] of [[i, j, 1, cc - j], [i, dd, 1, j + 1 - dd], [i, cc, a - i, dd - cc], [b, cc, i + 1 - b, dd - cc]])
+        if (pw > 1e-6 && ph > 1e-6) add(X0 + px, py, -.3, pw, ph, .3, col, T0(X0 + i, j), EM, 0, .012);
+    } else add(X0 + i, j, -.3, 1, 1, .3, col, T0(X0 + i, j), EM, 0, .012);
   }
 
   // ---- 外墙：后墙（-y）整排窗带百叶帘、内侧结构柱；左墙是核心筒外墙；前、右两面剖到窗台高度
@@ -640,17 +650,22 @@ function buildOffice(off, oi, X0, opt, W0){
   // 核心筒外侧墙（面向通道），各房间开门；门禁入口较宽、装玻璃门和读卡器
   const exitY = EVE + .35;
   iwall(X0 + CORE - .15, 0, false, D, CWH, "#ece8e1", tcw,
-        [[1.4, 2.2], [PAN + .15, PAN + .85], [WC1 + .15, WC1 + .85], [entY - .75, entY + .75], [exitY, exitY + .8], [STE + .8, STE + 1.6]]);
-  for (const yb of [PAN, WC1, WC2, EVE, STE]) iwall(X0, yb - .075, true, CORE - .15, yb === WC1 ? CWH : CWH, "#ece8e1", T0(X0 + 2, yb, .2), []);
-  // 卫生间门牌（蓝 / 红像素小人）
-  for (const [y0, col] of [[PAN + .15, "#3b7dd8"], [WC1 + .15, "#e5484d"]]){
-    const t = T0(X0 + CORE, y0, .4), x = X0 + CORE + .01;
-    add(x, y0 + .9, .85, .02, .3, .32, C.white, t);
-    add(x + .02, y0 + 1.0, 1.08, .01, .1, .08, col, t + .02); add(x + .02, y0 + .98, .93, .01, .14, .14, col, t + .02);
-    if (col === "#e5484d") add(x + .02, y0 + .95, .9, .01, .2, .05, col, t + .02);
+        [[1.4, 2.2], [PAN + .1, PAN + .7], [WC1 + .3, WC1 + .9], [entY - .75, entY + .75], [exitY, exitY + .8], [STE + .8, STE + 1.6]]);
+  // 房间隔墙；楼梯间和机房之间那堵剖到窗台高度，不然 1.35 进深的楼梯间整个被挡住
+  for (const yb of [PAN, WC1, WC2, EVE, STE]) iwall(X0, yb - .075, true, CORE - .15, yb === STE ? LOWH : CWH, "#ece8e1", T0(X0 + 2, yb, .2), []);
+  // 卫生间门牌：贴在男 / 女卫两扇门之间的墙垛上，各靠自己那扇门（蓝 / 红像素小人）
+  for (const [y0, col, girl] of [[PAN + .73, "#3b7dd8", false], [WC1 + .03, "#e5484d", true]]){
+    const t = T0(X0 + CORE, y0, .4), x = X0 + CORE + .01, f = x + .02, c = y0 + .12, P = (w, z, h) => add(f, c - w / 2, z, .01, w, h, col, t + .02);
+    add(x, y0, .82, .02, .24, .28, C.white, t);
+    P(.06, 1.02, .06);                                                         // 头
+    if (girl){ P(.07, .98, .03); P(.1, .95, .03); P(.13, .92, .03) }           // 梯形裙
+    else P(.1, .92, .09);                                                      // 身体
+    add(f, c - .045, .85, .01, .03, .07, col, t + .02); add(f, c + .015, .85, .01, .03, .07, col, t + .02);   // 双腿
   }
-  // 楼梯间门上的绿色"非常口"灯
-  { const t = T0(X0 + CORE, exitY, .4); add(X0 + CORE + .01, exitY + .1, 1.0, .03, .6, .16, "#2fbf71", t, 1, 1); add(X0 + CORE + .04, exitY + .18, 1.03, .01, .1, .1, C.white, t + .02, 1, 1); add(X0 + CORE + .04, exitY + .36, 1.03, .01, .3, .03, C.white, t + .02, 1, 1) }
+  // 楼梯间门旁墙上的绿色"非常口"灯
+  { const t = T0(X0 + CORE, exitY, .4), y = exitY - .44;
+    add(X0 + CORE + .01, y, .92, .03, .36, .16, "#2fbf71", t, 1, 1);
+    add(X0 + CORE + .04, y + .05, .95, .01, .08, .1, C.white, t + .02, 1, 1); add(X0 + CORE + .04, y + .17, .99, .01, .14, .03, C.white, t + .02, 1, 1) }
   // 门禁：玻璃门 + 读卡器 + 公司名牌
   { const t = T0(X0 + CORE, entY, .4);
     add(X0 + CORE - .12, entY - .75, 0, .08, .06, 1.1, C.metal, t); add(X0 + CORE - .12, entY + .69, 0, .08, .06, 1.1, C.metal, t);
@@ -691,10 +706,25 @@ function buildOffice(off, oi, X0, opt, W0){
   add(X0 + 2.6, e2 + .7, .32, 1.4, .42, .06, C.wood, th + .05); for (const a of [.1, 1.2]) add(X0 + 2.6 + a, e2 + .75, 0, .1, .32, .32, C.dark, th + .03);
   plant(X0 + 4.2, WC2 + .25, 0, th + .05, true); plant(X0 + 4.2, EVE - .6, 0, th + .05, false);
   add(X0 + 3.5, WC2 + .2, 0, .28, .28, .45, "#5b6573", th + .05); for (let s = 0; s < 3; s++) add(X0 + 3.55 + s * .06, WC2 + .25 + (s % 2) * .1, .45, .03, .03, .25, ["#ff6b6b", "#5b9dff", "#ffd166"][s], th + .08);
-  // 楼梯间：台阶 + 扶手
-  { const t = T0(X0 + 2, EVE + .7, .3);
-    for (let k = 0; k < 8; k++) add(X0 + .3 + k * .45, EVE + .25, 0, .45, .9, .12 * (k + 1), "#d5dae1", t + k * .02);
-    add(X0 + .3, EVE + .2, .5, 3.6, .04, .04, C.metal, t + .2); for (let k = 0; k < 4; k++) add(X0 + .4 + k * .9, EVE + .2, 0, .04, .04, .5 + k * .45, C.metal, t + .2) }
+  // 楼梯间：门口是本层平台，一段往上、一段往下，都朝里（-x）走到远端的中间平台
+  { const t = T0(X0 + 2, EVE + .7, .3), x1 = X0 + PIT[1], st = .45, R = .15, n = 6, uy = EVE + .1, dy = PIT[2], uw = .58, dw = PIT[3] - PIT[2];
+    const DN = ["#c3c8d0", "#b6bcc5", "#a9b0ba", "#9ca4af", "#8f98a4", "#838c99"];
+    for (let k = 0; k < n; k++){
+      const x = x1 - (k + 1) * st, hu = R * (k + 1), hd = -R * (k + 1);
+      add(x, uy, 0, st, uw, hu, "#d5dae1", t + k * .02);                                   // 上行踏步 + 防滑条
+      add(x + st - .06, uy, hu, .06, uw, .01, "#9aa3ad", t + k * .02 + .02);
+      add(x, dy, -1.05, st, dw, 1.05 + hd, DN[k], t + k * .02);                            // 下行踏步 + 防滑条
+      add(x + st - .06, dy, hd, .06, dw, .01, "#8a929e", t + k * .02 + .02);
+      // 中间栏杆：每级一根立柱，扶手随台阶分段抬高 / 降低
+      add(x + st / 2, uy + uw - .03, hu, .03, .03, .5, C.metal, t + .2); add(x, uy + uw - .03, hu + .5, st, .03, .03, C.metal, t + .22);
+      add(x + st / 2, dy, hd, .03, .03, .5, C.metal, t + .2); add(x, dy, hd + .5, st, .03, .03, C.metal, t + .22);
+    }
+    const lx = X0 + .1, lw = x1 - n * st - lx, top = R * n;                                 // 中间平台：上行半边实心，下行半边是薄板
+    add(lx, uy, 0, lw, uw, top, "#d5dae1", t + .14);
+    add(lx, uy + uw, top - .15, lw, PIT[3] - uy - uw, .15, "#d5dae1", t + .14);
+    add(lx, dy, -1.05, lw, dw, .15, DN[n - 1], t + .14);                                   // 下层的中间平台
+    add(lx + lw - .03, dy, top, .03, dw, .03, C.metal, t + .22); add(lx + lw - .03, dy, top + .47, .03, dw, .03, C.metal, t + .22);   // 平台边护栏
+    for (const yy of [dy, PIT[3] - .03]) add(lx + lw - .03, yy, top, .03, .03, .5, C.metal, t + .22) }
   // 机房
   { const t = T0(X0 + 2, STE + 1.5, .3), y = STE + .5;
     for (let k = 0; k < 3; k++){
@@ -708,14 +738,14 @@ function buildOffice(off, oi, X0, opt, W0){
       add(x + .14, y + .7, 1.2, .38, .02, .22, "#1d3b4f", t + .21, .8, 1); add(x + .17, y + .72, 1.25, .2, .005, .02, "#9df2b4", t + .22, 1, 1);
       spot("srv", [x + .33, y + 1.15], 3, "stand", [[corr, STE + 1.2], [X0 + CORE + .3, STE + 1.2], [X0 + 4.3, STE + 1.2], [X0 + 4.3, y + 1.15]], t + .5);
     }
-    add(X0 + 2.75, STE + .25, 0, .9, .55, 1.4, "#eef1f4", t + .1); for (let s = 0; s < 8; s++) add(X0 + 2.8, STE + .81, .2 + s * .14, .8, .01, .04, "#b9c1cb", t + .12);
+    add(X0 + .15, D - 1.75, 0, .55, .9, 1.4, "#eef1f4", t + .1); for (let s = 0; s < 8; s++) add(X0 + .71, D - 1.7, .2 + s * .14, .01, .8, .04, "#b9c1cb", t + .12);   // 配电柜靠外墙放，不挡楼梯间
     add(X0 + .3, y + 1.1, .001, 2.3, .12, .01, "#ffd166", t + .1); for (let s = 0; s < 6; s++) add(X0 + .35 + s * .38, y + 1.1, .012, .18, .12, .005, C.dark, t + .11);
-    add(X0 + 3.9, D - .7, 0, .16, .16, .4, "#e5484d", t + .1) }
-  // 核心筒前通道：饮水机、分类垃圾桶、灭火器
+    extinguisher(X0 + 3.9, D - .7, t + .1, false) }
+  // 核心筒前通道：饮水机、分类垃圾桶、灭火器（茶水间门与男卫门之间那段整墙前，不挡门）
   { const t = T0(X0 + CORE + .3, 1, .3);
     add(X0 + CORE + .05, .3, 0, .3, .3, .62, C.white, t); add(X0 + CORE + .08, .33, .62, .24, .24, .3, "#a8dcff", t + .03);
     for (let s = 0; s < 3; s++) add(X0 + CORE + .05, D - 1.4 + s * .32, 0, .28, .28, .5, ["#5b9dff", "#4fbf7a", "#ffd166"][s], T0(X0 + CORE, D - 1, .3));
-    add(X0 + CORE + .05, BD1 - .5, 0, .16, .16, .4, "#e5484d", T0(X0 + CORE, BD1, .3)) }
+    extinguisher(X0 + CORE + .03, 2.9, T0(X0 + CORE, 2.9, .3), true) }
 
   // ---- 大开间：任务岛
   for (const T of teams){
@@ -787,6 +817,15 @@ function buildOffice(off, oi, X0, opt, W0){
     const A = (a, b, z, d, e, f, c, tt) => alongX ? add(x + a, y + b, z, d, e, f, c, tt) : add(x + b, y + a, z, e, d, f, c, tt);
     for (const [a, b] of segs){ A(a, 0, 0, b - a, .15, hgt, col, t); A(a, -.01, hgt, b - a, .17, .04, C.white, t + .05); A(a, -.01, 0, b - a, .17, .08, "#a7aeb7", t + .02) }
     for (const [a, b] of gaps){ A(a - .05, -.01, 0, .05, .17, hgt + .02, "#b9c1cb", t + .05); A(b, -.01, 0, .05, .17, hgt + .02, "#b9c1cb", t + .05) }
+  }
+  // 灭火器（正面朝 +x）：红色筒身、白标签、深色阀头和提把、黑色软管；sign 时在身后墙上（x 处）挂小红牌
+  function extinguisher(x, y, t, sign){
+    const R = "#e5484d";
+    add(x, y, 0, .14, .14, .38, R, t); add(x + .02, y + .02, .38, .1, .1, .04, R, t + .02);
+    add(x + .14, y + .03, .14, .005, .08, .1, C.white, t + .03);
+    add(x + .04, y + .04, .42, .06, .06, .05, C.dark, t + .04); add(x + .03, y + .05, .47, .1, .03, .015, C.dark, t + .05);
+    add(x + .1, y + .1, .43, .06, .02, .02, "#1d2128", t + .05); add(x + .145, y + .1, .14, .015, .02, .31, "#1d2128", t + .05);
+    if (sign){ add(x - .02, y - .01, .62, .02, .16, .14, R, t + .06); add(x, y + .05, .66, .005, .06, .06, C.white, t + .07) }
   }
   function plant(x, y, z0, t, big){
     add(x, y, z0, .36, .36, .32, C.pot, t); add(x + .03, y + .03, z0 + .32, .3, .3, .02, "#6b4a33", t + .02);
