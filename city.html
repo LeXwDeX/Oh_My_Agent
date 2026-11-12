@@ -52,6 +52,9 @@ header>*{pointer-events:auto}
 .ctl{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:6px;z-index:4}
 .ctl button{width:36px;height:36px;border-radius:11px;border:1px solid #fff;background:var(--card);box-shadow:0 4px 12px #1a2a4a26;font:inherit;font-size:15px;cursor:pointer;color:var(--ink)}
 .ctl button:hover{background:#fff}
+.ic{display:inline-block;width:.9em;height:.9em;vertical-align:-.1em;flex:none;overflow:visible}   /* SVG 图标：盒子中心落在大写字母/汉字的视觉中线上 */
+.ctl button{display:grid;place-items:center;padding:0}
+.ctl button .ic{width:16px;height:16px}
 #tip{position:fixed;z-index:5;max-width:300px;padding:9px 12px;border-radius:12px;background:#fffffff5;border:1px solid var(--line);box-shadow:0 10px 30px #1a2a4a33;font-size:12px;pointer-events:none;display:none}
 #tip h4{margin:0 0 4px;font-size:13px;display:flex;gap:6px;align-items:center}
 #tip h4 i{width:8px;height:8px;border-radius:50%}
@@ -81,10 +84,10 @@ header>*{pointer-events:auto}
 </header>
 <div class="pill" id="loader"><span id="ltext">正在铺设道路…</span><div class="bar"><b id="lbar"></b></div><span id="lpct">0%</span></div>
 <div class="ctl">
-  <button id="replay" title="重新铺设">↻</button>
-  <button id="zin" title="放大">＋</button>
-  <button id="zout" title="缩小">－</button>
-  <button id="zfit" title="适配全部">⤢</button>
+  <button id="replay" title="重新铺设"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M13 8a5 5 0 1 1-1.46-3.54"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M11.8 1.6v3.1H8.7"/></svg></button>
+  <button id="zin" title="放大"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M8 3v10M3 8h10"/></svg></button>
+  <button id="zout" title="缩小"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 8h10"/></svg></button>
+  <button id="zfit" title="适配全部"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9.5 2.5h4v4M13.5 2.5L9.3 6.7M6.5 13.5h-4v-4M2.5 13.5l4.2-4.2"/></svg></button>
 </div>
 <div id="tip"></div>
 <div class="pill" id="hint">点击楼层剖开查看 · Esc 收起 · 拖动平移 · 滚轮缩放</div>

@@ -10,6 +10,9 @@
 (function(){var m="auto";try{m=localStorage.getItem("deck.theme")||"auto"}catch(e){}
 var h=new Date().getHours(),t=m==="light"?"light":m==="night"?"night":(h>=6&&h<18?"light":"night");
 document.documentElement.setAttribute("data-theme",t)})();
+/* 图标统一用 SVG：都画在 16×16 视框正中，不再用 ▸ ✕ ＋ 等字符（字形重心随字体漂移，看起来不居中） */
+const IC_P = {caretR:`<path fill="currentColor" d="M5.75 3.5L11 8l-5.25 4.5z"/>`,caretL:`<path fill="currentColor" d="M10.25 3.5L5 8l5.25 4.5z"/>`,caretD:`<path fill="currentColor" d="M3.5 5.75L8 11l4.5-5.25z"/>`,caretU:`<path fill="currentColor" d="M3.5 10.25L8 5l4.5 5.25z"/>`,close:`<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 4l8 8M12 4l-8 8"/>`,check:`<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 8.4l3.3 3.3L13 4.6"/>`,stop:`<rect fill="currentColor" x="4" y="4" width="8" height="8" rx="1.5"/>`,star:`<path fill="currentColor" d="M8.00 2.39L9.57 6.44L13.90 6.68L10.54 9.42L11.64 13.61L8.00 11.26L4.36 13.61L5.46 9.42L2.10 6.68L6.43 6.44Z"/>`,full:`<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/>`};
+const IC = Object.fromEntries(Object.entries(IC_P).map(([k, p]) => [k, `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${p}</svg>`]));
 </script>
 <style>
 /* ============ 主题：夜晚（默认）/ 白天，两套色板共用同一组变量 ============ */
@@ -139,7 +142,7 @@ h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-
 .l2 .task{color:var(--dim);overflow:hidden;text-overflow:ellipsis}
 /* flex 居中：工具徽标与回复文字共用一条中线 */
 .l3{display:flex;align-items:center;font-size:11px;color:var(--faint);margin-top:3px;white-space:nowrap;overflow:hidden;cursor:pointer;max-width:100%}
-.l3::before{content:"↳";margin-right:.35em;flex:none;color:var(--text)}
+.l3::before{content:"";width:11px;height:11px;margin-right:.35em;flex:none;background:var(--text);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 2.5v6.5h8M9.5 6l3 3-3 3' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 2.5v6.5h8M9.5 6l3 3-3 3' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}   /* ↳ 改用 SVG 遮罩，和徽标、文字同一条中线 */
 .l3 .rt{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .l3 .tool{display:inline-flex;align-items:center;gap:3px;font-size:10px;letter-spacing:.04em;color:var(--work);border:1px solid color-mix(in srgb,var(--work) 40%,transparent);border-radius:4px;padding:3px 5px 3px 3px;margin-right:6px;line-height:9px;flex:none}
 .l3 .tool svg{flex:none;width:9px;height:9px;display:block}
@@ -234,7 +237,8 @@ body{height:100vh;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr)
 .tb-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;overflow-x:auto;scrollbar-width:none;padding:1px}
 .tb-main::-webkit-scrollbar{display:none}
 .tb-main .seg{flex:none;background:var(--panel)}
-.seg.theme button{padding:5px 10px;font-size:12px}
+.seg.theme button{padding:5px 10px;font-size:12px;display:inline-flex;align-items:center;gap:5px}
+.seg.theme button .ic{width:12px;height:12px}
 .laysel{flex:none;display:flex;align-items:center;gap:4px;padding:1px 4px 1px 10px;border:1px solid var(--line2);border-radius:7px;background:var(--panel);font-size:11px;color:var(--dim)}
 .laysel select{background:transparent;color:var(--text);border:0;font:inherit;font-size:12px;padding:4px 2px;cursor:pointer;outline:none}
 .laysel select option{color:#1e2740;background:#fff}
@@ -242,7 +246,9 @@ body{height:100vh;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr)
 .tb-lanes small{font:400 11px var(--mono);color:var(--dim)}
 .tb-lanes:hover{border-color:var(--dim)}
 .tb-lanes.on{background:color-mix(in srgb,var(--accent) 20%,var(--panel));border-color:color-mix(in srgb,var(--accent) 65%,transparent)}
-.tb-lanes .ar{display:inline-block;transition:transform .25s}
+.ic{display:inline-block;width:.9em;height:.9em;vertical-align:-.1em;flex:none;overflow:visible}   /* SVG 图标：盒子中心落在大写字母/汉字的视觉中线上 */
+.tb-lanes .ar{display:inline-grid;place-items:center;width:12px;height:12px;transition:transform .25s}
+.tb-lanes .ar .ic{width:10px;height:10px}
 .tb-lanes.on .ar{transform:rotate(180deg)}
 
 /* 排班抽屉：从办公室右侧推出，内容就是原来的泳道图 */
@@ -255,7 +261,8 @@ body{height:100vh;height:100dvh;display:grid;grid-template-columns:minmax(0,1fr)
 .drawer .ph .sp{display:none}
 .drawer .ph .seg,.drawer .ph .x{flex:none}
 .drawer .chips{max-height:88px;overflow-y:auto;scrollbar-width:thin}
-.drawer .ph .x{font-size:14px;color:var(--dim);padding:2px 6px;border-radius:6px}
+.drawer .ph .x{display:grid;place-items:center;width:26px;height:26px;padding:0;color:var(--dim);border-radius:6px}
+.drawer .ph .x .ic{width:13px;height:13px}
 .drawer .ph .x:hover{color:var(--text);background:var(--line)}
 .row.lead[data-lead]{cursor:pointer}
 .blk.sel{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 70%,transparent)}
@@ -291,7 +298,8 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
 .otitle b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;min-width:3em;flex:0 1 auto}
 .otitle span{color:#aab4cc;white-space:nowrap}
 .otitle em{font-style:normal;color:#7dffb0;font-weight:700}
-.otitle button{border:0;background:#2a3655;color:#eef2ff;border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:10px;flex:none}
+.otitle button{border:0;background:#2a3655;color:#eef2ff;border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:10px;flex:none;display:grid;place-items:center;padding:0}
+.otitle button .ic{width:10px;height:10px}
 .otitle button:hover{background:#3a4870}
 .otitle button:first-child{margin-left:-4px}
 .time{display:flex;align-items:center;gap:4px;padding:4px 5px 4px 11px;font-size:12px}
@@ -324,7 +332,8 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
 .ctl{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;z-index:4;transition:right .32s cubic-bezier(.2,.8,.2,1)}
 .office.lanes-open .ctl{right:calc(clamp(420px,56%,760px) + 12px)}
 .office.lanes-open #loader{left:calc((100% - clamp(420px,56%,760px)) / 2)}
-.ctl button{width:36px;height:36px;border-radius:9px;border:2px solid #34405f;background:#1e2740eb;box-shadow:0 3px 0 #0f1526;font:15px var(--sans);cursor:pointer;color:#eef2ff;padding:0}
+.ctl button{width:36px;height:36px;border-radius:9px;border:2px solid #34405f;background:#1e2740eb;box-shadow:0 3px 0 #0f1526;font:15px var(--sans);cursor:pointer;color:#eef2ff;padding:0;display:grid;place-items:center}
+.ctl button .ic{width:16px;height:16px}
 .ctl button:hover{background:#2a3655}
 .ctl button:active{transform:translateY(2px);box-shadow:none}
 #nogl,.oempty{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:12px 18px;display:none;z-index:3;text-align:center;font-size:13px}
@@ -345,7 +354,7 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
 <header id="top">
   <div>
     <div class="eyebrow" id="eyebrow">AGENT DECK · 值班台</div>
-    <h1>谁在值班 <a class="viewlink" href="/classic" title="原版泳道看板">CLASSIC →</a></h1>
+    <h1>谁在值班 <a class="viewlink" href="/classic" title="原版泳道看板">CLASSIC <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></a></h1>
   </div>
   <section class="stats" id="stats"></section>
   <div class="clockbox">
@@ -357,7 +366,7 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
   </div>
 </header>
 
-<div class="ticker"><div class="lab">◀ FEED</div><div class="track"><div class="run" id="ticker"></div></div></div>
+<div class="ticker"><div class="lab"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M10.25 3.5L5 8l5.25 4.5z"/></svg> FEED</div><div class="track"><div class="run" id="ticker"></div></div></div>
 
 <section class="panel map" id="map" aria-label="任务（一台设备一行）">
   <div class="mapbody" id="mapbody"></div>
@@ -365,10 +374,10 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
 
 <nav class="toolbar" id="toolbar" aria-label="常规">
   <div class="tb-main">
-    <div class="seg theme" id="theme" title="页面主题：自动按服务器时间切换"><button data-theme="auto">◐ 自动</button><button data-theme="light">☀ 白天</button><button data-theme="night">☾ 夜晚</button></div>
+    <div class="seg theme" id="theme" title="页面主题：自动按服务器时间切换"><button data-theme="auto"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" cx="8" cy="8" r="5.5"/><path fill="currentColor" d="M8 2.5a5.5 5.5 0 0 1 0 11z"/></svg>自动</button><button data-theme="light"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle fill="currentColor" cx="8" cy="8" r="2.8"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>白天</button><button data-theme="night"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M10.6 2.9A5.6 5.6 0 1 0 13.4 10.3 4.6 4.6 0 0 1 10.6 2.9z"/></svg>夜晚</button></div>
     <label class="laysel" title="办公室布局版式">版式<select id="lay"></select></label>
   </div>
-  <button class="tb-lanes" id="lanesBtn" aria-controls="drawer" aria-expanded="false">排班 · 泳道图 <small id="lanesn"></small><span class="ar">◂</span></button>
+  <button class="tb-lanes" id="lanesBtn" aria-controls="drawer" aria-expanded="false">排班 · 泳道图 <small id="lanesn"></small><span class="ar"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M10.25 3.5L5 8l5.25 4.5z"/></svg></span></button>
 </nav>
 
 <main class="office" id="office">
@@ -387,11 +396,11 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
   <div class="hud" id="loader"><span id="ltext">正在铺设办公区…</span><div class="bar"><b id="lbar"></b></div><span id="lpct">0%</span></div>
   <div class="hud" id="hint">悬停小人看详情 · 拖动平移 · ＋/－ 或双指缩放 · ←/→ 切换任务</div>
   <div class="ctl">
-    <button id="replay" title="重新铺设">↻</button>
-    <button id="zin" title="放大">＋</button>
-    <button id="zout" title="缩小">－</button>
-    <button id="zfit" title="适配全部">⤢</button>
-    <button id="zfull" title="全屏办公室">⛶</button>
+    <button id="replay" title="重新铺设"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M13 8a5 5 0 1 1-1.46-3.54"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M11.8 1.6v3.1H8.7"/></svg></button>
+    <button id="zin" title="放大"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M8 3v10M3 8h10"/></svg></button>
+    <button id="zout" title="缩小"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 8h10"/></svg></button>
+    <button id="zfit" title="适配全部"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9.5 2.5h4v4M13.5 2.5L9.3 6.7M6.5 13.5h-4v-4M2.5 13.5l4.2-4.2"/></svg></button>
+    <button id="zfull" title="全屏办公室"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg></button>
   </div>
   <div class="hud" id="nogl">当前浏览器不支持 WebGL2，无法显示体素办公室。</div>
   <div class="hud oempty" id="oempty">暂无任务 · 办公室空着</div>
@@ -400,7 +409,7 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
       <h2>排班</h2><span class="note">泳道图 · 进行中优先 · 用时 = 最后活动 − 开始 · 点主 agent 切换办公室</span>
       <span class="sp"></span>
       <div class="seg" id="win"></div>
-      <button class="x" id="drawerX" title="收起（Esc）">✕</button>
+      <button class="x" id="drawerX" title="收起（Esc）"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 4l8 8M12 4l-8 8"/></svg></button>
     </div>
     <div class="chips" id="jobs"></div>
     <div class="lhead"><span>AGENT · JOB · TASK</span><div class="ax" id="axis"></div><span class="w">用时</span></div>
@@ -1624,7 +1633,7 @@ function hideTip(){ tip.style.display = "none" }
 function showTip(p, sx, sy){
   const d = p.d || {}, now = S.data ? S.data.now : Date.now(), row = (k, v) => v ? `<div class="tr">${k}：<b>${h(v)}</b></div>` : "";
   const walking = p.state === "in" ? "（正在走过去）" : p.state === "out" ? "（正在离开）" : "";
-  tip.innerHTML = `<h4><i style="background:${ST_COL[p.status] || "#9aa3ad"}"></i>${p.boss ? "★ " : ""}${h(p.name)} <small>${p.boss ? "主 agent" : h(d.type || "子 agent")} · ${h(ST_ZH[p.status] || p.status)}${walking}</small></h4>`
+  tip.innerHTML = `<h4><i style="background:${ST_COL[p.status] || "#9aa3ad"}"></i>${p.boss ? IC.star : ""}${h(p.name)} <small>${p.boss ? "主 agent" : h(d.type || "子 agent")} · ${h(ST_ZH[p.status] || p.status)}${walking}</small></h4>`
     + row(p.boss ? "任务" : "子任务", p.boss ? p.z.title : d.task) + (p.boss ? "" : row("所属任务", p.z.title))
     + row("位置", p.state === "in" || p.state === "out" ? "" : PLACE_ZH[p.at && p.at.kind] || (p.boss ? "在课长席" : "在工位")) + row("档位", p.z.src) + row("模型", d.model) + row("工具", p.status === "working" && d.tool ? toolName(d.tool) : "")
     + (d.start && d.last ? row("用时", dur(d.last - d.start) + (p.status === "working" ? "" : " · " + dur(now - d.last) + " 前")) : "")
@@ -1708,7 +1717,7 @@ const SRC_COLOR = {app:"var(--app)", cli:"var(--cli)", ds:"var(--ds)", qwen:"var
 const SRC_HEX = {app:"#e08a5f", cli:"#b8b3a8", ds:"#5b9dff", qwen:"#a884ff"};
 const JOB_PALETTE = ["#ff9a3c","#5b9dff","#6fcf8a","#a884ff","#e8c46a","#4fd1c5","#ff7aa8","#9ccc65","#f0a35e","#7aa2ff"];
 const KIND_LABEL = {on:"ON DUTY", finished:"FINISHED", done:"DONE", stopped:"STOPPED", failed:"FAILED"};
-const ST_LABEL = {working:"WORKING", idle:"IDLE", finished:"✓ FINISHED", done:"✓ DONE", stopped:"■ STOPPED", failed:"✕ FAILED"};
+const ST_LABEL = {working:"WORKING", idle:"IDLE", finished:IC.check+" FINISHED", done:IC.check+" DONE", stopped:IC.stop+" STOPPED", failed:IC.close+" FAILED"};
 /* 齿轮：外沿正好贴满 16×16 视框，徽标里左/上/下与文字间距都等于 3px */
 const GEAR=`<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="2.553 2.553"/><circle cx="8" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="3.2"/></svg>`;
 const VERB = {on:"上岗", finished:"完成", done:"收工", stopped:"中止", failed:"失败"};
@@ -1854,7 +1863,7 @@ function renderAxis(){
   const step=[5,10,15,30,60,120,180,240,360].find(m=>mins/m<=maxTicks)||720;
   const first=Math.ceil(a/(step*60e3))*step*60e3; let out="";
   for(let t=first;t<b-(b-a)*0.16;t+=step*60e3) out+=`<span style="left:${pct(t)}%">${hm(t)}</span>`;
-  out+=`<span class="now" style="left:auto;right:0;transform:none">NOW ▾</span>`;
+  out+=`<span class="now" style="left:auto;right:0;transform:none">NOW ${IC.caretD}</span>`;
   patch($("axis"),out);
   patch($("win"),[1,3,6,12].map(w=>`<button class="${S.win===w?"on":""}" data-win="${w}">${w}h</button>`).join(""));
 }
@@ -1919,8 +1928,8 @@ function leadBlock(l, live){
   kids.forEach((a,i)=>{ s+=childRow(a, i<kids.length-1) });
   const rest=l.agents.length-kids.length;
   if(rest>0){const fin=l.agents.slice(kids.length).filter(a=>a.status==="finished").length;
-    s+=`<div class="more">+ ${rest} more · ${fin} 完成 · ${rest-fin} 其他 · <button data-all="${h(l.id)}">▾ 全部展开</button></div>`}
-  else if(all && l.agents.length>LIMIT) s+=`<div class="more"><button data-all="${h(l.id)}">▴ 收起</button></div>`;
+    s+=`<div class="more">+ ${rest} more · ${fin} 完成 · ${rest-fin} 其他 · <button data-all="${h(l.id)}">${IC.caretD} 全部展开</button></div>`}
+  else if(all && l.agents.length>LIMIT) s+=`<div class="more"><button data-all="${h(l.id)}">${IC.caretU} 收起</button></div>`;
   const hot = l.status==="working" || l.agents.some(a=>a.status==="working");
   return `<div class="blk ${hot?"w":""} ${l.src+"|"+l.id===API.sel?"sel":""}" style="--sc:${sHex(l.src)}" data-key="l:${h(l.src)}:${h(l.id)}">${s}</div>`;
 }
@@ -2134,9 +2143,9 @@ function renderTitle(){
   const d = APP.data, l = d && (d.leads || []).find(x => leadKey(x) === APP.sel), many = allTasks().length > 1;
   if (!l){ Deck.patch($("otitle"), `<i style="background:#9aa3ad"></i><b>空办公室</b><span>暂无任务</span>`); return }
   const busy = (l.status === "working" ? 1 : 0) + l.agents.filter(a => a.status === "working").length, title = l.title || l.project || l.name;
-  Deck.patch($("otitle"), (many ? `<button data-nav="-1" title="上一个任务（←）">◀</button>` : "")
+  Deck.patch($("otitle"), (many ? `<button data-nav="-1" title="上一个任务（←）">${IC.caretL}</button>` : "")
     + `<i style="background:${ST_COL[l.status] || "#9aa3ad"}"></i><b title="${h(title)}">${h(title)}</b><span class="who">主管 ${h(l.name)} · ${h(devOf(d, l.src))}</span>`
-    + `<span>子 ${l.agents.length}${busy ? ` · <em>${busy} 在忙</em>` : ""}</span>` + (many ? `<button data-nav="1" title="下一个任务（→）">▶</button>` : ""));
+    + `<span>子 ${l.agents.length}${busy ? ` · <em>${busy} 在忙</em>` : ""}</span>` + (many ? `<button data-nav="1" title="下一个任务（→）">${IC.caretR}</button>` : ""));
 }
 
 /* ---------------- 排班抽屉 / 全屏 ---------------- */
@@ -2156,7 +2165,7 @@ function setDrawer(on){
 }
 function setFull(on){
   APP.full = on; document.body.classList.toggle("full", on);
-  $("zfull").textContent = on ? "✕" : "⛶"; $("zfull").title = on ? "退出全屏（Esc）" : "全屏办公室";
+  $("zfull").innerHTML = on ? IC.close : IC.full; $("zfull").title = on ? "退出全屏（Esc）" : "全屏办公室";
 }
 
 /* ---------------- 轮询：一次拉取，分发给看板（顶部 / 排班 / 日志）、地图和办公室 ---------------- */
