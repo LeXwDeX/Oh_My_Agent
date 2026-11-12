@@ -514,7 +514,7 @@ function OB(cx, cy, dir, t){
    ============================================================ */
 function buildWorld(offices, opt){
   OUT = []; EM = 0; HL = 0; LY = LAYOUTS[S.layout] || LAYOUTS.jp;
-  const W0 = {labels: [], zoneLabels: [], seats: new Map(), doors: [], maxT: 0, MW: 0, MD: 0, entry: [], spots: [], spotMap: new Map()};
+  const W0 = {labels: [], zoneLabels: [], seats: new Map(), doors: [], maxT: 0, MW: 0, MD: 0, entry: [], spots: [], spotMap: new Map(), geo: []};
   let X0 = 0;
   offices.forEach((off, oi) => { const r = buildOffice(off, oi, X0, opt, W0); X0 += r.W + 5; W0.MD = Math.max(W0.MD, r.D) });
   W0.MW = Math.max(1, X0 - 5);
@@ -531,6 +531,7 @@ function buildOffice(off, oi, X0, opt, W0){
   const D = Math.ceil(Math.max(15.5, BD1 + MAIN + BD2)), mainY = BD1 + MAIN / 2, ty2 = BD1 + MAIN;
   const corr = X0 + CORE + .8, HUB = [corr, mainY];                          // 所有路线都经过这个枢纽
   const W = Math.ceil(Math.max(TX0 + (nt + 1) * TW, TX0 + nb * TW + 13, 20) + 1);          // 上排末尾多留一个共享工位岛
+  W0.geo[oi] = {BD1, D, W};                                                  // 增量重建时用来识别整体平移（见 popNew）
   // 核心筒分段（y）
   const PAN = 3.6, WC1 = PAN + 1.0, WC2 = WC1 + 1.0, EVE = WC2 + 4.4, STE = EVE + 1.5, SVE = D;
   const e1 = WC2 + 1.2, e2 = WC2 + 3.1, entY = e1 + .1;                      // 两部电梯；门禁入口与电梯 1 对齐
@@ -1041,6 +1042,11 @@ function buildOffice(off, oi, X0, opt, W0){
     add(x + 2.1, y + 1.7, .3, .2, .2, .07, "#e58f65", t + .12); for (let s = 0; s < 4; s++) add(x + 2.12 + (s % 2) * .08, y + 1.72 + Math.floor(s / 2) * .08, .37, .06, .06, .03, ["#ffd166", "#ff7aa8", "#4fbf7a", "#ff9f43"][s], t + .13);
     add(x + 2.4, y + 1.95, .3, .14, .08, .03, C.dark, t + .13);
     if (w >= 6){ for (const [a, b, c] of [[w - 1.8, 2.6, "#ff7aa8"], [w - 1.0, 3.3, "#ffd166"]]){ add(x + a, y + b, 0, .6, .6, .3, c, t + .1); add(x + a + .08, y + b + .08, .3, .44, .44, .12, tint(c, .2), t + .12); spot("lounge", [x + a + .3, y + b + .3], 2, "seat", [[x + a - .5, mainY], [x + a - .5, y + b + .3]], t + .5) } }
+    // 座位坐满后，完成的人站在空地上歇着：沙发右侧两排（避开懒人沙发和街机）+ 茶几下方一排
+    const standAt = (xx, yy, dir, appr) => { if (xx > .8 && xx < w - .6 && yy > .9 && yy < d - .5) spot("lounge", [x + xx, y + yy], dir, "stand", appr, t + .5) };
+    for (let xx = 3.5; xx <= w - 1.3; xx += .8) standAt(xx, 1.7, 2, [[x + xx, mainY]]);
+    for (let xx = 3.5; xx <= w - (w >= 6 ? 2.1 : 1.3); xx += .8) standAt(xx, 2.6, 2, [[x + xx, mainY]]);
+    for (const xx of [1.7, 2.5]) standAt(xx, 3.2, 3, [[x + 3.3, mainY], [x + 3.3, y + 3.2]]);
     add(x + .25, y + d - 1.6, 0, .4, 1.2, 1.1, C.wood2, t + .08);
     for (const hh of [.05, .4, .75]){ let yy = y + d - 1.55; while (yy < y + d - .5){ const ww = .07 + RND() * .08; add(x + .62, yy, hh, .04, ww, .25 + RND() * .07, C.books[Math.floor(RND() * C.books.length)], t + .12); yy += ww + .01 } }
     add(x + w - 1.0, y + .3, 0, .7, .6, 1.5, "#3b4a6b", t + .1); add(x + w - .95, y + .9, .85, .6, .02, .45, "#1d2b44", t + .12); add(x + w - .9, y + .91, .9, .5, .01, .35, "#6fe3ff", t + .13, 1, 1);
@@ -1383,6 +1389,8 @@ function skyPos(s){
    数据 → 办公区；人员管理（入座 / 从电梯走进来 / 走回电梯离开）
    ============================================================ */
 const MAX_SUB = 36;                                            // 办公室最多上座的子 agent（3 个岛 × 12）
+const COOL_MS = 60 * 60e3;                                     // 结束（完成 / 失败 / 中止）超过 1 小时的子 agent 下班：从工位或休息区走回电梯离开
+const onDuty = (a, now) => a.status === "working" || a.status === "idle" || now - a.last < COOL_MS;
 const S = {world: null, start: performance.now(), autoFit: true, skew: 0, data: null, sig: "", slots: new Map(),
            hourMode: "auto", themeMode: "auto", hourShown: null, people: new Map(), labelEls: [], zoneEls: [], lastFrame: 0, raf: 0,
            animEnd: 0, hover: null, tween: null, down: null, layout: "jp"};
@@ -1398,9 +1406,10 @@ function officesFrom(d){
   const l = selLead(d), srcLabel = new Map((d.sources || []).map(s => [s.id, String(s.label).split(" · ")[0]]));
   const dev = l ? devOf(d, l.src) : (d.host || "本机"), hex = DEV_HEX[hashStr(dev) % DEV_HEX.length];
   if (!l) return [{id: dev, label: dev, hex, zones: []}];
-  // 整个团队都上座（最多 3 个岛 36 人）：在忙的优先，其余按最近活动排；已完成的坐在工位上亮“✓”，最近完成的几个去休息区
+  // 在岗的团队都上座（最多 3 个岛 36 人）：在忙的优先，其余按最近活动排；新人需要时自动加开工位；已完成的去休息区（坐满就站着），结束超过 1 小时的下班离开
   const key = leadKey(l);
-  const subs = l.agents.slice()
+  const team = l.agents.filter(a => onDuty(a, d.now));
+  const subs = team.slice()
     .sort((a, b) => (a.status !== "working") - (b.status !== "working") || b.last - a.last).slice(0, MAX_SUB);
   // 槽位：已经坐着的保持原位，新人填最小空位；有空洞导致多占一列时压紧
   let sm = S.slots.get(key); if (!sm){ sm = new Map(); S.slots.set(key, sm) }
@@ -1414,7 +1423,7 @@ function officesFrom(d){
   const parts = [];
   for (const a of subs){ const s = sm.get(a.id), p = Math.floor(s / (MAXP * 2)); (parts[p] = parts[p] || []).push({id: a.id, slot: s % (MAXP * 2), status: a.status, a}) }
   const groups = Array.from({length: Math.max(1, parts.length)}, (_, i) => parts[i] || []);
-  const hidden = l.agents.length - subs.length;                 // 超出 36 人的部分只在名牌上计数
+  const hidden = team.length - subs.length;                    // 超出 36 人的部分只在名牌上计数（已下班的不算）
   const base = {title: l.title || l.project || l.name, name: l.name, face: l.face, status: l.status, src: srcLabel.get(l.src) || "", hex: srcHex(l.src), lead: l};
   return [{id: dev, label: dev, hex, zones: groups.map((ps, i) => ({...base, key: i ? key + "#" + i : key, part: i,
     pairs: clamp(Math.floor(Math.max(-1, ...ps.map(x => x.slot)) / 2) + 1, 1, MAXP), subs: ps, hidden: i ? 0 : hidden}))}];
@@ -1429,7 +1438,8 @@ function staticSig(offices){
 }
 
 function build(offices, animate){
-  const w = buildWorld(offices, {animate});
+  const prev = S.world, w = buildWorld(offices, {animate});
+  if (!animate && prev) popNew(prev, w);
   S.world = w;
   gl.bindBuffer(gl.ARRAY_BUFFER, staticBuf); gl.bufferData(gl.ARRAY_BUFFER, w.data, gl.STATIC_DRAW);
   staticCount = w.count;
@@ -1441,6 +1451,27 @@ function build(offices, animate){
     lab.appendChild(e); S.zoneEls.push([e, Z]);
   }
   if (S.autoFit) fit();
+}
+
+/* 增量重建时，找出上一版没有的体素，把它们的出现时间设为“现在”，让新工位凭空长出来。
+   团队变大时岛会加长、办公室加深：下排和休息区整体下移 ΔD 或 ΔBD1，右侧设施右移 ΔW——这些只是挪位置，不算新的；
+   万一仍有大半是新的（换了结构），就直接显示，避免整间办公室重播动画 */
+function popNew(prev, w){
+  const old = prev.data, cur = w.data, a = prev.geo[0], b = w.geo[0];
+  const key = (arr, i, dx, dy) => { let k = Math.round((arr[i] - dx) * 100) + "," + Math.round((arr[i + 1] - dy) * 100); for (let j = 2; j < 6; j++) k += "," + Math.round(arr[i + j] * 100); return k };
+  const seen = new Set(); for (let i = 0; i < old.length; i += STRIDE) seen.add(key(old, i, 0, 0));
+  const dys = [0], dxs = [0];
+  if (a && b && prev.geo.length === w.geo.length){ for (const v of [b.D - a.D, b.BD1 - a.BD1]) if (v && !dys.includes(v)) dys.push(v); if (b.W !== a.W) dxs.push(b.W - a.W) }
+  const fresh = [];
+  for (let i = 0; i < cur.length; i += STRIDE){
+    let hit = false;
+    for (const dx of dxs){ for (const dy of dys) if (seen.has(key(cur, i, dx, dy))){ hit = true; break } if (hit) break }
+    if (!hit && Math.max(cur[i + 3], cur[i + 4]) <= 2.5) fresh.push(i);   // 墙、地板这类长条随房间伸长，直接显示，不重播
+  }
+  if (!fresh.length || fresh.length > cur.length / STRIDE * .5) return 0;
+  const now = (performance.now() - S.start) / 1000;
+  for (const i of fresh) cur[i + 9] = now + .1 + Math.min(.6, cur[i + 2] * .25);   // 由下往上：桌腿、桌面、屏幕依次出现
+  return fresh.length;
 }
 
 // 去处规则：完成的子 agent → 休息区；讨论类（advisor / Plan / reviewer…）工作时 → 会议室；运维类（ops / deploy / helper…）工作时 → 机房；其余 → 自己的工位
