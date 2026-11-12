@@ -394,7 +394,7 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
     </div>
   </div>
   <div class="hud" id="loader"><span id="ltext">正在铺设办公区…</span><div class="bar"><b id="lbar"></b></div><span id="lpct">0%</span></div>
-  <div class="hud" id="hint">悬停小人看详情 · 拖动平移 · ＋/－ 或双指缩放 · ←/→ 切换任务</div>
+  <div class="hud" id="hint">悬停小人看详情 · 拖动平移 · ＋/－ 或双指缩放 · ←/→ 切换项目</div>
   <div class="ctl">
     <button id="replay" title="重新铺设"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M13 8a5 5 0 1 1-1.46-3.54"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M11.8 1.6v3.1H8.7"/></svg></button>
     <button id="zin" title="放大"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M8 3v10M3 8h10"/></svg></button>
@@ -429,7 +429,7 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
 "use strict";
 /* ============================================================
    Agent Office Voxel —— 平铺开放办公区（手写 WebGL2 实例化体素，零依赖，全部程序化生成）
-   一个任务（主会话）= 一间办公室：主管坐课长席，子 agent 在岛上对坐（超过 12 人再开第 2、3 个岛）；
+   一个项目 = 一间办公室：项目里每个会话（主 agent）一个岛，主管坐课长席，子 agent 在岛上对坐（人多再开续岛，全办公室最多 6 个岛）；
    页面上方的任务栏（一台设备一行）负责切换办公室。
    单位：1 = 大体素（一格地板）；微体素 M = 1/8。
    每个体素 13 个 float：位置(最小角) 尺寸 颜色 出现时间 t0 自发光 em 模式 mode 高亮 hl
@@ -1388,7 +1388,6 @@ function skyPos(s){
 /* ============================================================
    数据 → 办公区；人员管理（入座 / 从电梯走进来 / 走回电梯离开）
    ============================================================ */
-const MAX_SUB = 36;                                            // 办公室最多上座的子 agent（3 个岛 × 12）
 const COOL_MS = 60 * 60e3;                                     // 结束（完成 / 失败 / 中止）超过 1 小时的子 agent 下班：从工位或休息区走回电梯离开
 const onDuty = (a, now) => a.status === "working" || a.status === "idle" || now - a.last < COOL_MS;
 const S = {world: null, start: performance.now(), autoFit: true, skew: 0, data: null, sig: "", slots: new Map(),
@@ -1400,33 +1399,43 @@ try { const q = new URLSearchParams(location.search).get("layout"), m = localSto
 /* 任务键：同一 id 可能出现在不同档位 / 设备上 */
 function leadKey(l){ return l.src + "|" + l.id }
 function devOf(d, id){ return String(id || "").split("@")[1] || d.host || "本机" }
-/* 当前选中任务 → 一间办公室；页面层会替换 selLead（按任务栏的选择） */
-let selLead = d => (d.leads || []).find(l => l.status === "working") || (d.leads || [])[0] || null;
+/* 当前选中的项目 → 一间办公室；项目里的每个会话（主 agent）各占一个岛、坐自己的课长席。页面层会替换 selLeads（按任务栏的选择） */
+let selLeads = d => { const ls = d.leads || [], l = ls.find(x => x.status === "working") || ls[0]; return l ? [l] : [] };
+const MAX_ISLANDS = 6;                                         // 一间办公室最多 6 个岛（上下两排各 3）
 function officesFrom(d){
-  const l = selLead(d), srcLabel = new Map((d.sources || []).map(s => [s.id, String(s.label).split(" · ")[0]]));
-  const dev = l ? devOf(d, l.src) : (d.host || "本机"), hex = DEV_HEX[hashStr(dev) % DEV_HEX.length];
-  if (!l) return [{id: dev, label: dev, hex, zones: []}];
-  // 在岗的团队都上座（最多 3 个岛 36 人）：在忙的优先，其余按最近活动排；新人需要时自动加开工位；已完成的去休息区（坐满就站着），结束超过 1 小时的下班离开
+  const ls = selLeads(d), srcLabel = new Map((d.sources || []).map(s => [s.id, String(s.label).split(" · ")[0]]));
+  const dev = ls.length ? devOf(d, ls[0].src) : (d.host || "本机"), hex = DEV_HEX[hashStr(dev) % DEV_HEX.length];
+  if (!ls.length) return [{id: dev, label: dev, hex, zones: []}];
+  // 在岗的团队都上座：在忙的优先，其余按最近活动排；新人需要时自动加开工位；已完成的去休息区（坐满就站着），结束超过 1 小时的下班离开
+  const teams = ls.map(l => ({l, team: l.agents.filter(a => onDuty(a, d.now))}));
+  // 岛的分配：每个会话先给 1 个岛（最多 6 个会话上座），剩余名额按顺序补给人多的会话（单个会话最多 3 个岛）
+  const isl = teams.map((T, i) => i < MAX_ISLANDS ? 1 : 0);
+  let left = MAX_ISLANDS - isl.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < teams.length && left > 0; i++){ if (!isl[i]) continue; const want = Math.min(3, Math.ceil(teams[i].team.length / (MAXP * 2))); const add = Math.min(left, Math.max(0, want - 1)); isl[i] += add; left -= add }
+  const zones = [];
+  teams.forEach(({l, team}, li) => { if (isl[li]) zones.push(...leadZones(l, team, isl[li] * MAXP * 2, srcLabel)) });
+  return [{id: dev, label: dev, hex, zones}];
+}
+function leadZones(l, team, cap, srcLabel){
   const key = leadKey(l);
-  const team = l.agents.filter(a => onDuty(a, d.now));
   const subs = team.slice()
-    .sort((a, b) => (a.status !== "working") - (b.status !== "working") || b.last - a.last).slice(0, MAX_SUB);
-  // 槽位：已经坐着的保持原位，新人填最小空位；有空洞导致多占一列时压紧
+    .sort((a, b) => (a.status !== "working") - (b.status !== "working") || b.last - a.last).slice(0, cap);
+  // 槽位：已经坐着的保持原位，新人填最小空位；有空洞导致多占一列、或超出本会话的岛数时压紧
   let sm = S.slots.get(key); if (!sm){ sm = new Map(); S.slots.set(key, sm) }
   const ids = new Set(subs.map(a => a.id));
   for (const k of [...sm.keys()]) if (!ids.has(k)) sm.delete(k);
   const used = new Set(sm.values());
   for (const a of subs) if (!sm.has(a.id)){ let s = 0; while (used.has(s)) s++; sm.set(a.id, s); used.add(s) }
-  const need = Math.max(1, Math.ceil(subs.length / 2));
-  if (Math.floor(Math.max(-1, ...sm.values()) / 2) + 1 > need) [...sm.entries()].sort((a, b) => a[1] - b[1]).forEach(([k], i) => sm.set(k, i));
-  // 每岛 12 个座位；超过就开第 2、3 个岛（续岛没有课长席）
+  const need = Math.max(1, Math.ceil(subs.length / 2)), top = Math.max(-1, ...sm.values());
+  if (Math.floor(top / 2) + 1 > need || top >= cap) [...sm.entries()].sort((a, b) => a[1] - b[1]).forEach(([k], i) => sm.set(k, i));
+  // 每岛 12 个座位；超过就开续岛（续岛没有课长席）
   const parts = [];
   for (const a of subs){ const s = sm.get(a.id), p = Math.floor(s / (MAXP * 2)); (parts[p] = parts[p] || []).push({id: a.id, slot: s % (MAXP * 2), status: a.status, a}) }
   const groups = Array.from({length: Math.max(1, parts.length)}, (_, i) => parts[i] || []);
-  const hidden = team.length - subs.length;                    // 超出 36 人的部分只在名牌上计数（已下班的不算）
+  const hidden = team.length - subs.length;                    // 坐不下的只在名牌上计数（已下班的不算）
   const base = {title: l.title || l.project || l.name, name: l.name, face: l.face, status: l.status, src: srcLabel.get(l.src) || "", hex: srcHex(l.src), lead: l};
-  return [{id: dev, label: dev, hex, zones: groups.map((ps, i) => ({...base, key: i ? key + "#" + i : key, part: i,
-    pairs: clamp(Math.floor(Math.max(-1, ...ps.map(x => x.slot)) / 2) + 1, 1, MAXP), subs: ps, hidden: i ? 0 : hidden}))}];
+  return groups.map((ps, i) => ({...base, key: i ? key + "#" + i : key, part: i,
+    pairs: clamp(Math.floor(Math.max(-1, ...ps.map(x => x.slot)) / 2) + 1, 1, MAXP), subs: ps, hidden: i ? 0 : hidden}));
 }
 const DEMO = (() => { const now = Date.now(), ag = (id, name, type, status, tool) => ({id, name, type, status, tool, task: "示例子任务", start: now - 9e5, last: now, reply: "这是演示数据。"});
   return {now, host: "Demo", hours: 12, events: [], sources: [{id: "app", label: "Claude App", sessions: 2, online: 2, working: 1, agents: 5, dir: "演示数据"}], leads: [
@@ -1638,7 +1647,7 @@ function sceneUpdate(d, replay){
   for (const [e, Z] of S.zoneEls){ if (Z.amen) continue; const z = zs.find(x => x.key === Z.Z.key); if (z){ Z.Z = z; e.innerHTML = zoneLabelHTML(Z) } }
   $("oempty").style.display = zs.length ? "none" : "block";
 }
-/* 重新铺设：首次加载、切换任务、换版式、点 ↻ */
+/* 重新铺设：首次加载、切换项目、换版式、点 ↻ */
 function sceneReplay(){
   if (!S.data) return;
   const offices = officesFrom(S.data);
@@ -1962,7 +1971,7 @@ function leadBlock(l, live){
     s+=`<div class="more">+ ${rest} more · ${fin} 完成 · ${rest-fin} 其他 · <button data-all="${h(l.id)}">${IC.caretD} 全部展开</button></div>`}
   else if(all && l.agents.length>LIMIT) s+=`<div class="more"><button data-all="${h(l.id)}">${IC.caretU} 收起</button></div>`;
   const hot = l.status==="working" || l.agents.some(a=>a.status==="working");
-  return `<div class="blk ${hot?"w":""} ${l.src+"|"+l.id===API.sel?"sel":""}" style="--sc:${sHex(l.src)}" data-key="l:${h(l.src)}:${h(l.id)}">${s}</div>`;
+  return `<div class="blk ${hot?"w":""} ${API.isSel(l.src,l.id)?"sel":""}" style="--sc:${sHex(l.src)}" data-key="l:${h(l.src)}:${h(l.id)}">${s}</div>`;
 }
 
 function renderLanes(){
@@ -1986,7 +1995,7 @@ function evLine(e){
 function renderLog(){
   const ev=S.data.events.filter(e=>!S.off.has(e.src) && (!S.job||e.job===S.job));
   $("logn").textContent=`${ev.length} 条 · 最新在前`;
-  patch($("log"),ev.slice(0,250).map(e=>`<div class="ev ${now()-e.at<120e3?"hl":""} ${e.src+"|"+e.lid===API.sel?"cur":""}" data-key="${h(e.src+"|"+e.lid+"|"+(e.aid||"")+"|"+e.kind+"|"+e.at)}"><span class="t">${hm(e.at,true)}</span><span class="k ${KIND_LABEL[e.kind]?e.kind:""}">${h(KIND_LABEL[e.kind]||e.kind)}</span><span class="w" title="${h(e.task||"")}">${evLine(e)}</span></div>`).join("")
+  patch($("log"),ev.slice(0,250).map(e=>`<div class="ev ${now()-e.at<120e3?"hl":""} ${API.isSel(e.src,e.lid)?"cur":""}" data-key="${h(e.src+"|"+e.lid+"|"+(e.aid||"")+"|"+e.kind+"|"+e.at)}"><span class="t">${hm(e.at,true)}</span><span class="k ${KIND_LABEL[e.kind]?e.kind:""}">${h(KIND_LABEL[e.kind]||e.kind)}</span><span class="w" title="${h(e.task||"")}">${evLine(e)}</span></div>`).join("")
     || `<div class="empty">暂无事件</div>`);
   const tk=ev.slice(0,14).map(e=>`<span class="tk"><span class="t">${hm(e.at,true)}</span><b style="color:${e.job==="lead"?sHex(e.src):jobColor(e.job)}">${h(e.who)}</b> ${h(VERB[e.kind]||e.kind)} · <span class="dim">${h(e.job==="lead"?"会话":e.job)}</span></span>`).join("");
   // 鼠标悬停时冻结跑马灯内容；只有事件真的变了才更新，避免停住时内容跳动
@@ -2046,7 +2055,7 @@ function tickClock(){
 }
 
 /* 页面层统一轮询后把数据交进来；d 为空表示这次没拉到（显示 OFFLINE，沿用旧数据） */
-const API={sel:null,onRender:null,onSelect:null,S,patch,render:()=>render(),ingest};
+const API={sel:null,onRender:null,onSelect:null,isSel:(src,id)=>src+"|"+id===API.sel,S,patch,render:()=>render(),ingest};
 function ingest(d, ok){
   S.ok=ok;
   if(d){ S.data=d; S.skew=d.now-Date.now();
@@ -2103,25 +2112,39 @@ function applyTheme(){
   for (const b of $("theme").querySelectorAll("button")) b.classList.toggle("on", b.dataset.theme === APP.theme);
 }
 
-/* ---------------- 任务：按设备分组（任务栏顺序 = ←/→ 切换顺序） ---------------- */
+/* ---------------- 项目：按设备分组，同一设备上 project 相同的会话归为一个项目（任务栏顺序 = ←/→ 切换顺序） ---------------- */
+const projName = l => l.project || l.title || l.name || "未命名";
+const projKey = (d, l) => devOf(d, l.src) + "|" + projName(l);
+const byLive = (a, b) => isLive(b) - isLive(a) || (isLive(a) ? a.start - b.start : b.last - a.last);
+function projFrom(key, leads){
+  const live = leads.filter(isLive), st = leads.some(l => l.status === "working") ? "working" : live.length ? "idle" : leads[0].status;
+  return {key, name: projName(leads[0]), leads, status: st, src: leads[0].src,
+          start: Math.min(...(live.length ? live : leads).map(l => l.start)), last: Math.max(...leads.map(l => l.last))};
+}
 function mapGroups(d){
-  const now = d.now, off = Deck.S.off, groups = new Map(), at = n => { if (!groups.has(n)) groups.set(n, []); return groups.get(n) };
+  const now = d.now, off = Deck.S.off, groups = new Map(), at = n => { if (!groups.has(n)) groups.set(n, new Map()); return groups.get(n) };
+  const put = l => { const g = at(devOf(d, l.src)), k = projKey(d, l); if (!g.has(k)) g.set(k, []); g.get(k).push(l) };
   for (const x of d.devices || []) at(x.name);
+  let selSeen = false;
   for (const l of d.leads || []){
-    if (off.has(l.src)) continue;
-    if (isLive(l) || now - l.last < MAP_KEEP || leadKey(l) === APP.sel) at(devOf(d, l.src)).push(l);
+    if (off.has(l.src) || !(isLive(l) || now - l.last < MAP_KEEP)) continue;
+    put(l); if (projKey(d, l) === APP.sel) selSeen = true;
   }
+  // 选中的项目已经全部结束超过 30 分钟：只把它最近的一个会话留在任务栏上，不把更早的老会话都搬回来
+  if (APP.sel && !selSeen){ const l = (d.leads || []).filter(x => !off.has(x.src) && projKey(d, x) === APP.sel).sort((a, b) => b.last - a.last)[0]; if (l) put(l) }
   if (!groups.size) at(d.host || "本机");
-  return [...groups].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0).map(([dev, ls]) => ({dev, hex: DEV_HEX[hashStr(dev) % DEV_HEX.length],
-    tasks: ls.sort((a, b) => isLive(b) - isLive(a) || (isLive(a) ? a.start - b.start : b.last - a.last))}));
+  return [...groups].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0).map(([dev, pm]) => ({dev, hex: DEV_HEX[hashStr(dev) % DEV_HEX.length],
+    tasks: [...pm].map(([k, ls]) => projFrom(k, ls.sort(byLive))).sort(byLive)}));
 }
 const allTasks = () => APP.data ? mapGroups(APP.data).flatMap(g => g.tasks) : [];
+const selProject = () => allTasks().find(p => p.key === APP.sel) || null;
+const sumBusy = ls => ls.filter(isLive).reduce((n, l) => n + (l.status === "working" ? 1 : 0) + l.agents.filter(a => a.status === "working").length, 0);
 /* 选中的任务不在了（超出时间窗 / 被档位筛掉）就换一个：优先在忙的，其次在线的 */
 function pickSel(){
   const tasks = allTasks();
-  if (APP.sel && tasks.some(l => leadKey(l) === APP.sel)) return false;
-  const l = tasks.find(x => x.status === "working") || tasks.find(isLive) || tasks[0] || null;
-  const k = l ? leadKey(l) : null, changed = k !== APP.sel;
+  if (APP.sel && tasks.some(p => p.key === APP.sel)) return false;
+  const p = tasks.find(x => x.status === "working") || tasks.find(isLive) || tasks[0] || null;
+  const k = p ? p.key : null, changed = k !== APP.sel;
   APP.sel = k; Deck.sel = k;
   return changed;
 }
@@ -2147,36 +2170,36 @@ function revealLane(el, center){
 }
 function step(dir){
   const ts = allTasks(); if (ts.length < 2) return;
-  const i = ts.findIndex(l => leadKey(l) === APP.sel);
-  select(leadKey(ts[((i < 0 ? 0 : i + dir) + ts.length) % ts.length]));
+  const i = ts.findIndex(p => p.key === APP.sel);
+  select(ts[((i < 0 ? 0 : i + dir) + ts.length) % ts.length].key);
 }
 
-/* ---------------- 任务栏：一台设备一行，每个任务一个标签 ---------------- */
-function tabHTML(l, srcLabel){
-  const now = APP.data.now, k = leadKey(l), live = isLive(l), sel = k === APP.sel, title = l.title || l.project || l.name;
-  const busy = (l.status === "working" ? 1 : 0) + l.agents.filter(a => a.status === "working").length;
-  const tm = live ? `${busy ? `<em>${busy} 忙</em> · ` : ""}子 ${l.agents.length}` : `已结束 · ${dur(now - l.last)} 前`;
-  return `<button class="tab ${sel ? "sel" : ""} ${live ? "" : "off"} ${l.status === "working" ? "working" : ""}" data-task="${h(k)}" data-key="t:${h(k)}" role="tab" aria-selected="${sel}"`
-    + ` title="${h(title)} · 主管 ${h(l.name)}${srcLabel.get(l.src) ? " · " + h(srcLabel.get(l.src)) : ""}"><i style="background:${ST_VAR[l.status] || "var(--stop)"}"></i><span class="tt">${h(title)}</span><span class="tm">${tm}</span></button>`;
+/* ---------------- 任务栏：一台设备一行，每个项目一个标签 ---------------- */
+function tabHTML(p, srcLabel){
+  const now = APP.data.now, live = isLive(p), sel = p.key === APP.sel, busy = sumBusy(p.leads), subs = p.leads.reduce((n, l) => n + l.agents.length, 0);
+  const tm = live ? `${busy ? `<em>${busy} 忙</em> · ` : ""}${p.leads.length > 1 ? `会话 ${p.leads.length} · ` : ""}子 ${subs}` : `已结束 · ${dur(now - p.last)} 前`;
+  const tip = [p.name, ...p.leads.map(l => `· ${l.title || l.name}（主管 ${l.name}${srcLabel.get(l.src) ? " · " + srcLabel.get(l.src) : ""}）`)].join("\n");
+  return `<button class="tab ${sel ? "sel" : ""} ${live ? "" : "off"} ${p.status === "working" ? "working" : ""}" data-task="${h(p.key)}" data-key="t:${h(p.key)}" role="tab" aria-selected="${sel}"`
+    + ` title="${h(tip)}"><i style="background:${ST_VAR[p.status] || "var(--stop)"}"></i><span class="tt">${h(p.name)}</span><span class="tm">${tm}</span></button>`;
 }
 function renderMap(){
   const d = APP.data; if (!d) return;
   const groups = mapGroups(d), srcLabel = new Map((d.sources || []).map(s => [s.id, String(s.label).split(" · ")[0]]));
-  const busyOf = ls => ls.filter(isLive).reduce((n, l) => n + (l.status === "working" ? 1 : 0) + l.agents.filter(a => a.status === "working").length, 0);
-  Deck.patch($("mapbody"), groups.map(g => { const b = busyOf(g.tasks);
-    return `<div class="drow" data-key="d:${h(g.dev)}"><div class="dname" title="${h(g.dev)}"><i style="background:${g.hex}"></i><b>${h(g.dev)}</b><small>${g.tasks.length} 任务${b ? ` · <em>${b} 忙</em>` : ""}</small></div>`
-      + `<div class="dtabs" role="tablist">${g.tasks.map(l => tabHTML(l, srcLabel)).join("") || `<span class="dempty">暂无任务</span>`}</div></div>` }).join(""));
+  Deck.patch($("mapbody"), groups.map(g => { const b = sumBusy(g.tasks.flatMap(p => p.leads));
+    return `<div class="drow" data-key="d:${h(g.dev)}"><div class="dname" title="${h(g.dev)}"><i style="background:${g.hex}"></i><b>${h(g.dev)}</b><small>${g.tasks.length} 项目${b ? ` · <em>${b} 忙</em>` : ""}</small></div>`
+      + `<div class="dtabs" role="tablist">${g.tasks.map(l => tabHTML(l, srcLabel)).join("") || `<span class="dempty">暂无项目</span>`}</div></div>` }).join(""));
   const lv = (d.leads || []).filter(l => !Deck.S.off.has(l.src) && isLive(l));
   $("lanesn").textContent = `${lv.length} 会话 · ${lv.reduce((n, l) => n + l.agents.filter(a => a.status === "working").length, 0)} 在岗`;
 }
-/* 办公室左上角：当前任务名牌 + 上一个 / 下一个 */
+/* 办公室左上角：当前项目名牌 + 上一个 / 下一个 */
 function renderTitle(){
-  const d = APP.data, l = d && (d.leads || []).find(x => leadKey(x) === APP.sel), many = allTasks().length > 1;
-  if (!l){ Deck.patch($("otitle"), `<i style="background:#9aa3ad"></i><b>空办公室</b><span>暂无任务</span>`); return }
-  const busy = (l.status === "working" ? 1 : 0) + l.agents.filter(a => a.status === "working").length, title = l.title || l.project || l.name;
-  Deck.patch($("otitle"), (many ? `<button data-nav="-1" title="上一个任务（←）">${IC.caretL}</button>` : "")
-    + `<i style="background:${ST_COL[l.status] || "#9aa3ad"}"></i><b title="${h(title)}">${h(title)}</b><span class="who">主管 ${h(l.name)} · ${h(devOf(d, l.src))}</span>`
-    + `<span>子 ${l.agents.length}${busy ? ` · <em>${busy} 在忙</em>` : ""}</span>` + (many ? `<button data-nav="1" title="下一个任务（→）">${IC.caretR}</button>` : ""));
+  const d = APP.data, p = d && selProject(), many = allTasks().length > 1;
+  if (!p){ Deck.patch($("otitle"), `<i style="background:#9aa3ad"></i><b>空办公室</b><span>暂无项目</span>`); return }
+  const busy = sumBusy(p.leads), subs = p.leads.reduce((n, l) => n + l.agents.length, 0);
+  const who = p.leads.length > 1 ? `${p.leads.length} 个会话` : `主管 ${p.leads[0].name}`;
+  Deck.patch($("otitle"), (many ? `<button data-nav="-1" title="上一个项目（←）">${IC.caretL}</button>` : "")
+    + `<i style="background:${ST_COL[p.status] || "#9aa3ad"}"></i><b title="${h(p.name)}">${h(p.name)}</b><span class="who">${h(who)} · ${h(devOf(d, p.src))}</span>`
+    + `<span>子 ${subs}${busy ? ` · <em>${busy} 在忙</em>` : ""}</span>` + (many ? `<button data-nav="1" title="下一个项目（→）">${IC.caretR}</button>` : ""));
 }
 
 /* ---------------- 排班抽屉 / 全屏 ---------------- */
@@ -2206,7 +2229,7 @@ async function poll(){
   if (!d && APP.first && sceneOK()) d = DEMO;                 // 首次就连不上：先用演示数据把办公室摆出来
   if (!d){ Deck.ingest(null, ok); return }
   APP.data = d; Deck.S.skew = d.now - Date.now();
-  if (APP.first){ const cur = (d.leads || []).find(l => leadKey(l) === APP.sel); if (!cur || !isLive(cur)) APP.sel = null }   // 刷新后优先看在线的任务
+  if (APP.first){ const cur = selProject(); if (!cur || !isLive(cur)) APP.sel = null }   // 刷新后优先看在线的项目
   const switched = pickSel(); if (switched) keep("sel", APP.sel);
   Deck.sel = APP.sel;
   Deck.ingest(d, ok);
@@ -2217,14 +2240,15 @@ async function poll(){
 }
 
 /* ---------------- 交互 ---------------- */
-Deck.onSelect = k => { select(k); if (innerWidth < 900) setDrawer(false) };
+Deck.onSelect = k => { const l = APP.data && (APP.data.leads || []).find(x => leadKey(x) === k); if (l) select(projKey(APP.data, l)); if (innerWidth < 900) setDrawer(false) };   // 点排班里的会话 → 切到它所在的项目
+Deck.isSel = (src, id) => { const l = APP.data && (APP.data.leads || []).find(x => x.src === src && x.id === id); return !!l && projKey(APP.data, l) === APP.sel };   // 排班 / 日志高亮当前项目的所有会话
 Deck.onRender = () => {
   if (!APP.data) return;
   if (pickSel()){ keep("sel", APP.sel); setTimeout(() => { Deck.render(); if (sceneOK()) sceneReplay() }) }   // 当前任务被档位筛掉了
   renderMap(); renderTitle();
 };
 if (sceneOK()) fitPadRight = drawerPad;
-if (sceneOK()) selLead = d => (d.leads || []).find(l => leadKey(l) === APP.sel) || null;   // 办公室只摆选中的任务
+if (sceneOK()) selLeads = () => (selProject() || {leads: []}).leads;   // 办公室只摆选中项目的会话
 if (sceneOK()) onPersonClick = p => {                         // 抽屉开着时，点小人 → 在排班里定位到对应行
   if (!APP.drawer || !p.z || !p.z.lead) return;
   const l = p.z.lead, q = p.boss ? `[data-lead="${CSS.escape(leadKey(l))}"]` : `[data-key="a:${CSS.escape(p.d.id)}"]`;
