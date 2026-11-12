@@ -2,7 +2,7 @@
 
 多设备 Claude Code 多档位 agent 的实时值班面板：只读扫描各档位的配置目录，在浏览器里展示哪些会话在线、谁在工作、派出了哪些子 agent。
 
-hub（`server.py`）零依赖：Python 3 标准库 + 单个 `index.html`；推送采集器 `deck-push` 为 Rust 实现。
+hub（`server.py`）零依赖：Python 3 标准库 + 手写前端页面（`index.html` 主页面、`classic.html` 泳道看板，另有两个早期原型 `office.html`、`city.html`），无构建步骤、无外部脚本；推送采集器 `deck-push` 为 Rust 实现。
 
 ![Agent Deck 面板截图](docs/screenshot.png)
 
@@ -23,7 +23,7 @@ hub（`server.py`）零依赖：Python 3 标准库 + 单个 `index.html`；推�
 
 **没有复制的部分**
 
-- 没有下载或复制该站的前端源码、样式表或接口实现；`index.html` 与 `server.py` 是对着页面效果重新编写的。
+- 没有下载或复制该站的前端源码、样式表或接口实现；`classic.html`（原 `index.html`）与 `server.py` 是对着页面效果重新编写的；新主页面 `index.html` 同样是自行编写的。
 - 没有使用该站的头像图片。本项目头像由 `tools/gen_avatars.py` 调用图像生成模型按 `avatars/roster.json` 的描述生成，风格（二次元萌系）也与原站不同。
 - 数据来源完全不同：原站展示的是它自己的 agent 编排系统；本项目只读扫描本机 Claude Code 各档位的会话文件。
 - 推送采集器 `deck-push` 为 Rust 独立实现。
@@ -39,6 +39,18 @@ hub（`server.py`）零依赖：Python 3 标准库 + 单个 `index.html`；推�
 - 右侧日志。
 - 每个主会话（队长）和子 agent（船员）有固定的名字与头像，缺图时回退为像素小人 SVG。
 - 多设备：多台设备推送到同一个 hub 时，档位标签带 “· 设备名”（如 `claude · CatWork🐱`）。
+
+### 主页面布局
+
+新主页面 `index.html` 自上而下：
+
+- 顶部：值班台标题、WORKING / FINISHED / STOPPED·FAILED / ONLINE 四项统计、LIVE 与时钟、FEED 跑马灯。
+- 任务栏：一台设备一行，左边是机器名与该机器的任务数 / 在忙人数，右边是这台机器上的任务标签（每个任务 = 一个主 agent 会话，显示状态点、任务名、在忙人数和子 agent 数；已结束的任务显示“已结束 · 多久前”）；标签多时可横向滚动，点击标签或按 `←` / `→` 切换下方办公室。
+- 常规栏：主题（自动 / 白天 / 夜晚，自动档按服务器时间切换，6:00–18:00 为白天）、办公室版式（4 种）；右侧“排班 · 泳道图”按钮会从办公室右侧推出原来的泳道图抽屉。档位筛选仍可在 `/classic` 使用。
+- 办公室：WebGL2 体素场景，只显示当前选中的任务；主管坐课长席，子 agent 坐工位，完成的去休息区、讨论类去会议室、运维类去机房，超过 12 个子 agent 会开第 2、3 个岛。天色默认跟随页面主题，也可单独选早上 / 中午 / 黄昏 / 夜晚。
+- 右侧日志列。
+- 全屏：办公室右下角 ⛶ 按钮，`Esc` 退出；访问 `/voxel` 直接以全屏办公室打开。浏览器不支持 WebGL2 时，办公室区域显示提示，其余部分照常工作。
+- 整页只轮询一次 `/api/state`（每 3 秒），各区域共用。
 
 ## 架构
 
@@ -176,7 +188,13 @@ docker compose -f deploy/linux/docker-compose.push.yml up -d --build
 | `ds` | claude-ds | `~/.claude-deepseek` | 不过滤 | `DeepSeek` |
 | `qwen` | claude-qwen | `~/.claude-qwen` | 不过滤 | `Qwen4` |
 
-新增档位后，在 `index.html` 的 `SRC_COLOR` 与 `SRC_HEX` 中为新 `id` 加上颜色，否则会使用默认灰色。
+新增档位后，为新 `id` 加上颜色，否则会使用默认灰色。`index.html` 需改三处：
+
+- CSS 变量 `--app` / `--cli` / `--ds` / `--qwen` 这一组，在 `:root`（夜晚）与 `:root[data-theme=light]`（白天）各有一份；
+- 看板模块里的 `SRC_COLOR` / `SRC_HEX`；
+- 体素场景里的 `SRC_HEX`。
+
+`classic.html` 另有自己的一份 CSS 变量和 `SRC_COLOR` / `SRC_HEX`，如仍使用需同步修改。
 
 ## local 模式
 
@@ -243,7 +261,11 @@ python3 tools/demo_push.py http://127.0.0.1:7799
 
 | 接口 | 说明 |
 | --- | --- |
-| `GET /` | 前端页面 `index.html` |
+| `GET /`、`/index.html` | 新主页面 `index.html`（任务栏 + 体素办公室） |
+| `GET /voxel`、`/voxel.html` | 同样返回 `index.html`，用于直接以全屏办公室打开 |
+| `GET /classic`、`/classic.html` | 原泳道看板 `classic.html` |
+| `GET /office`、`/office.html` | 早期原型：SVG 等距办公室 `office.html` |
+| `GET /city`、`/city.html` | 早期原型：体素城市楼宇 `city.html` |
 | `GET /api/state` | 当前状态 JSON（hub 模式合并所有在线设备，缓存约 1 秒） |
 | `POST /api/ingest` | 仅 hub 模式：设备推送 `{"device": 名字, "state": {...}}`。成功 `204`；设备名无效或 payload 畸形 `400`；请求体为空或超过 1MiB `413` |
 | `GET /healthz` | 健康检查，返回 `ok` |

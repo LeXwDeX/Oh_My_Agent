@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Office</title>
+<style>
+:root{
+  --sky:#dcefff; --sand:#fff4e2; --ink:#2b2f3a; --muted:#6b7280; --card:#ffffffd9; --line:#e6e0d4;
+  --work:#2f9e6f; --fail:#e5484d; --stop:#9aa1ac; --idle:#d9a21b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;color:var(--ink);
+  background:radial-gradient(1200px 600px at 70% -10%,#ffffff 0,transparent 60%),linear-gradient(180deg,var(--sky),var(--sand));
+  font:13px/1.4 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif}
+#stage{position:fixed;inset:0;width:100%;height:100%;cursor:grab;touch-action:none;user-select:none;font-family:inherit}
+#stage.drag{cursor:grabbing}
+header{position:fixed;left:16px;right:16px;top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;z-index:2}
+header>*{pointer-events:auto}
+.pill{background:var(--card);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid #fff;border-radius:14px;box-shadow:0 4px 14px #4a5a7a1a}
+.brand{display:flex;align-items:center;gap:8px;padding:7px 12px;font-weight:700}
+.brand .dot{width:8px;height:8px;border-radius:50%;background:var(--work);box-shadow:0 0 0 3px #2f9e6f33}
+.brand.off .dot{background:var(--fail);box-shadow:0 0 0 3px #e5484d33}
+.brand .host{font-weight:500;color:var(--muted)}
+.brand a{font-weight:500;color:var(--muted);text-decoration:none;font-size:12px;margin-left:4px;border-left:1px solid var(--line);padding-left:10px}
+.brand a:hover{color:var(--ink)}
+.stat{padding:6px 11px;font-size:12px;color:var(--muted)}
+.stat b{color:var(--ink);font-size:15px;margin-right:3px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid #fff;background:var(--card);border-radius:999px;padding:5px 10px;font:inherit;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px #4a5a7a12;color:var(--ink)}
+.chip i{width:9px;height:9px;border-radius:50%}
+.chip.off{opacity:.45}
+.zoom{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:6px;z-index:2}
+.zoom button{width:36px;height:36px;border-radius:11px;border:1px solid #fff;background:var(--card);box-shadow:0 4px 12px #4a5a7a1f;font:inherit;font-size:16px;cursor:pointer;color:var(--ink)}
+.zoom button:hover{background:#fff}
+.legend{position:fixed;left:16px;bottom:16px;z-index:2;display:flex;flex-wrap:wrap;gap:10px;padding:7px 12px;font-size:12px;color:var(--muted);max-width:calc(100% - 90px)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend em{font-style:normal;display:inline-grid;place-items:center;min-width:16px;height:16px;border-radius:8px;color:#fff;font-size:10px;font-weight:700;padding:0 4px}
+#tip{position:fixed;z-index:3;max-width:340px;background:#fffffff5;border:1px solid var(--line);border-radius:12px;padding:10px 12px;box-shadow:0 10px 30px #2b2f3a26;font-size:12px;pointer-events:none;display:none}
+#tip h4{margin:0 0 4px;font-size:13px;display:flex;gap:6px;align-items:center}
+#tip h4 small{font-weight:500;color:var(--muted)}
+#tip .row{color:var(--muted)}
+#tip .row b{color:var(--ink);font-weight:500}
+#tip .r{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);white-space:pre-wrap;word-break:break-word;color:var(--ink)}
+#empty{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 18px;color:var(--muted);display:none;z-index:1;text-align:center}
+
+/* ---- SVG ---- */
+.room{transition:transform .9s cubic-bezier(.4,.1,.2,1),opacity .5s}
+.room.new{animation:roomIn .6s ease-out both}
+@keyframes roomIn{from{opacity:0}}
+.room.gone{opacity:0}
+.room.off .lit{filter:saturate(.35) brightness(.95)}
+.st{cursor:pointer}
+.st.away .who{visibility:hidden}
+.st.leave{animation:leave .5s ease-in both;pointer-events:none}
+@keyframes leave{to{opacity:0}}
+.walker{pointer-events:none}
+.walker .lg{animation:step .34s ease-in-out infinite alternate}
+.walker .lg2{animation-direction:alternate-reverse}
+@keyframes step{from{transform:translateY(0)}to{transform:translateY(-3.5px)}}
+.walker .wb{animation:wbob .17s ease-in-out infinite alternate}
+@keyframes wbob{to{transform:translateY(-1.6px)}}
+.bob{animation:bob .9s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-2px)}}
+.glow{animation:glow 1.8s ease-in-out infinite}
+@keyframes glow{50%{opacity:.35}}
+.zz{animation:zz 2.6s ease-in-out infinite}
+.zz2{animation-delay:1.3s}
+@keyframes zz{0%{opacity:0;transform:translate(0,4px)}30%{opacity:1}100%{opacity:0;transform:translate(7px,-12px)}}
+.dots circle{animation:dot 1.2s infinite}
+.dots circle:nth-child(2){animation-delay:.2s}
+.dots circle:nth-child(3){animation-delay:.4s}
+@keyframes dot{0%,60%,100%{opacity:.25}30%{opacity:1}}
+.shake{animation:shake 2.4s infinite}
+@keyframes shake{0%,88%,100%{transform:none}91%{transform:translateX(-2px)}94%{transform:translateX(2px)}97%{transform:translateX(-1px)}}
+.lamp{animation:lamp 1.6s ease-in-out infinite}
+@keyframes lamp{50%{opacity:.45}}
+.hl{opacity:0;transition:opacity .15s}
+.st:hover .hl{opacity:1}
+@media (prefers-reduced-motion:reduce){.bob,.glow,.zz,.dots circle,.shake,.lamp{animation:none}.room{transition:none}}
+</style>
+</head>
+<body>
+<svg id="stage" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="cc" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+    <radialGradient id="scr" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#9fe7ff" stop-opacity=".75"/><stop offset="1" stop-color="#9fe7ff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g id="cam"><g id="ground"></g><g id="rooms"></g></g>
+</svg>
+<header>
+  <div class="pill brand" id="brand"><span class="dot"></span>Agent Office <span class="host" id="host"></span><a href="/">泳道视图 →</a></div>
+  <div class="pill stat" id="sRooms"></div>
+  <div class="pill stat" id="sLeads"></div>
+  <div class="pill stat" id="sWork"></div>
+  <div class="chips" id="chips"></div>
+</header>
+<div class="pill legend">
+  <span><em style="background:var(--work)">⚙</em>工作中</span>
+  <span><em style="background:#3aa76d">✓</em>已完成</span>
+  <span><em style="background:var(--fail)">!</em>失败</span>
+  <span><em style="background:var(--stop)">❚❚</em>中止</span>
+  <span><em style="background:#8b7fd6">Z</em>待命</span>
+  <span>悬停人物看详情 · 滚轮缩放 · 拖动平移</span>
+</div>
+<div class="zoom">
+  <button id="zin" title="放大">＋</button>
+  <button id="zout" title="缩小">－</button>
+  <button id="zfit" title="适配全部">⤢</button>
+</div>
+<div id="tip"></div>
+<div class="pill" id="empty">暂时没有活跃的任务房间<br><small>主会话上岗后会自动开出新房间</small></div>
+
+<script>
+"use strict";
+/* ============ 常量与工具 ============ */
+const $ = id => document.getElementById(id);
+const HX = 32, HY = 16;          // 等距 2:1：一格 64×32
+const WALL = 46;                 // 墙高（px）
+const COLS = 3;                  // 每个房间员工工位列数
+const PITCH_X = 2.3, PITCH_Y = 2.4, BOSS_D = 3.4;
+const ROOM_W = 8, GAP = 2.6;     // 房间宽（格）与房间间距
+const MAX_AG = 12, MAX_ROOMS = 16;
+const ROOM_KEEP = 30 * 60e3;     // 已结束的主会话保留房间 30 分钟
+const AG_KEEP = 15 * 60e3;       // 已结束的子 agent 留在工位 15 分钟
+const SRC_HEX = {app:"#e08a5f", cli:"#8f8a80", ds:"#5b9dff", qwen:"#a884ff"};
+const JOB_PALETTE = ["#ff9a3c","#5b9dff","#4fbf7a","#a884ff","#e8b84a","#3cc3b8","#ff7aa8","#8cc152","#f08a4b","#7aa2ff"];
+const ST_ZH = {working:"工作中", idle:"待命", done:"已下班", stopped:"已中止", finished:"已完成", failed:"失败"};
+const NS = "http://www.w3.org/2000/svg";
+
+const P = (x, y, z = 0) => [(x - y) * HX, (x + y) * HY - z];
+const f1 = v => Math.round(v * 10) / 10;
+const pts = a => a.map(p => f1(p[0]) + "," + f1(p[1])).join(" ");
+const h = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const lget = k => { try { return localStorage.getItem("office." + k) } catch { return null } };
+const lset = (k, v) => { try { localStorage.setItem("office." + k, v) } catch {} };
+const srcBase = id => String(id || "").split("@")[0];
+const sHex = id => SRC_HEX[srcBase(id)] || "#9a958c";
+function hash(s){ let x = 0; for (const c of String(s)) x = (x * 31 + c.charCodeAt(0)) | 0; return Math.abs(x) }
+const jobHex = t => JOB_PALETTE[hash(t) % JOB_PALETTE.length];
+const rgb = hx => [1, 3, 5].map(i => parseInt(hx.slice(i, i + 2), 16));
+const hex = a => "#" + a.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("");
+const tint = (hx, t) => hex(rgb(hx).map(v => v + (255 - v) * t));
+const shade = (hx, f) => hex(rgb(hx).map(v => v * f));
+function textW(s, size){ let w = 0; for (const c of String(s)) w += c.charCodeAt(0) > 0x2e80 ? size : size * 0.6; return w }
+function clip(s, maxW, size){
+  s = String(s || ""); if (textW(s, size) <= maxW) return s;
+  let out = ""; for (const c of s){ if (textW(out + c + "…", size) > maxW) break; out += c } return out + "…";
+}
+const toolName = t => (String(t).replace(/^mcp(?=_)/i, "").replace(/_+/g, " ").trim() || String(t)).toUpperCase();
+function dur(ms){
+  const s = Math.max(0, Math.round(ms / 1000)); if (s < 60) return s + "s";
+  const m = Math.round(s / 60); if (m < 60) return m + "m";
+  return Math.floor(m / 60) + "h " + (m % 60) + "m";
+}
+
+/* 等距长方体：返回 SVG 字符串（右面 x+w、左面 y+d、顶面） */
+function box(x, y, z, w, d, hgt, top, left, right){
+  left = left || shade(top, .9); right = right || shade(top, .8);
+  return `<polygon points="${pts([P(x+w,y,z),P(x+w,y+d,z),P(x+w,y+d,z+hgt),P(x+w,y,z+hgt)])}" fill="${right}"/>`
+       + `<polygon points="${pts([P(x,y+d,z),P(x+w,y+d,z),P(x+w,y+d,z+hgt),P(x,y+d,z+hgt)])}" fill="${left}"/>`
+       + `<polygon points="${pts([P(x,y,z+hgt),P(x+w,y,z+hgt),P(x+w,y+d,z+hgt),P(x,y+d,z+hgt)])}" fill="${top}"/>`;
+}
+function svgEl(tag, cls, parent){ const e = document.createElementNS(NS, tag); if (cls) e.setAttribute("class", cls); if (parent) parent.appendChild(e); return e }
+
+/* ============ 人物 + 工位 ============ */
+function hasFace(name){ return !!(name && S.data && S.data.avatars && S.data.avatars.includes(String(name).toLowerCase())) }
+
+function personSVG(o, s){
+  const r = 13 * s, hy = -52 * s;
+  let g = `<rect x="${-11*s}" y="${-41*s}" width="${22*s}" height="${36*s}" rx="${9*s}" fill="${o.shirt}"/>`
+        + `<path d="M${-5*s} ${-41*s} L0 ${-34*s} L${5*s} ${-41*s}Z" fill="#fff" opacity=".9"/>`;
+  if (o.boss) g += `<path d="M0 ${-35*s} l${-2.4*s} ${4*s} l${2.4*s} ${9*s} l${2.4*s} ${-9*s}Z" fill="#e5484d"/>`
+               + `<path d="M${-7*s} ${-30*s} l1.2 2.6 2.8 .3 -2.1 1.9 .6 2.8 -2.5 -1.4 -2.5 1.4 .6 -2.8 -2.1 -1.9 2.8 -.3Z" fill="#ffd34d" stroke="#e0a800" stroke-width=".5"/>`;
+  g += `<circle cx="0" cy="${hy}" r="${r + 2}" fill="#fff"/>`;
+  if (o.face) g += `<image href="/avatars/${h(String(o.face).toLowerCase())}.png" x="${-r}" y="${hy - r}" width="${2*r}" height="${2*r}" clip-path="url(#cc)" preserveAspectRatio="xMidYMid slice"/>`;
+  else g += `<circle cx="0" cy="${hy}" r="${r}" fill="${tint(o.shirt,.35)}"/><text x="0" y="${hy + 4.5*s}" text-anchor="middle" font-size="${13*s}" font-weight="700" fill="#fff">${h(String(o.name||"?")[0])}</text>`;
+  g += `<circle cx="0" cy="${hy}" r="${r + 2}" fill="none" stroke="${o.ring}" stroke-width="1.6" opacity=".85"/>`;
+  if (o.status === "working") g += `<ellipse class="glow" cx="0" cy="${hy + 4}" rx="${r + 6}" ry="${r + 4}" fill="url(#scr)"/>`;
+  return g;
+}
+
+/* 头顶名牌：状态图标 + 名字 (+ 正在调用的工具)；前后排错开，不会互相遮挡 */
+const ICON = {working: ["#2f9e6f", "⚙"], finished: ["#3aa76d", "✓"], done: ["#b6bec9", "✓"], failed: ["#e5484d", "!"],
+              stopped: ["#9aa1ac", "❚❚"], idle: ["#8b7fd6", "Z"]};
+function badgeSVG(o, s){
+  const y = -84 * s, st = o.status;
+  const [ic, glyph] = ICON[st] || ["#9aa1ac", "·"];
+  const name = (o.boss ? "★ " : "") + o.name;
+  const tool = st === "working" && o.tool ? clip(toolName(o.tool), 90, 9.5) : "";
+  const dots = st === "working" && !o.tool;
+  const nw = textW(name, 10.5), tw = tool ? textW(" · ", 10) + textW(tool, 9.5) * 1.06 : 0, dw = dots ? 22 : 0;
+  const w = 31 + nw + tw + dw + 9, x0 = -w / 2;
+  let g = `<g class="${st === "failed" ? "shake" : ""}">`
+    + `<rect x="${f1(x0)}" y="${y-10}" width="${f1(w)}" height="20" rx="10" fill="#fff" stroke="${o.boss ? o.ring : "#e3e7ee"}" stroke-width="${o.boss ? 1.5 : 1}"/>`
+    + `<path d="M-4 ${y+9.5} L0 ${y+14} L4 ${y+9.5}Z" fill="#fff"/>`
+    + `<circle cx="${f1(x0+16)}" cy="${y}" r="7.5" fill="${ic}"/>`
+    + `<text x="${f1(x0+16)}" y="${y + (glyph === "❚❚" ? 2.4 : 3.6)}" text-anchor="middle" font-size="${glyph === "❚❚" ? 6.5 : 10}" font-weight="800" fill="#fff">${glyph}</text>`
+    + `<text x="${f1(x0+29)}" y="${y+3.7}" font-size="10.5" font-weight="${o.boss ? 700 : 600}" fill="${o.boss ? shade(o.ring, .7) : "#3b4252"}">${h(name)}`
+    + (tool ? `<tspan fill="#9aa1ac" font-weight="400"> · </tspan><tspan fill="#2f9e6f" font-size="9.5" font-weight="800" letter-spacing=".04em">${h(tool)}</tspan>` : "")
+    + `</text>`;
+  if (dots){ const dx = x0 + 29 + nw + 7; g += `<g class="dots" fill="#2f9e6f">` + [0, 6, 12].map(d => `<circle cx="${f1(dx+d)}" cy="${y+1}" r="2"/>`).join("") + `</g>` }
+  if (st === "idle") g += `<g fill="#8b7fd6" font-weight="800"><text class="zz" x="${f1(-x0+3)}" y="${y-4}" font-size="11">z</text><text class="zz zz2" x="${f1(-x0+9)}" y="${y-12}" font-size="8">z</text></g>`;
+  return g + `</g>`;
+}
+
+function stationSVG(o){
+  const s = o.boss ? 1.12 : 1;
+  const dw = o.boss ? 1.6 : 1.15, dd = o.boss ? .9 : .75, dh = o.boss ? 17 : 15;
+  const cx = .62, cy = .62, dx = cx - dw / 2, dy = cy - dd / 2;
+  const desk = o.boss ? "#d7a874" : "#f7f2ea", deskL = o.boss ? "#c08d5a" : "#e9e1d3", deskR = o.boss ? "#a9784a" : "#d9cfbe";
+  const off = o.status === "finished" || o.status === "done" || o.status === "stopped";
+  let g = `<ellipse class="hl" cx="${P(cx,cy)[0]}" cy="${P(cx,cy)[1] - 2}" rx="${46*s}" ry="${23*s}" fill="${o.ring}" opacity=".18"/>`;
+  g += `<ellipse cx="${P(.3,.3)[0]}" cy="${P(.3,.3)[1]}" rx="${32*s}" ry="${16*s}" fill="#3b4a6b" opacity=".07"/>`;
+  const cb = o.boss ? ["#7a5a44", "#5f4433", 70] : ["#b4c4dc", "#97aaca", 56];                   // 椅背（正对镜头）
+  g += `<rect x="${-16*s}" y="${-cb[2]*s}" width="${32*s}" height="${(cb[2]-12)*s}" rx="${9*s}" fill="${cb[0]}" stroke="${cb[1]}" stroke-width="1.5"/>`;
+  g += `<g class="who"><g class="${o.status === "working" ? "bob" : ""}" opacity="${off ? .82 : 1}">${personSVG(o, s)}</g></g>`;
+  g += box(dx, dy, 0, dw, dd, dh, desk, deskL, deskR);                                              // 桌子
+  const lx = cx - .25, ly = cy - .22;
+  g += box(lx, ly, dh, .5, .32, 1.5, "#e3e8ee");                                                   // 笔记本底座
+  g += box(lx, ly + .3, dh, .5, .03, 12, "#c8d1dc", "#d3dbe5", "#b7c1ce");                          // 屏幕背面
+  const lg = P(lx + .25, ly + .33, dh + 6.5);
+  g += `<circle cx="${f1(lg[0])}" cy="${f1(lg[1])}" r="1.8" fill="#fff" opacity=".9"/>`;
+  if (o.boss){ const m = P(dx + dw - .25, dy + .25, dh); g += `<rect x="${m[0]-3.5}" y="${m[1]-9}" width="7" height="9" rx="2" fill="#fff" stroke="#e0d6c8"/><path d="M${m[0]+3.5} ${m[1]-7} q4 2 0 4" fill="none" stroke="#e0d6c8" stroke-width="1.4"/>` }
+  g += `<g class="who">${badgeSVG(o, s)}</g>`;
+  g += `<rect x="-34" y="-96" width="68" height="136" fill="transparent"/>`;
+  return g;
+}
+
+/* 走路的小人：原点在脚底；两条腿交替抬起 + 身体轻颠 */
+function walkerSVG(o){
+  const s = o.boss ? 1.12 : 1, nm = (o.boss ? "★ " : "") + o.name, w = textW(nm, 10) + 14;
+  return `<ellipse cx="0" cy="0" rx="${13*s}" ry="${6*s}" fill="#3b4a6b" opacity=".16"/>`
+    + `<rect class="lg" x="${-7*s}" y="${-19*s}" width="${5.6*s}" height="${19*s}" rx="${2.6*s}" fill="#4b5563"/>`
+    + `<rect class="lg lg2" x="${1.4*s}" y="${-19*s}" width="${5.6*s}" height="${19*s}" rx="${2.6*s}" fill="#4b5563"/>`
+    + `<g class="wb"><g transform="translate(0 ${-13*s})">${personSVG({...o, status: "walk"}, s)}</g></g>`
+    + `<rect x="${-w/2}" y="${-96*s}" width="${w}" height="16" rx="8" fill="#fff" fill-opacity=".95" stroke="${o.boss ? o.ring : "#e3e7ee"}"/>`
+    + `<text x="0" y="${-96*s + 11.5}" text-anchor="middle" font-size="10" font-weight="600" fill="#3b4252">${h(nm)}</text>`;
+}
+
+/* ============ 房间静态部分 ============ */
+function roomSize(rows){ return [ROOM_W, BOSS_D + rows * PITCH_Y + .6] }
+function bossPos(){ return [ROOM_W / 2 - .6, 1.0] }
+function slotPos(i){ return [1.2 + (i % COLS) * PITCH_X, BOSS_D + Math.floor(i / COLS) * PITCH_Y] }
+
+function roomStaticSVG(R){
+  const {W, D, hx, lead, cnt} = R;
+  const fa = tint(hx, .86), fb = tint(hx, .78);
+  let s = box(0, 0, -7, W, D, 7, fa, tint(hx, .55), tint(hx, .45));
+  // 棋盘地板
+  for (let i = 0; i < Math.ceil(W); i++) for (let j = 0; j < Math.ceil(D); j++){
+    if ((i + j) % 2) continue;
+    const x2 = Math.min(W, i + 1), y2 = Math.min(D, j + 1);
+    s += `<polygon points="${pts([P(i,j),P(x2,j),P(x2,y2),P(i,y2)])}" fill="${fb}"/>`;
+  }
+  // 主管区地毯
+  s += `<polygon points="${pts([P(1.1,.45),P(W-1.1,.45),P(W-1.1,2.85),P(1.1,2.85)])}" fill="${tint(hx,.6)}" stroke="#fff" stroke-width="2" stroke-dasharray="6 4"/>`;
+  // 墙
+  s += box(-.22, -.22, 0, W + .22, .22, WALL, "#ffffff", "#fbf5ea", "#eadfcc");
+  s += box(-.22, 0, 0, .22, D, WALL, "#ffffff", "#eadfcc", "#f4ebdc");
+  s += `<polygon points="${pts([P(0,0,0),P(W,0,0),P(W,0,5),P(0,0,5)])}" fill="${tint(hx,.35)}"/>`;
+  s += `<polygon points="${pts([P(0,0,0),P(0,D,0),P(0,D,5),P(0,0,5)])}" fill="${tint(hx,.42)}"/>`;
+  // 后墙窗户（主管身后偏右）
+  {
+    const a = W - 3.3, b = W - 1.4;
+    s += `<polygon points="${pts([P(a,0,14),P(b,0,14),P(b,0,39),P(a,0,39)])}" fill="#ffffff"/>`;
+    s += `<polygon points="${pts([P(a+.12,0,17),P(b-.12,0,17),P(b-.12,0,36),P(a+.12,0,36)])}" fill="#bfe6ff"/>`;
+    s += `<polygon points="${pts([P(a+.3,0,30),P(a+.75,0,36),P(a+.55,0,36),P(a+.12,0,31)])}" fill="#fff" opacity=".7"/>`;
+    s += `<polyline points="${pts([P((a+b)/2,0,17),P((a+b)/2,0,36)])}" stroke="#fff" stroke-width="2"/>`;
+    s += `<polygon points="${pts([P(a+.2,0),P(b-.2,0),P(b-.7,1.4),P(a-.3,1.4)])}" fill="#fffbe0" opacity=".55"/>`;  // 窗光
+  }
+  // 门牌挂在左墙（不会被主管挡住）
+  const a = D - .4, b = .75;
+  s += `<polygon points="${pts([P(0,a,13),P(0,b,13),P(0,b,43),P(0,a,43)])}" fill="#fff" stroke="${tint(hx,.25)}" stroke-width="1.4"/>`;
+  s += `<polygon points="${pts([P(0,a,40),P(0,b,40),P(0,b,43),P(0,a,43)])}" fill="${hx}"/>`;
+  const maxU = (a - b - .55) * HX, t0 = P(0, a - .18, 0);
+  const line1 = clip(`${lead.name} · ${lead.project || "—"}`, maxU, 11.5);
+  const line2 = clip(lead.title || "", maxU, 10);
+  s += `<g transform="matrix(1,-.5,0,1,${f1(t0[0])},${f1(t0[1])})">`
+     + `<text x="0" y="-27" font-size="11.5" font-weight="700" fill="${shade(hx,.55)}">${h(line1)}</text>`
+     + `<text x="0" y="-16" font-size="10" fill="#4b5563">${h(line2)}</text></g>`;
+  const lampC = {working:"#2fbf71", idle:"#f2b630", done:"#b6bec9", stopped:"#b6bec9"}[lead.status] || "#b6bec9";
+  const lp = P(0, b + .22, 30);
+  s += `<circle class="${lead.status === "working" ? "lamp" : ""}" cx="${f1(lp[0])}" cy="${f1(lp[1])}" r="4.2" fill="${lampC}" stroke="#fff" stroke-width="1.5"/>`;
+  // 盆栽（后左角）与饮水机（后右角）
+  s += box(.15, .15, 0, .4, .4, 10, "#ec9a6e", "#d9845a", "#c4744d");
+  const pl = P(.35, .35, 24);
+  s += `<circle cx="${f1(pl[0])}" cy="${f1(pl[1])}" r="12" fill="#7cc47a"/><circle cx="${f1(pl[0]-6)}" cy="${f1(pl[1]+3)}" r="8" fill="#5fae62"/><circle cx="${f1(pl[0]+5)}" cy="${f1(pl[1]-6)}" r="6" fill="#9ad88f"/>`;
+  s += box(W - .55, .15, 0, .35, .35, 20, "#e8eef5", "#dbe3ec", "#c9d3df");
+  const wc = P(W - .375, .325, 29);
+  s += `<ellipse cx="${f1(wc[0])}" cy="${f1(wc[1])}" rx="7" ry="9" fill="#a8dcff" opacity=".95"/><ellipse cx="${f1(wc[0]-2.5)}" cy="${f1(wc[1]-3)}" rx="2" ry="3.5" fill="#fff" opacity=".7"/>`;
+  // 地板上的统计字样
+  const fl = P(.45, D - .32);
+  const parts = [`工作中 ${cnt.working}`, `已完成 ${cnt.finished}`];
+  if (cnt.failed) parts.push(`失败 ${cnt.failed}`);
+  if (cnt.hidden) parts.push(`另有 ${cnt.hidden} 人未显示`);
+  s += `<text transform="matrix(1,.5,-1,.5,${f1(fl[0])},${f1(fl[1])})" font-size="11" font-weight="700" fill="${shade(hx,.6)}" opacity=".75">${h(parts.join(" · "))}</text>`;
+  return s;
+}
+
+/* ============ 状态与差量渲染 ============ */
+const S = {data: null, ok: true, off: new Set(JSON.parse(lget("off") || "[]")), rooms: new Map(), idx: new Map(),
+           cam: {x: 0, y: 0, k: 1}, autoFit: true, info: new Map(), bounds: null};
+
+function visibleAgents(l, now){
+  const keep = l.agents.filter(a => a.status === "working" || now - a.last < AG_KEEP);
+  keep.sort((a, b) => (a.status !== "working") - (b.status !== "working") || b.last - a.last);
+  const shown = keep.slice(0, MAX_AG);
+  const ids = new Set(shown.map(a => a.id));
+  // 已经坐着的人优先保留座位，避免满员时来回换人
+  return {shown, hidden: l.agents.filter(a => a.status === "working").length - shown.filter(a => a.status === "working").length,
+          ids};
+}
+
+function ensureRoom(id){
+  let R = S.rooms.get(id);
+  if (R) return R;
+  const g = svgEl("g", S.rendered ? "room new" : "room");   // 首屏不做淡入，只给后来新开的房间做
+  g.addEventListener("animationend", e => { if (e.target === g) g.classList.remove("new") });
+  const lit = svgEl("g", "lit", g);
+  R = {id, g, lit, gStatic: svgEl("g", "", lit), gBoss: svgEl("g", "", lit), gSlots: svgEl("g", "", lit),
+       slots: new Map(), leaving: new Map(), slotEls: [], stations: new Map(), known: new Set(), rows: 0, staticSig: "", boss: null, pos: null};
+  S.rooms.set(id, R);
+  return R;
+}
+
+/* 走动：从房间右侧敞开的一边沿过道走到座位（入场），或反向走出（离场）。
+   走路的小人插在自己工位之前，所以会被自己的桌子、同排右侧和前排的工位正确遮挡。 */
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const SPEED = 2.2;   // 格/秒
+function walk(R, st, inbound){
+  const [px, py] = st.pos, ex = R.W + 1.4, ay = st.aisle;
+  const path = inbound ? [[ex, ay], [px, ay], [px, py]] : [[px, py], [px, ay], [ex, ay]];
+  const g = svgEl("g", "walker");
+  st.parent.insertBefore(g, st.g);
+  const inner = svgEl("g", "", g);
+  inner.innerHTML = walkerSVG(st.o);
+  const d = [0];
+  for (let i = 1; i < path.length; i++) d.push(d[i-1] + Math.hypot(path[i][0] - path[i-1][0], path[i][1] - path[i-1][1]));
+  const total = d[d.length - 1] || 1, dur = total / SPEED * 1000;
+  const anim = g.animate(path.map(([x, y], i) => { const p = P(x - px, y - py); return {transform: `translate(${f1(p[0])}px,${f1(p[1])}px)`, offset: d[i] / total} }),
+                         {duration: dur, easing: "linear", fill: "forwards"});
+  inner.animate(inbound ? [{opacity: 0}, {opacity: 1}] : [{opacity: 1}, {opacity: 0}], {duration: 450, delay: inbound ? 0 : Math.max(0, dur - 450), fill: "both"});
+  st.g.classList.add("away");
+  return anim.finished.catch(() => {}).then(() => g.remove());
+}
+
+function placeStation(R, key, parent, o, pos, aisle, walkIn){
+  let st = R.stations.get(key), created = false;
+  const sig = JSON.stringify(o);
+  if (st && st.parent !== parent){ st.g.remove(); st = null }
+  if (!st){
+    const g = svgEl("g", "st", parent);
+    g.dataset.k = o.k;
+    st = {g, parent, sig: ""};
+    R.stations.set(key, st);
+    created = true;
+  }
+  st.pos = pos; st.aisle = aisle; st.o = o;
+  if (st.sig !== sig){ st.g.innerHTML = stationSVG(o); st.sig = sig }
+  if (created && walkIn && S.rendered && !REDUCED) walk(R, st, true).then(() => st.g.classList.remove("away"));
+}
+
+function addSlotEl(R, i){
+  const e = svgEl("g", "", R.gSlots), p = P(...slotPos(i));
+  e.setAttribute("transform", `translate(${f1(p[0])} ${f1(p[1])})`);
+  R.slotEls.push(e);
+}
+
+function updateRoom(R, l, now){
+  const hx = sHex(l.src);
+  const {shown, hidden} = visibleAgents(l, now);
+  // 1) 工位分配：已有人保持原位，新人填最小空位
+  const ids = new Set(shown.map(a => a.id));
+  for (const [aid, slot] of R.slots) if (!ids.has(aid)){
+    const st = R.stations.get(aid);
+    R.slots.delete(aid); R.stations.delete(aid);
+    if (!st) continue;
+    // 离场：先走出房间，再收走桌子；走完之前这个工位不分给别人
+    const finish = () => { st.g.classList.add("leave"); setTimeout(() => { st.g.remove(); if (R.leaving.get(slot) === st) R.leaving.delete(slot) }, 520) };
+    R.leaving.set(slot, st);
+    if (S.rendered && !REDUCED && st.g.isConnected) walk(R, st, false).then(finish); else finish();
+  }
+  const occ = new Set([...R.slots.values(), ...R.leaving.keys()]);
+  for (const a of shown) if (!R.slots.has(a.id)){ let s = 0; while (occ.has(s)) s++; R.slots.set(a.id, s); occ.add(s) }
+  let need = Math.max(1, Math.ceil(occ.size / COLS));
+  const maxS = Math.max(-1, ...occ);
+  if (Math.floor(maxS / COLS) + 1 > need){
+    if (!R.leaving.size){                               // 有空洞导致多占一排：压紧（没人在走动时才压）
+      [...R.slots.entries()].sort((a, b) => a[1] - b[1]).forEach(([aid], i) => R.slots.set(aid, i));
+      R.rows = -1;
+    } else need = Math.floor(maxS / COLS) + 1;
+  }
+  // 2) 行数变化：只加排时追加容器（不打断走动），减排/压紧时整体重建
+  if (need !== R.rows){
+    if (R.rows > 0 && need > R.rows){
+      for (let i = R.rows * COLS; i < need * COLS; i++) addSlotEl(R, i);
+    } else {
+      for (const [k, st] of R.stations) if (k !== "@boss"){ st.g.remove(); R.stations.delete(k) }
+      R.leaving.clear();
+      R.gSlots.replaceChildren(); R.slotEls = [];
+      for (let i = 0; i < need * COLS; i++) addSlotEl(R, i);
+    }
+    R.rows = need;
+  }
+  [R.W, R.D] = roomSize(R.rows);
+  // 3) 静态部分
+  const cnt = {working: l.agents.filter(a => a.status === "working").length,
+               finished: l.agents.filter(a => a.status === "finished").length,
+               failed: l.agents.filter(a => a.status === "failed").length, hidden};
+  const sig = JSON.stringify([R.W, R.D, hx, l.name, l.project, l.title, l.status, cnt]);
+  if (sig !== R.staticSig){ R.gStatic.innerHTML = roomStaticSVG({W: R.W, D: R.D, hx, lead: l, cnt}); R.staticSig = sig }
+  R.g.classList.toggle("off", l.status === "done" || l.status === "stopped");
+  // 4) 主管
+  if (!R.boss){ R.boss = svgEl("g", "", R.gBoss); const p = P(...bossPos()); R.boss.setAttribute("transform", `translate(${f1(p[0])} ${f1(p[1])})`) }
+  const face = l.face || l.name;
+  const lk = "L:" + l.id;
+  S.info.set(lk, {kind: "lead", d: l});
+  placeStation(R, "@boss", R.boss, {k: lk, boss: true, name: l.name, face: hasFace(face) ? face : null, shirt: hx, ring: hx,
+                                     status: l.status, tool: l.status === "working" ? l.tool : null}, bossPos(), .55, !R.known.has("@boss"));
+  R.known.add("@boss");
+  // 5) 员工
+  for (const a of shown){
+    const k = "A:" + l.id + ":" + a.id;
+    S.info.set(k, {kind: "agent", d: a, lead: l});
+    const slot = R.slots.get(a.id), sp = slotPos(slot);
+    placeStation(R, a.id, R.slotEls[slot],
+      {k, boss: false, name: a.name, face: hasFace(a.name) ? a.name : null, shirt: jobHex(a.type), ring: jobHex(a.type),
+       status: a.status, tool: a.status === "working" ? a.tool : null}, sp, sp[1] - .95, !R.known.has(a.id));
+    R.known.add(a.id);
+  }
+}
+
+function layout(list){
+  // 房间编号：沿用旧编号，新房间填空位；空位 ≥3 时整体压紧
+  const ids = new Set(list.map(l => l.id));
+  for (const id of [...S.idx.keys()]) if (!ids.has(id)) S.idx.delete(id);
+  const used = new Set(S.idx.values());
+  for (const l of list) if (!S.idx.has(l.id)){ let i = 0; while (used.has(i)) i++; S.idx.set(l.id, i); used.add(i) }
+  let maxI = Math.max(-1, ...S.idx.values());
+  if (maxI + 1 - list.length >= 3){
+    [...S.idx.entries()].sort((a, b) => a[1] - b[1]).forEach(([id], i) => S.idx.set(id, i));
+    maxI = list.length - 1;
+  }
+  const cols = Math.max(1, Math.ceil(Math.sqrt(maxI + 1)));
+  const colW = [], rowD = [];
+  for (const [id, i] of S.idx){
+    const R = S.rooms.get(id), c = i % cols, r = Math.floor(i / cols);
+    colW[c] = Math.max(colW[c] || 0, R.W); rowD[r] = Math.max(rowD[r] || 0, R.D);
+  }
+  const nC = cols, nR = Math.floor(maxI / cols) + 1;
+  const ox = [0], oy = [0];
+  for (let c = 1; c <= nC; c++) ox[c] = ox[c-1] + (colW[c-1] || ROOM_W) + GAP;
+  for (let r = 1; r <= nR; r++) oy[r] = oy[r-1] + (rowD[r-1] || 6) + GAP;
+  const order = [];
+  for (const [id, i] of S.idx){
+    const R = S.rooms.get(id), c = i % cols, r = Math.floor(i / cols);
+    const p = P(ox[c], oy[r]);
+    R.pos = [ox[c], oy[r]];
+    R.g.style.transform = `translate(${f1(p[0])}px,${f1(p[1])}px)`;
+    order.push([r + c, c, id]);
+  }
+  order.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  // 画家算法：后面的房间先画；只有顺序变了才重排 DOM
+  const layer = $("rooms");
+  const want = order.map(o => S.rooms.get(o[2]).g);
+  const live = [...layer.children].filter(e => !e.classList.contains("gone"));
+  if (want.length !== live.length || want.some((g, i) => g !== live[i])) for (const g of want) layer.appendChild(g);
+  // 草坪与边界
+  const X = ox[nC] - GAP, Y = oy[nR] - GAP;
+  S.bounds = list.length ? [P(-1.7, Y + 1.7)[0], P(0, 0, WALL + 40)[1], P(X + 1.7, -1.7)[0], P(X, Y)[1] + 70] : null;
+  drawGround(list.length ? X : 0, list.length ? Y : 0);
+}
+
+function drawGround(X, Y){
+  const m = 1.7;
+  let s = box(-m, -m, -20, X + 2*m, Y + 2*m, 13, "#cdeebf", "#b5dfa4", "#a3d391");
+  s += `<polygon points="${pts([P(-m+.25,-m+.25,-7),P(X+m-.25,-m+.25,-7),P(X+m-.25,Y+m-.25,-7),P(-m+.25,Y+m-.25,-7)])}" fill="none" stroke="#e5f7dc" stroke-width="2" stroke-dasharray="2 10" stroke-linecap="round"/>`;
+  const tree = (x, y) => { const b = P(x, y, -7); return `<ellipse cx="${f1(b[0])}" cy="${f1(b[1])}" rx="16" ry="8" fill="#5b8f4f" opacity=".18"/>`
+    + `<rect x="${f1(b[0]-3)}" y="${f1(b[1]-22)}" width="6" height="22" rx="2" fill="#b07a4f"/>`
+    + `<circle cx="${f1(b[0])}" cy="${f1(b[1]-34)}" r="17" fill="#6cc070"/><circle cx="${f1(b[0]-7)}" cy="${f1(b[1]-40)}" r="9" fill="#8fd88a"/>` };
+  s += tree(-m + .8, -m + .8) + tree(-m + .8, Y + m - .9) + tree(X + m - .9, -m + .8);
+  $("ground").innerHTML = s;
+}
+
+function render(){
+  const d = S.data; if (!d) return;
+  const now = d.now;
+  S.info.clear();
+  const list = d.leads.filter(l => !S.off.has(l.src) && (l.status === "working" || l.status === "idle" || now - l.last < ROOM_KEEP)).slice(0, MAX_ROOMS);
+  const ids = new Set(list.map(l => l.id));
+  for (const [id, R] of S.rooms) if (!ids.has(id)){ R.g.classList.add("gone"); setTimeout(() => R.g.remove(), 600); S.rooms.delete(id) }
+  for (const l of list) updateRoom(ensureRoom(l.id), l, now);
+  layout(list);
+  // 顶部统计
+  const agents = list.flatMap(l => l.agents);
+  $("sRooms").innerHTML = `<b>${list.length}</b>个房间`;
+  $("sLeads").innerHTML = `<b>${list.filter(l => l.status === "working" || l.status === "idle").length}</b>位主管在岗`;
+  $("sWork").innerHTML = `<b>${agents.filter(a => a.status === "working").length}</b>名员工工作中 · 今日完成 ${agents.filter(a => a.status === "finished").length}`;
+  $("empty").style.display = list.length ? "none" : "block";
+  $("chips").innerHTML = (d.sources || []).map(s =>
+    `<button class="chip ${S.off.has(s.id) ? "off" : ""}" data-src="${h(s.id)}"><i style="background:${sHex(s.id)}"></i>${h(s.label)}</button>`).join("");
+  if (S.autoFit) fit();
+  S.rendered = true;
+}
+
+/* ============ 相机：缩放 / 平移 / 适配 ============ */
+function applyCam(){ const c = S.cam; $("cam").setAttribute("transform", `translate(${f1(c.x)} ${f1(c.y)}) scale(${c.k.toFixed(4)})`) }
+function fit(){
+  const b = S.bounds, vw = innerWidth, vh = innerHeight;
+  if (!b){ S.cam = {x: vw / 2, y: vh / 2, k: 1}; return applyCam() }
+  const top = document.querySelector("header").getBoundingClientRect().bottom + 8;
+  const bot = innerHeight - document.querySelector(".legend").getBoundingClientRect().top + 8;
+  const w = b[2] - b[0], hh = b[3] - b[1];
+  const k = Math.max(.15, Math.min(1.5, Math.min((vw - 24) / w, (vh - top - bot) / hh)));
+  S.cam = {k, x: vw / 2 - (b[0] + w / 2) * k, y: top + (vh - top - bot) / 2 - (b[1] + hh / 2) * k};
+  applyCam();
+}
+function zoomAt(px, py, f){
+  const c = S.cam, k = Math.max(.15, Math.min(2.6, c.k * f));
+  c.x = px - (px - c.x) * k / c.k; c.y = py - (py - c.y) * k / c.k; c.k = k;
+  S.autoFit = false; applyCam();
+}
+const stage = $("stage");
+stage.addEventListener("wheel", e => { e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * .0015)) }, {passive: false});
+let drag = null;
+stage.addEventListener("pointerdown", e => { drag = {x: e.clientX, y: e.clientY, cx: S.cam.x, cy: S.cam.y, moved: false}; stage.setPointerCapture(e.pointerId) });
+stage.addEventListener("pointermove", e => {
+  if (drag){
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) > 3){ drag.moved = true; stage.classList.add("drag"); hideTip() }
+    if (drag.moved){ S.cam.x = drag.cx + dx; S.cam.y = drag.cy + dy; S.autoFit = false; applyCam(); return }
+  }
+  showTip(e);
+});
+const endDrag = () => { drag = null; stage.classList.remove("drag") };
+stage.addEventListener("pointerup", endDrag);
+stage.addEventListener("pointercancel", endDrag);
+stage.addEventListener("pointerleave", hideTip);
+$("zin").onclick = () => zoomAt(innerWidth / 2, innerHeight / 2, 1.25);
+$("zout").onclick = () => zoomAt(innerWidth / 2, innerHeight / 2, .8);
+$("zfit").onclick = () => { S.autoFit = true; fit() };
+addEventListener("resize", () => { if (S.autoFit) fit() });
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-src]"); if (!t) return;
+  const k = t.dataset.src; S.off.has(k) ? S.off.delete(k) : S.off.add(k);
+  lset("off", JSON.stringify([...S.off])); render();
+});
+
+/* ============ 悬停详情 ============ */
+const tip = $("tip");
+function hideTip(){ tip.style.display = "none" }
+function showTip(e){
+  const t = e.target.closest && e.target.closest("[data-k]");
+  const inf = t && S.info.get(t.dataset.k);
+  if (!inf){ hideTip(); return }
+  const d = inf.d, now = S.data.now;
+  const row = (k, v) => v ? `<div class="row">${k}：<b>${h(v)}</b></div>` : "";
+  let html;
+  if (inf.kind === "lead"){
+    const w = d.agents.filter(a => a.status === "working").length;
+    html = `<h4>★ ${h(d.name)} <small>主管 · ${h(ST_ZH[d.status] || d.status)}</small></h4>`
+      + row("任务", d.title) + row("项目", d.project + (d.branch ? " @ " + d.branch : "")) + row("模型", d.model)
+      + row("工具", d.status === "working" && d.tool ? toolName(d.tool) : "")
+      + row("员工", `${d.agents.length} 名（工作中 ${w}）`) + row("用时", dur(d.last - d.start) + " · 最后活动 " + dur(now - d.last) + " 前");
+  } else {
+    html = `<h4>${h(d.name)} <small>${h(d.type)}${d.bg ? " · 后台" : ""} · ${h(ST_ZH[d.status] || d.status)}</small></h4>`
+      + row("任务", d.task) + row("主管", inf.lead.name) + row("模型", d.model)
+      + row("工具", d.status === "working" && d.tool ? toolName(d.tool) : "")
+      + row("用时", dur(d.last - d.start) + (d.status === "working" ? "" : " · " + dur(now - d.last) + " 前结束"));
+  }
+  if (d.reply) html += `<div class="r">${h(d.reply)}</div>`;
+  tip.innerHTML = html; tip.style.display = "block";
+  const r = tip.getBoundingClientRect();
+  let x = e.clientX + 16, y = e.clientY + 16;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 16;
+  if (y + r.height > innerHeight - 8) y = Math.max(8, e.clientY - r.height - 16);
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+
+/* ============ 轮询 ============ */
+async function poll(){
+  try {
+    const r = await fetch("/api/state", {cache: "no-store"}); if (!r.ok) throw 0;
+    S.data = await r.json(); S.ok = true;
+    $("host").textContent = S.data.host ? "· " + S.data.host : "";
+  } catch { S.ok = false }
+  $("brand").classList.toggle("off", !S.ok);
+  try { render() } catch (err) { console.error(err) }
+}
+applyCam();
+poll(); setInterval(poll, 3000);
+</script>
+</body>
+</html>
