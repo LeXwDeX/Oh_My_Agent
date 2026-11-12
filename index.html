@@ -1811,6 +1811,8 @@ const officeRO = new ResizeObserver(() => resize()); officeRO.observe($("office"
 var SCENE_OK = true;                                         // 页面层据此判断体素场景可用
 </script>
 <script>
+/* 项目名显示：全大写，连续下划线并成一个空格（只影响显示，分组键仍用原名） */
+function projLabel(n){ return String(n).replace(/_+/g, " ").trim().toUpperCase() || String(n); }
 /* 原泳道看板（顶部统计 / 档位 / 排班泳道 / 日志 / 跑马灯），包成模块以免与体素场景的全局名冲突 */
 const Deck = (() => {
 const $ = id => document.getElementById(id);
@@ -1998,7 +2000,7 @@ function leadRow(l, live, hasKids){
       <div class="av">${avatar(l.id,"lead",l.face||l.name)}<span class="sb" style="background:${sCol(l.src)}"></span></div>
       <div class="txt">
         <div class="l1"><span class="n" style="color:${sHex(l.src)}">${h(l.name)}</span><span class="mdl">${h(shortModel(l.model))}</span>${stLabel(l.status)}</div>
-        <div class="l2"><span class="task" title="${h(l.title)}">${h(l.project)} · ${h(l.title)}</span></div>
+        <div class="l2"><span class="task" title="${h(l.title)}">${h(projLabel(l.project || ""))} · ${h(l.title)}</span></div>
         ${replyLine(l)}
       </div>
     </div>
@@ -2179,7 +2181,7 @@ const projKey = (d, l) => devOf(d, l.src) + "|" + projName(l);
 const byLive = (a, b) => isLive(b) - isLive(a) || (isLive(a) ? a.start - b.start : b.last - a.last);
 function projFrom(key, leads){
   const live = leads.filter(isLive), st = leads.some(l => l.status === "working") ? "working" : live.length ? "idle" : leads[0].status;
-  return {key, name: projName(leads[0]), leads, status: st, src: leads[0].src,
+  return {key, name: projLabel(projName(leads[0])), leads, status: st, src: leads[0].src,
           start: Math.min(...(live.length ? live : leads).map(l => l.start)), last: Math.max(...leads.map(l => l.last))};
 }
 function mapGroups(d){

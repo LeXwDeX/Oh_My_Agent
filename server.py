@@ -343,6 +343,48 @@ def load_registry(cfg: Path) -> dict[str, dict]:
     return reg
 
 
+# Claude App 的会话元数据目录：其中 isArchived=true 的会话不再显示；DECK_APP_SESSIONS_DIR 设为空串可关闭
+_APP_DIR = os.environ.get("DECK_APP_SESSIONS_DIR", "~/Library/Application Support/Claude/claude-code-sessions").strip()
+APP_SESSIONS = Path(os.path.expanduser(_APP_DIR)) if _APP_DIR else None
+_APP_CACHE: dict[Path, tuple[tuple, bool, list[str]]] = {}
+
+
+def archived_ids() -> set[str]:
+    """在 Claude App 里已归档的 CLI 会话 id（同一 id 也出现在未归档会话里时不算）。按 mtime/size 缓存。"""
+    if not APP_SESSIONS or not APP_SESSIONS.is_dir():
+        return set()
+    out, keep, seen = set(), set(), set()
+    for depth in ("local_*.json", "*/local_*.json", "*/*/local_*.json", "*/*/*/local_*.json"):
+        try:
+            files = list(APP_SESSIONS.glob(depth))
+        except OSError:
+            continue
+        for f in files:
+            try:
+                st = f.stat()
+            except OSError:
+                continue
+            sig = (st.st_mtime_ns, st.st_size)
+            seen.add(f)
+            c = _APP_CACHE.get(f)
+            if not c or c[0] != sig:
+                try:
+                    d = json.loads(f.read_bytes())
+                except Exception:
+                    continue
+                if not isinstance(d, dict):
+                    continue
+                ids = [d.get("cliSessionId"), d.get("lastAssistantCliSessionId")]
+                prior = d.get("priorCliSessionIds")
+                ids += prior if isinstance(prior, list) else []
+                c = _APP_CACHE[f] = (sig, d.get("isArchived") is True, [x for x in ids if isinstance(x, str) and x])
+            (out if c[1] else keep).update(c[2])
+    for f in list(_APP_CACHE):
+        if f not in seen:
+            del _APP_CACHE[f]
+    return out - keep
+
+
 def entry_match(rule, entry) -> bool:
     if rule is None:
         return True
@@ -359,6 +401,7 @@ def scan(sources: list[dict], hours: float) -> dict:
     horizon = time.time() - hours * 3600
     leads, events = [], []
     src_stats = {}
+    archived = archived_ids()
 
     by_dir: dict[str, list[dict]] = {}
     for s in sources:
@@ -387,6 +430,8 @@ def scan(sources: list[dict], hours: float) -> dict:
                 except OSError:
                     continue
                 sid = jf.stem
+                if sid in archived:
+                    continue  # 已在 Claude App 里归档：不再显示
                 subdir = pdir / sid / "subagents"
                 sub_files = []
                 try:
