@@ -869,10 +869,11 @@ function groupsFrom(d){
   }).sort((a, b) => a.id < b.id ? -1 : 1);
   return out.slice(0, 9);
 }
+/* 没有数据时的示例楼：字段与 groupsFrom() 产出一致（缺 subs 会在画人数灯时崩溃） */
 const DEMO = [{id: "demo", label: "Agent Tower", hex: "#5b9dff", floors: [
-  {key: "d1", title: "示例任务 · 重构", name: "Aurora", status: "working", lit: true, boss: true, work: [true, false, true, true]},
-  {key: "d2", title: "示例任务 · 文档", name: "Nova", status: "idle", lit: true, boss: false, work: [false, false, true]},
-  {key: "d3", title: "示例任务 · 排查", name: "Vega", status: "working", lit: true, boss: true, work: [true, true, false, false, true, false]}]}];
+  {key: "d1", title: "示例任务 · 重构", name: "Aurora", status: "working", lit: true, boss: true, work: [true, false, true, true], subs: ["working", "finished", "working"], subTotal: 3},
+  {key: "d2", title: "示例任务 · 文档", name: "Nova", status: "idle", lit: true, boss: false, work: [false, false, true], subs: ["finished"], subTotal: 1},
+  {key: "d3", title: "示例任务 · 排查", name: "Vega", status: "working", lit: true, boss: true, work: [true, true, false, false, true, false], subs: ["working", "working", "finished"], subTotal: 3}]}];
 
 function build(groups, animate){
   const c = buildCity(groups, {animate});
