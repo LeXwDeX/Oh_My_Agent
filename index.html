@@ -1247,7 +1247,7 @@ const VS = `#version 300 es
 layout(location=0) in vec3 aC; layout(location=1) in vec3 aN; layout(location=2) in vec2 aUV;
 layout(location=3) in vec3 iP; layout(location=4) in vec3 iS; layout(location=5) in vec3 iCol; layout(location=6) in vec3 iX; layout(location=7) in float iH;
 uniform mat4 uVP; uniform float uTime;
-out vec3 vCol; out vec3 vN; out vec2 vE; out vec2 vD; out float vEm; out float vMode; out float vZ; out float vHL;
+out vec3 vCol; out vec3 vN; out vec2 vE; out vec2 vD; out float vEm; out float vMode; out float vZ; out float vHL; out vec3 vW;
 void main(){
   float t0 = iX.x;
   float s = 1.0, dz = 0.0;
@@ -1263,14 +1263,26 @@ void main(){
   gl_Position = uVP * vec4(p, 1.0);
   float thin = min(min(iS.x, iS.y), iS.z);
   gl_Position.z -= (1.0 - smoothstep(0.004, 0.06, thin)) * 0.00015;
-  vN = aN; vCol = iCol; vEm = iX.y; vMode = iX.z; vZ = p.z; vHL = iH;
+  vN = aN; vCol = iCol; vEm = iX.y; vMode = iX.z; vZ = p.z; vHL = iH; vW = p;
   vD = abs(aN.x) > 0.5 ? iS.yz : (abs(aN.y) > 0.5 ? iS.xz : iS.xy);
   vE = aUV * vD;
 }`;
 const FS = `#version 300 es
 precision highp float;
-in vec3 vCol; in vec3 vN; in vec2 vE; in vec2 vD; in float vEm; in float vMode; in float vZ; in float vHL;
+in vec3 vCol; in vec3 vN; in vec2 vE; in vec2 vD; in float vEm; in float vMode; in float vZ; in float vHL; in vec3 vW;
 uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uSky; uniform vec3 uGnd; uniform vec3 uWin; uniform float uNight;
+uniform float uIn; uniform vec3 uLamp; uniform vec4 uRoom[8]; uniform int uRoomN;
+/* 室内灯：只照办公室地板以上、朝向室内的面（沿法线外推一点再判断，外墙外侧面不算），楼下和窗外保持夜色 */
+float indoor(vec3 n){
+  vec3 q = vW + n * 0.06;
+  if (q.z < -0.05) return 0.0;
+  for (int i = 0; i < 8; i++){
+    if (i >= uRoomN) break;
+    vec4 r = uRoom[i];
+    if (q.x > r.x && q.y > r.y && q.x < r.z && q.y < r.w) return 1.0;
+  }
+  return 0.0;
+}
 out vec4 o;
 void main(){
   vec3 n = normalize(vN);
@@ -1278,7 +1290,17 @@ void main(){
   vec3 base = isWin ? mix(uWin, vCol, 0.18) : vCol;
   float ndl = max(dot(n, uSun), 0.0);
   vec3 amb = mix(uGnd, uSky, n.z * 0.5 + 0.5);
-  vec3 c = base * (amb + uSunCol * ndl);
+  vec3 lit = amb + uSunCol * ndl;
+  float k = uIn > 0.0 ? uIn * indoor(n) : 0.0;
+  if (k > 0.0){
+    // 顶灯：室内去掉月光的冷色，按缺多少光补暖光；水平面上按 4 格间距有一圈圈灯下光斑
+    float y = dot(lit, vec3(0.3, 0.59, 0.11));
+    lit = mix(lit, vec3(y), 0.6 * k);
+    vec2 g = fract((vW.xy + 2.0) * 0.25) - 0.5;
+    float pool = n.z > 0.5 ? 0.8 + 0.36 * exp(-dot(g, g) * 9.0) : 1.0;
+    lit += uLamp * (k * (0.5 + 0.42 * (n.z * 0.5 + 0.5)) * pool * clamp(1.0 - y * 0.9, 0.0, 1.0));
+  }
+  vec3 c = base * lit;
   if (n.z < 0.5 && vZ > -0.35) c *= mix(0.86, 1.0, smoothstep(0.0, 0.6, vZ));
   float w = min(0.035, 0.16 * min(vD.x, vD.y));
   vec2 d = min(vE, vD - vE);
@@ -1294,7 +1316,7 @@ function shader(type, src){ const s = gl.createShader(type); gl.shaderSource(s, 
 const prog = gl.createProgram();
 gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
 if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-const U = {}; for (const n of ["uVP", "uTime", "uSun", "uSunCol", "uSky", "uGnd", "uWin", "uNight"]) U[n] = gl.getUniformLocation(prog, n);
+const U = {}; for (const n of ["uVP", "uTime", "uSun", "uSunCol", "uSky", "uGnd", "uWin", "uNight", "uIn", "uLamp", "uRoom", "uRoomN"]) U[n] = gl.getUniformLocation(prog, n);
 const cube = [], idx = [];
 const FACES = [[[1,0,0], (u, v) => [1, u, v]], [[-1,0,0], (u, v) => [0, u, v]], [[0,1,0], (u, v) => [u, 1, v]], [[0,-1,0], (u, v) => [u, 0, v]], [[0,0,1], (u, v) => [u, v, 1]], [[0,0,-1], (u, v) => [u, v, 0]]];
 FACES.forEach(([nrm, fn], f) => { for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) cube.push(...fn(u, v), ...nrm, u, v); idx.push(f * 4, f * 4 + 1, f * 4 + 2, f * 4, f * 4 + 2, f * 4 + 3) });
@@ -1394,6 +1416,27 @@ function lightAt(hr){
   const day = norm([Math.cos(az), Math.sin(az), el]), moon = norm([.55, .45, .9]);
   L.dir = norm(day.map((v, i) => lerp(v, moon[i], L.night)));
   return L;
+}
+/* 室内开灯：天黑到一定程度开灯（黄昏已开一部分），白天为 0、着色器完全不走这段；
+   房间范围按 buildWorld 的排法推算（办公室沿 x 依次排开、间隔 5），超过 8 间时最后一格盖住其余 */
+const LAMP = rgbOf("#ffd49c"), ROOMS = new Float32Array(32);
+let roomsOf = null, roomN = 0;
+function setIndoorLight(L){
+  const w = S.world;
+  if (w !== roomsOf){
+    roomsOf = w; roomN = 0; ROOMS.fill(0);
+    let x = 0;
+    for (const g of (w && w.geo) || []){
+      if (!g) continue;
+      const i = Math.min(roomN, 7) * 4;
+      if (roomN < 8){ ROOMS[i] = x; ROOMS[i + 1] = 0; roomN++ }
+      ROOMS[i + 2] = x + g.W; ROOMS[i + 3] = Math.max(ROOMS[i + 3], g.D);
+      x += g.W + 5;
+    }
+  }
+  const t = clamp((L.night - .08) / .42, 0, 1);
+  gl.uniform1f(U.uIn, t * t * (3 - 2 * t)); gl.uniform3fv(U.uLamp, LAMP);
+  gl.uniform4fv(U.uRoom, ROOMS); gl.uniform1i(U.uRoomN, roomN);
 }
 const PHASES = [[5, 10, "早上", "🌅"], [10, 16, "中午", "☀️"], [16, 19.5, "黄昏", "🌇"]];
 const phaseOf = hr => { for (const [a, b, n, ic] of PHASES) if (hr >= a && hr < b) return [n, ic]; return ["夜晚", "🌙"] };
@@ -1683,6 +1726,7 @@ function frame(ts){
   gl.uniform3fv(U.uSky, rgbOf(L.sky)); gl.uniform3fv(U.uGnd, rgbOf(L.gnd));
   gl.uniform3fv(U.uWin, rgbOf(mixHex(mixHex(L.bot, L.top, .4), "#ffffff", .25)));
   gl.uniform1f(U.uNight, L.night);
+  setIndoorLight(L);
   gl.bindVertexArray(staticVAO); gl.drawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0, staticCount);
   if (nDyn){ gl.bindVertexArray(dynVAO); gl.drawElementsInstanced(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0, nDyn) }
   gl.bindVertexArray(null);
