@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const m = html.match(/\/\/ <place-rules>[^\n]*\n([\s\S]*?)\/\/ <\/place-rules>/);
 assert.ok(m, "index.html 里找不到 <place-rules> 段落");
-const { placeKind, isCiTask } = new Function(m[1] + "\nreturn {placeKind, isCiTask};")();
+const { placeKind, isCiTask, dutyHeld } = new Function(m[1] + "\nreturn {placeKind, isCiTask, dutyHeld};")();
 
 const sub = (o) => ({ boss: false, status: "working", type: "implementer", task: "", kind: null, ...o });
 const boss = (o) => ({ boss: true, status: "working", type: "lead", title: "", kind: null, ...o });
@@ -49,4 +49,19 @@ test("没有分类结果时退回本地规则：只看自己的标题", () => {
 test("本地规则里的 CI 只按独立的词识别", () => {
   for (const t of ["CI", "ci: 缓存分层", "修复 CI", "跑CI", "CI/CD 流水线", "GitHub CI 失败", "(ci)"]) assert.ok(isCiTask(sub({ task: t })), t);
   for (const t of ["", "decision log", "CICD", "Circle 配置", "specific", "acid"]) assert.ok(!isCiTask(sub({ task: t })), t);
+});
+
+test("下班判定带记忆：判定下班后不再被拉回，重新开工才回来", () => {
+  const held = new Map(), H = 3600e3, a = { status: "finished", last: 0 };
+  assert.equal(dutyHeld(held, "k", a, H - 1, H), true);
+  assert.equal(dutyHeld(held, "k", a, H, H), false);
+  // 时间戳在 1 小时边界上抖动（推送时钟校正）也不回来
+  assert.equal(dutyHeld(held, "k", { ...a, last: 500 }, H, H), false);
+  assert.equal(dutyHeld(held, "k", { ...a, last: 63e3 }, H, H), false);
+  assert.equal(dutyHeld(held, "k", a, H - 1, H), false);
+  // 之后又有新的活动、或者重新开工，才回到岗位
+  assert.equal(dutyHeld(held, "k", { ...a, last: 10 * 60e3 }, 11 * 60e3, H), true);
+  assert.equal(dutyHeld(held, "k", a, 2 * H, H), false);
+  assert.equal(dutyHeld(held, "k", { status: "working", last: 0 }, 2 * H, H), true);
+  assert.equal(held.has("k"), false);
 });

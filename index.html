@@ -529,9 +529,9 @@ function buildOffice(off, oi, X0, opt, W0){
   const top = zones.slice(0, nt), bot = zones.slice(nt);
   const topP = Math.max(2, ...top.map(z => z.pairs)), BD1 = bandDepth(topP), BD2 = nb ? bandDepth(Math.max(2, ...bot.map(z => z.pairs))) : 6.5;
   const D = Math.ceil(Math.max(15.5, BD1 + MAIN + BD2)), mainY = BD1 + MAIN / 2, ty2 = BD1 + MAIN;
-  const corr = X0 + CORE + .8, HUB = [corr, mainY];                          // 所有路线都经过这个枢纽
+  const corr = X0 + CORE + .8, HUB = [corr, mainY];                          // 进出电梯、去机房都经过这个枢纽
   const W = Math.ceil(Math.max(TX0 + (nt + 1) * TW, TX0 + nb * TW + 13, 20) + 1);          // 上排末尾多留一个共享工位岛
-  W0.geo[oi] = {BD1, D, W};                                                  // 增量重建时用来识别整体平移（见 popNew）
+  W0.geo[oi] = {BD1, D, W, mainY};                                           // 增量重建时用来识别整体平移（见 popNew、remapPeople）
   // 核心筒分段（y）
   const PAN = 3.6, WC1 = PAN + 1.0, WC2 = WC1 + 1.0, EVE = WC2 + 4.4, STE = EVE + 1.5, SVE = D;
   const e1 = WC2 + 1.2, e2 = WC2 + 3.1, entY = e1 + .1;                      // 两部电梯；门禁入口与电梯 1 对齐
@@ -1055,7 +1055,8 @@ function buildOffice(off, oi, X0, opt, W0){
     for (let cx = tx0 + .4; cx < tx1 - .2; cx += .8){
       chairAt(OB(cx, ty0 - .38, 1, t + .2), "#5b6b86"); chairAt(OB(cx, ty1 + .38, 3, t + .2), "#5b6b86");
       spot("meet", [cx, ty0 - .38], 1, "seat", [[doorX, mainY], [doorX, y + .6], [cx, y + .6]], t + .5);
-      spot("meet", [cx, ty1 + .38], 3, "seat", [[doorX, mainY], [doorX, y + .6], [x + w - .35, y + .6], [x + w - .35, y + d - .45], [cx, y + d - .45]], t + .5);
+      // 下排座位从桌子左端绕过去：右端被桌尾那把椅子和玻璃墙堵住，走不过去
+      spot("meet", [cx, ty1 + .38], 3, "seat", [[doorX, mainY], [doorX, y + .6], [x + 1.0, y + .6], [x + 1.0, y + d - .45], [cx, y + d - .45]], t + .5);
       if (RND() < .6){ const s = RND() < .5 ? -1 : 1, yy = s < 0 ? ty0 + .1 : ty1 - .35; add(cx - .15, yy, .72, .3, .25, .015, "#c9cfd6", t + .25); add(cx - .15, s < 0 ? yy + .22 : yy, .72, .3, .03, .2, "#3a4352", t + .26) }
       if (RND() < .5) add(cx + .2, (ty0 + ty1) / 2 + (RND() - .5) * .5, .72, .05, .05, .16, "#bfe6ff", t + .27);
     }
@@ -1075,12 +1076,14 @@ function buildOffice(off, oi, X0, opt, W0){
     add(x + .3, y + .4, 0, .75, 2.4, .35, sc, t + .05); add(x + .2, y + .4, .35, .22, 2.4, .45, shade(sc, .9), t + .07);
     for (const [a, b, c] of [[.8, .5, "#ffd166"], [1.7, .5, "#ff9fb0"], [.45, 1.6, "#9fd8ff"]]) add(x + a, y + b, .35, .4, .3, .3, c, t + .1);
     add(x + 1.4, y + 1.5, 0, 1.3, .8, .3, C.wood, t + .1);
-    for (const sx of [1.0, 1.85, 2.7]) spot("lounge", [x + sx, y + .85], 1, "seat", [[x + sx, mainY]], t + .5);
-    for (const sy of [1.55, 2.35]) spot("lounge", [x + .75, y + sy], 0, "seat", [[x + 1.2, mainY], [x + 1.2, y + sy]], t + .5);
+    // 沙发背朝主通道：从沙发右端外侧（x + 3.3）进休息区，沿沙发与茶几之间的空当走到座位前，不翻沙发靠背
+    const gate = [[x + 3.3, mainY], [x + 3.3, y + 1.33]];
+    for (const sx of [1.0, 1.85, 2.7]) spot("lounge", [x + sx, y + .85], 1, "seat", [...gate, [x + sx, y + 1.33]], t + .5);
+    for (const sy of [1.55, 2.35]) spot("lounge", [x + .75, y + sy], 0, "seat", [...gate, [x + 1.2, y + 1.33], [x + 1.2, y + sy]], t + .5);
     add(x + 1.55, y + 1.65, .3, .3, .22, .03, "#5b9dff", t + .12); add(x + 1.6, y + 1.68, .33, .26, .18, .02, "#ffd166", t + .13);
     add(x + 2.1, y + 1.7, .3, .2, .2, .07, "#e58f65", t + .12); for (let s = 0; s < 4; s++) add(x + 2.12 + (s % 2) * .08, y + 1.72 + Math.floor(s / 2) * .08, .37, .06, .06, .03, ["#ffd166", "#ff7aa8", "#4fbf7a", "#ff9f43"][s], t + .13);
     add(x + 2.4, y + 1.95, .3, .14, .08, .03, C.dark, t + .13);
-    if (w >= 6){ for (const [a, b, c] of [[w - 1.8, 2.6, "#ff7aa8"], [w - 1.0, 3.3, "#ffd166"]]){ add(x + a, y + b, 0, .6, .6, .3, c, t + .1); add(x + a + .08, y + b + .08, .3, .44, .44, .12, tint(c, .2), t + .12); spot("lounge", [x + a + .3, y + b + .3], 2, "seat", [[x + a - .5, mainY], [x + a - .5, y + b + .3]], t + .5) } }
+    if (w >= 6){ for (const [a, b, c] of [[w - 1.8, 2.6, "#ff7aa8"], [w - 1.0, 3.3, "#ffd166"]]){ add(x + a, y + b, 0, .6, .6, .3, c, t + .1); add(x + a + .08, y + b + .08, .3, .44, .44, .12, tint(c, .2), t + .12); spot("lounge", [x + a + .3, y + b + .3], 2, "seat", [[x + w - 2.3, mainY], [x + w - 2.3, y + b + .3]], t + .5) } }   // 两个懒人沙发都从左侧同一条竖道进，后一个不再穿过前一个
     // 座位坐满后，完成的人站在空地上歇着：沙发右侧两排（避开懒人沙发和街机）+ 茶几下方一排
     const standAt = (xx, yy, dir, appr) => { if (xx > .8 && xx < w - .6 && yy > .9 && yy < d - .5) spot("lounge", [x + xx, y + yy], dir, "stand", appr, t + .5) };
     for (let xx = 3.5; xx <= w - 1.3; xx += .8) standAt(xx, 1.7, 2, [[x + xx, mainY]]);
@@ -1428,8 +1431,7 @@ function skyPos(s){
    数据 → 办公区；人员管理（入座 / 从电梯走进来 / 走回电梯离开）
    ============================================================ */
 const COOL_MS = 60 * 60e3;                                     // 结束（完成 / 失败 / 中止）超过 1 小时的子 agent 下班：从工位或休息区走回电梯离开
-const onDuty = (a, now) => a.status === "working" || a.status === "idle" || now - a.last < COOL_MS;
-const S = {world: null, start: performance.now(), autoFit: true, skew: 0, data: null, sig: "", slots: new Map(),
+const S = {world: null, start: performance.now(), autoFit: true, skew: 0, data: null, sig: "", slots: new Map(), held: new Map(),
            hourMode: "auto", themeMode: "auto", hourShown: null, people: new Map(), labelEls: [], zoneEls: [], lastFrame: 0, raf: 0,
            animEnd: 0, hover: null, tween: null, down: null, layout: "jp"};
 // 版式：链接参数 ?layout= 优先，其次本地记忆
@@ -1446,7 +1448,7 @@ function officesFrom(d){
   const dev = ls.length ? devOf(d, ls[0].src) : (d.host || "本机"), hex = DEV_HEX[hashStr(dev) % DEV_HEX.length];
   if (!ls.length) return [{id: dev, label: dev, hex, zones: []}];
   // 在岗的团队都上座：在忙的优先，其余按最近活动排；新人需要时自动加开工位；已完成的去休息区（坐满就站着），结束超过 1 小时的下班离开
-  const teams = ls.map(l => ({l, team: l.agents.filter(a => onDuty(a, d.now))}));
+  const teams = ls.map(l => ({l, team: l.agents.filter(a => dutyHeld(S.held, leadKey(l) + "|" + a.id, a, d.now, COOL_MS))}));
   // 岛的分配：每个会话先给 1 个岛（最多 6 个会话上座），剩余名额按顺序补给人多的会话（单个会话最多 3 个岛）
   const isl = teams.map((T, i) => i < MAX_ISLANDS ? 1 : 0);
   let left = MAX_ISLANDS - isl.reduce((a, b) => a + b, 0);
@@ -1489,6 +1491,7 @@ function build(offices, animate){
   const prev = S.world, w = buildWorld(offices, {animate});
   if (!animate && prev) popNew(prev, w);
   S.world = w;
+  if (prev) remapPeople(prev, w);
   gl.bindBuffer(gl.ARRAY_BUFFER, staticBuf); gl.bufferData(gl.ARRAY_BUFFER, w.data, gl.STATIC_DRAW);
   staticCount = w.count;
   const lab = $("labels"); lab.replaceChildren(); S.labelEls = []; S.zoneEls = [];
@@ -1548,9 +1551,75 @@ const placeKind = sp => {
   if (sp.boss) return null;
   return MEET_RE.test(sp.type || "") ? "meet" : OPS_RE.test(sp.type || "") ? "srv" : null;
 };
+// 下班判定带记忆：判定下班后就一直算下班（时间戳在 1 小时边界上来回抖动也不会把人拉回来），
+// 直到重新开工（working / idle），或之后又有新的活动（last 比下班时晚 5 分钟以上；几分钟内的时间戳校正不算）
+const dutyHeld = (held, key, a, now, cool) => {
+  if (a.status === "working" || a.status === "idle"){ held.delete(key); return true }
+  const off = held.get(key);
+  if (off !== undefined && a.last <= off + 5 * 60e3) return false;
+  held.delete(key);
+  if (now - a.last < cool) return true;
+  held.set(key, a.last); return false;
+};
 // </place-rules>
 
-// 人员同步：首次（或铺设动画未完）直接就位；之后新人从电梯走进来，换去处的人沿通道走过去，离开的人走回电梯
+// <routes>（tests/routes.test.mjs 会抽出这一段单独测试）
+// 路线 = 出发支路（落点 → 主通道路口）+ 沿主通道直走 + 到达支路（主通道路口 → 落点）。
+// 落点的 approach 是 [枢纽, 主通道路口, …, 落点]，都是建场景时按通道 / 门洞排好的折线；路口在主通道中线上，
+// 没有这种路口的（机房）以枢纽为路口；电梯（落点为空）的支路就是 entry（电梯门 → … → 枢纽）。
+// 枢纽也在主通道中线上，所以任意两个路口之间都是沿主通道的一段直线：不用先绕回电梯口，也不会斜穿墙和家具。
+const ROUTE_EPS = 1e-3;
+const samePt = (a, b) => Math.abs(a[0] - b[0]) < ROUTE_EPS && Math.abs(a[1] - b[1]) < ROUTE_EPS;
+const pathLen = path => { let L = 0; for (let i = 1; i < path.length; i++) L += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]); return L };
+// 到达支路：主通道路口 → 落点（sp 为空 = 回电梯）；出发支路是它倒过来
+function legIn(w, oi, sp){
+  if (!sp) return w.entry[oi].slice().reverse();
+  const a = sp.approach, k = a.length > 2 && Math.abs(a[1][1] - w.geo[sp.oi].mainY) < ROUTE_EPS ? 1 : 0;
+  return a.slice(k);
+}
+const legOut = (w, oi, sp) => legIn(w, oi, sp).reverse();
+// from / to：座位或场景点位，null 表示电梯。La / Lc / Lb = 出发支路 / 主通道 / 到达支路的长度
+function routeOf(w, oi, from, to){
+  const a = legOut(w, oi, from), b = legIn(w, oi, to), ja = a[a.length - 1], jb = b[0];
+  return {path: samePt(ja, jb) ? a.concat(b.slice(1)) : a.concat(b), La: pathLen(a), Lc: Math.hypot(jb[0] - ja[0], jb[1] - ja[1]), Lb: pathLen(b), ja, jb};
+}
+function posAt(path, s){
+  let L = 0;
+  for (let i = 1; i < path.length; i++){
+    const a = path[i - 1], b = path[i], d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (s <= L + d || i === path.length - 1){ const u = d > 0 ? Math.min(1, Math.max(0, (s - L) / d)) : 1; return {x: a[0] + (b[0] - a[0]) * u, y: a[1] + (b[1] - a[1]) * u, i} }
+    L += d;
+  }
+  return {x: path[0][0], y: path[0][1], i: 1};
+}
+// 走到一半换目标：只沿已有支路和主通道走。还在出发支路上 → 先走到路口；已进到达支路 → 原路退回路口；
+// 在主通道上 → 从当前位置直接沿主通道走向新路口。返回新路线的出发点和当前位置在新路线上的进度
+function reroute(w, oi, from, to, s, dest){
+  const r = routeOf(w, oi, from, to);
+  if (s <= r.La || !to) return {from, s};
+  if (s >= r.La + r.Lc) return {from: to, s: Math.max(0, r.Lb - (s - r.La - r.Lc))};
+  const x = r.ja[0] + (r.jb[0] - r.ja[0]) * (s - r.La) / r.Lc, jz = legIn(w, oi, dest)[0];
+  if ((x - r.ja[0]) * (jz[0] - x) >= 0) return {from, s};                 // 新路口与原出发路口分在当前位置两侧：保留出发点
+  return {from: to, s: r.Lb + Math.abs(r.jb[0] - x)};                     // 否则以原目标为出发点，往回走
+}
+// 场景重建后行走中的人：同一段（出发支路 / 主通道 / 到达支路）、同样比例换算到新坐标
+function remapS(o, n, s){
+  if (s <= o.La) return o.La > 0 ? s / o.La * n.La : 0;
+  if (s <= o.La + o.Lc) return n.La + (o.Lc > 0 ? (s - o.La) / o.Lc * n.Lc : 0);
+  return n.La + n.Lc + (o.Lb > 0 ? Math.min(1, (s - o.La - o.Lc) / o.Lb) * n.Lb : 0);
+}
+// 新场景里已经没有的落点（离开的人的工位被收掉）：按版面平移换算旧坐标。
+// 上排岛从 y = 0 起算不动；主通道跟着 mainY；下排工位贴着前窗（D）；会议室 / 休息区跟着主通道（BD1）
+function shiftSpot(sp, a, b){
+  if (!sp || !a || !b) return sp;
+  const dy = sp.kind ? b.BD1 - a.BD1 : b.D - a.D;
+  const f = q => [q[0], Math.abs(q[1] - a.mainY) < ROUTE_EPS ? b.mainY : q[1] < a.mainY ? q[1] : q[1] + dy];
+  return {...sp, p: f(sp.p), approach: sp.approach.map(f)};
+}
+// </routes>
+
+// 人员同步：首次（或铺设动画未完）直接就位；之后新人从电梯走进来，换去处的人沿通道走过去，离开的人走回电梯。
+// 已经开始离场的人不再被拉回（若还在名单上，走进电梯后下一轮再从电梯进来）
 function syncPeople(offices, settle){
   const w = S.world, plan = new Map();
   offices.forEach((o, oi) => { for (const z of o.zones){
@@ -1558,19 +1627,19 @@ function syncPeople(offices, settle){
     for (const s of z.subs) plan.set(z.key + "|" + s.id, {boss: false, name: s.a.name, type: s.a.type, status: s.status, task: s.a.task, kind: s.a.kind || null, d: s.a, z, oi});
   }});
   for (const [k, p] of S.people){
-    if (plan.has(k) && w.seats.has(k)) continue;
-    if (!settle && (p.state === "seat" || p.state === "stand") && p.at) walkTo(p, null);
-    else if (p.state !== "out") S.people.delete(k);
+    if (p.state === "out" || (plan.has(k) && w.seats.has(k))) continue;
+    if (settle) S.people.delete(k); else goTo(p, null);
   }
   // 位置分配：已经在用的保留，其余按顺序分配空位；满了就留在自己工位
   const taken = new Set();
   for (const [k, sp] of plan){
     sp.home = w.seats.get(k); sp.kind = placeKind(sp);
-    const p = S.people.get(k), cur = p && p.want && w.spotMap.get(p.want.id);
+    const p = S.people.get(k), cur = p && p.state !== "out" && p.want && w.spotMap.get(p.want.id);
     if (sp.kind && cur && cur.kind === sp.kind && !taken.has(cur.id)){ sp.spot = cur; taken.add(cur.id) }
   }
-  for (const [, sp] of plan){
+  for (const [k, sp] of plan){
     if (!sp.kind || sp.spot) continue;
+    const p = S.people.get(k); if (p && p.state === "out") continue;
     const free = ((w.spots[sp.oi] || {})[sp.kind] || []).find(x => !taken.has(x.id));
     if (free){ sp.spot = free; taken.add(free.id) }
   }
@@ -1578,28 +1647,41 @@ function syncPeople(offices, settle){
     if (!sp.home) continue;
     const target = sp.spot || sp.home;
     let p = S.people.get(k);
+    if (p && p.state === "out") continue;
     if (!p){
       p = {key: k, look: lookOf(sp.name, sp.type, sp.boss), phase: Math.random() * 6.28, dir: 0, walk: 0, t0: -1};
       S.people.set(k, p);
-      if (settle) place(p, target, target.t); else enter(p, target);
-    } else if (p.state === "out") enter(p, target);
-    else if (p.state === "seat" || p.state === "stand"){
-      if (p.at && p.at.id !== target.id && !settle) walkTo(p, target); else place(p, target, p.t0);
-    } else if (p.next && p.next.id === target.id) p.next = target;
+      if (settle) place(p, target, target.t); else setRoute(p, null, target, 0);
+    } else if (p.state === "in"){
+      if (p.next.id !== target.id){ if (settle) place(p, target, -1); else goTo(p, target) }
+    } else if (p.at.id !== target.id && !settle) goTo(p, target);
+    else place(p, target, p.t0);
     Object.assign(p, {boss: sp.boss, name: sp.name, status: sp.status, d: sp.d, z: sp.z, oi: sp.oi, want: target});
   }
 }
-function place(p, target, t0){ Object.assign(p, {state: target.pose || "seat", at: target, next: null, x: target.p[0], y: target.p[1], dir: target.dir, t0}) }
-function setPath(p, path, state, next){
+function place(p, target, t0){ Object.assign(p, {state: target.pose || "seat", at: target, from: null, next: null, x: target.p[0], y: target.p[1], dir: target.dir, t0}) }
+// 按 from → to 铺路线，从进度 s 处接着走；to 为空 = 走回电梯离开
+function setRoute(p, from, to, s){
+  const oi = from ? from.oi : to ? to.oi : p.roi || 0, r = routeOf(S.world, oi, from, to), path = r.path;
   const cum = [0]; for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
-  Object.assign(p, {state, path, cum, s: 0, t0: -1, next, x: path[0][0], y: path[0][1]});
+  const q = posAt(path, s);
+  Object.assign(p, {state: to ? "in" : "out", from, next: to, roi: oi, route: r, path, cum, s, t0: -1, x: q.x, y: q.y});
 }
-function enter(p, target){ setPath(p, [...S.world.entry[target.oi], ...target.approach.slice(1)], "in", target) }
-// 从当前位置先退回枢纽，再走向目标；target 为空表示下班离开（走回电梯）
-function walkTo(p, target){
-  const back = [[p.x, p.y], ...p.at.approach.slice().reverse().slice(1)];
-  if (!target){ const e = (S.world.entry[p.at.oi] || []).slice().reverse(); setPath(p, [...back, ...e.slice(1)], "out", null); return }
-  setPath(p, [...back, ...target.approach.slice(1)], "in", target);
+// 换去处：坐着的从座位出发；走在路上的从当前位置沿支路 / 主通道改道（见 reroute），不会直线穿墙
+function goTo(p, dest){
+  if (p.state === "seat" || p.state === "stand"){ setRoute(p, p.at, dest, 0); return }
+  const r = reroute(S.world, p.roi, p.from, p.next, p.s, dest);
+  setRoute(p, r.from, dest, r.s);
+}
+// 场景重建后把人挪到新坐标：落点按 id 换成新场景里的对象（没有了就按版面平移换算），行走中的人按进度比例落到新路线上
+function remapPeople(prev, w){
+  const look = sp => sp && ((sp.kind ? w.spotMap.get(sp.id) : w.seats.get(sp.id)) || shiftSpot(sp, prev.geo[sp.oi], w.geo[sp.oi]));
+  for (const [k, p] of S.people){
+    if (p.state === "seat" || p.state === "stand"){ p.at = look(p.at); p.x = p.at.p[0]; p.y = p.at.p[1]; continue }
+    if (!w.entry[p.roi]){ S.people.delete(k); continue }
+    const from = look(p.from), to = look(p.next);
+    setRoute(p, from, to, remapS(p.route, routeOf(w, p.roi, from, to), p.s));
+  }
 }
 function stepPeople(dt){
   for (const [k, p] of S.people){
