@@ -143,7 +143,11 @@ h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-
 .l3 .rt{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .l3 .tool{display:inline-flex;align-items:center;gap:3px;font-size:10px;letter-spacing:.04em;color:var(--work);border:1px solid color-mix(in srgb,var(--work) 40%,transparent);border-radius:4px;padding:3px 5px 3px 3px;margin-right:6px;line-height:9px;flex:none}
 .l3 .tool svg{flex:none;width:9px;height:9px;display:block}
-.l3.open{align-items:flex-start;white-space:normal;color:var(--dim);line-height:1.5;background:color-mix(in srgb,var(--line) 40%,transparent);border-radius:5px;padding:4px 6px;margin-top:4px}
+.l3:hover .rt,.l3.open .rt{color:var(--dim)}
+/* 回复全文用浮层显示：悬停预览、点击固定，不再原地换行撑高泳道（窄栏里会一行一个字） */
+#rtip{position:fixed;z-index:70;left:0;top:0;max-width:min(420px,calc(100vw - 16px));max-height:min(50vh,320px);overflow:auto;padding:8px 11px;border-radius:9px;background:var(--panel);color:var(--text);border:1px solid var(--line2);box-shadow:0 10px 28px #0005;font:12px/1.55 var(--sans);white-space:pre-wrap;word-break:break-word;display:none;pointer-events:none}
+#rtip.pin{pointer-events:auto;border-color:color-mix(in srgb,var(--work) 45%,var(--line2))}
+#rtip .tn{display:block;margin-bottom:4px;font:10px var(--mono);letter-spacing:.04em;color:var(--work)}
 .row.hasreply{min-height:60px}
 .st{font-size:10.5px;letter-spacing:.12em;flex:none}
 .st.working{color:var(--work)} .st.idle{color:var(--idle)} .st.finished,.st.done{color:var(--done)} .st.stopped{color:var(--stop)} .st.failed{color:var(--fail)}
@@ -1709,7 +1713,7 @@ const ST_LABEL = {working:"WORKING", idle:"IDLE", finished:"✓ FINISHED", done:
 const GEAR=`<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="2.553 2.553"/><circle cx="8" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="3.2"/></svg>`;
 const VERB = {on:"上岗", finished:"完成", done:"收工", stopped:"中止", failed:"失败"};
 
-const S = {openReply:new Set(), data:null, ok:true, win:+(localGet("win")||1), job:null, off:new Set(JSON.parse(localGet("off")||"[]")), open:new Set(), showAll:new Set(), skew:0};
+const S = {pinReply:null, data:null, ok:true, win:+(localGet("win")||1), job:null, off:new Set(JSON.parse(localGet("off")||"[]")), open:new Set(), showAll:new Set(), skew:0};
 function localGet(k){try{return localStorage.getItem("deck."+k)}catch{return null}}
 function localSet(k,v){try{localStorage.setItem("deck."+k,v)}catch{}}
 
@@ -1871,7 +1875,7 @@ function replyLine(item){
   const tool = item.status==="working" && item.tool ? `<span class="tool">${GEAR}${h(toolName(item.tool))}</span>` : "";
   if(!item.reply && !tool) return "";
   const k=item.id||"";
-  return `<div class="l3 ${S.openReply.has(k)?"open":""}" data-reply="${h(k)}" title="${h(item.reply||"")}">${tool}<span class="rt">${h(item.reply||"")}</span></div>`;
+  return `<div class="l3 ${S.pinReply===k?"open":""}" data-reply="${h(k)}">${tool}<span class="rt">${h(item.reply||"")}</span></div>`;
 }
 function stLabel(st){st=ST_LABEL[st]?st:"stopped";return `<span class="st ${st}">${st==="working"?'<span class="spin" aria-hidden="true"></span> ':""}${ST_LABEL[st]}</span>`}
 
@@ -1961,11 +1965,37 @@ function restartTicker(run){
   const an=run.getAnimations()[0]; if(an&&t) an.currentTime=t;
 }
 
+/* 回复浮层：悬停 ↳ 行显示全文，点击固定（再点/点别处/Esc 关闭）；浮层挂在 body 上，不占泳道高度 */
+const rtip = document.createElement("div"); rtip.id = "rtip"; document.body.appendChild(rtip);
+let rtHover = null;
+function rtEl(k){ return k==null ? null : document.querySelector(`.l3[data-reply="${CSS.escape(k)}"]`) }
+function rtShow(){
+  if(S.pinReply!=null && !rtEl(S.pinReply)) S.pinReply = null;      // 那一行已不在列表里
+  const k = S.pinReply ?? rtHover, el = rtEl(k);
+  document.querySelectorAll(".l3.open").forEach(x => { if(x!==el || S.pinReply==null) x.classList.remove("open") });
+  if(el && S.pinReply!=null) el.classList.add("open");
+  const r = el && el.getBoundingClientRect();
+  const txt = el ? el.querySelector(".rt").textContent : "", tool = el ? (el.querySelector(".tool")?.textContent || "") : "";
+  if(!el || (!txt && !tool) || !r.width || r.bottom < 0 || r.top > innerHeight){ rtip.style.display = "none"; return }
+  rtip.classList.toggle("pin", S.pinReply!=null);
+  rtip.innerHTML = (tool ? `<span class="tn">${h(tool)}</span>` : "") + h(txt);
+  rtip.style.left = "0px"; rtip.style.display = "block";   // 先回到左侧再量尺寸，免得贴右边时宽度被挤窄
+  const t = rtip.getBoundingClientRect(), pad = 8;
+  const x = Math.max(pad, Math.min(r.left + 14, innerWidth - t.width - pad));
+  const y = r.bottom + 6 + t.height <= innerHeight - pad ? r.bottom + 6 : Math.max(pad, r.top - 6 - t.height);
+  rtip.style.left = x + "px"; rtip.style.top = y + "px";
+}
+document.addEventListener("mouseover", e => { const el = e.target.closest(".l3[data-reply]"); const k = el ? el.dataset.reply : null; if(k!==rtHover){ rtHover = k; rtShow() } });
+document.addEventListener("scroll", () => { if(rtip.style.display==="block") rtShow() }, true);
+addEventListener("resize", () => { if(rtip.style.display==="block") rtShow() });
+addEventListener("keydown", e => { if(e.key==="Escape" && S.pinReply!=null){ S.pinReply = null; rtShow(); e.stopImmediatePropagation() } }, true);
+
 function render(){
   if(!S.data) return;
   patch($("eyebrow"),`AGENT DECK · <span style="text-transform:none;color:var(--text)">${h(S.data.host)}</span> · 值班台`);
   renderStats(); renderSources(); renderJobs(); renderAxis(); renderLanes(); renderLog();
   if(API.onRender) API.onRender();
+  rtShow();
 }
 
 function tickClock(){
@@ -1986,9 +2016,10 @@ function ingest(d, ok){
 }
 
 document.addEventListener("click",e=>{
+  if(S.pinReply!=null && !e.target.closest("#rtip,[data-reply]")){ S.pinReply=null; rtShow(); }
   const t=e.target.closest("[data-src],[data-job],[data-win],[data-all],[data-reply],[data-lead]"); if(!t) return;
   if(t.dataset.lead!==undefined){ if(API.onSelect) API.onSelect(t.dataset.lead); return; }
-  if(t.dataset.reply!==undefined){const k=t.dataset.reply; S.openReply.has(k)?S.openReply.delete(k):S.openReply.add(k); render(); return;}
+  if(t.dataset.reply!==undefined){const k=t.dataset.reply; S.pinReply = S.pinReply===k ? null : k; rtShow(); return;}
   if(t.dataset.src){const k=t.dataset.src; S.off.has(k)?S.off.delete(k):S.off.add(k); localSet("off",JSON.stringify([...S.off]))}
   else if(t.dataset.job){S.job = S.job===t.dataset.job? null : t.dataset.job}
   else if(t.dataset.win){S.win=+t.dataset.win; localSet("win",S.win)}
