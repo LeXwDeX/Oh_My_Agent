@@ -1716,7 +1716,7 @@ function fireAt(level, t){ if (level < .8) return 0; const u = ((t % 10) + 10) %
 // </summon>
 
 /* 黑龙配色集中在这里。龙身带一点自发光（E），不然夜色里的黑龙只剩一团黑 */
-const DRAGON_COL = {scale: "#2f2d45", scale2: "#252338", ridge: "#15131f", shine: "#5a5680", belly: "#5d4e6c", horn: "#4a4768", tip: "#8f8aa8", bone: "#d8d2c4", eye: "#ff2d2d", pupil: "#2a0508", ember: "#ff6a1f", mouth: "#4a1620", wing: "#1e1f2e", membrane: "#3a2238", smoke: "#3a3540",
+const DRAGON_COL = {eye: "#ff2d2d", pupil: "#2a0508", ember: "#ff6a1f", wing: "#1e1f2e", membrane: "#3a2238", membrane2: "#33203a", smoke: "#3a3540",
                     line: "#0b0a11", dark: "#181624", mid: "#262438", light: "#3a3752", hi: "#58547a", bellyD: "#30283b", bellyL: "#4f4260", gum: "#4a1f2e", tooth: "#d8cfe0"};
 /* 黑龙头的体素模型：在整数网格上雕出来（一格 = DRAGON_VOX），只算一次。比例取自侧面像素画——颅骨到吻尖是逐渐收窄压低的楔形，
    眉骨隆起压着眼窝，嘴里掏空，上下两排牙；脑后七对角由粗到细向后上方掠出去。上色按部位分明暗档，不逐颗随机。
@@ -1831,6 +1831,55 @@ function moteVox(t){
   }
 }
 
+/* 龙爪的体素模型（只算一次）：手背是个扁椭球，三根手指是由粗到细的体素管，从墙外搭上墙头再向室内弯下去，末端骨白色利爪；前臂垂在墙外。
+   返回 [w, f, u, 颜色]（w 横向、f 朝室内、u 向上，原点在墙头） */
+let DRAGON_CLAW = null;
+function dragonClaw(){
+  if (DRAGON_CLAW) return DRAGON_CLAW;
+  const C0 = DRAGON_COL, m = new Map(), key = (w, f, u) => w + "," + f + "," + u;
+  const ball = (cw, cf, cu, r, kind) => {
+    const n = Math.ceil(r);
+    for (let a = -n; a <= n; a++) for (let b = -n; b <= n; b++) for (let c = -n; c <= n; c++){
+      if (a * a + b * b + c * c > r * r + .25) continue;
+      const w = Math.round(cw + a), f = Math.round(cf + b), u = Math.round(cu + c), old = m.get(key(w, f, u));
+      if (!old || kind === "bone" || old[3] !== "bone") m.set(key(w, f, u), [w, f, u, kind]);
+    }
+  };
+  const tube = (pts, r0, r1, kind) => {
+    const ls = []; let tot = 0, acc = 0;
+    for (let i = 1; i < pts.length; i++){ ls.push(Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2])); tot += ls[i - 1] }
+    for (let i = 1; i < pts.length; i++){
+      const n = Math.ceil(ls[i - 1] * 1.5);
+      for (let q = 0; q <= n; q++){ const tt = q / n; ball(lerp(pts[i - 1][0], pts[i][0], tt), lerp(pts[i - 1][1], pts[i][1], tt), lerp(pts[i - 1][2], pts[i][2], tt), lerp(r0, r1, (acc + ls[i - 1] * tt) / tot), kind) }
+      acc += ls[i - 1];
+    }
+  };
+  tube([[0, -9, 1], [0, -10.5, -4], [0, -10, -10]], 3.2, 3.6, "skin");
+  for (let a = -6; a <= 6; a++) for (let b = -3; b <= 3; b++) for (let c = -2; c <= 3; c++) if (a * a / 36 + b * b / 10 + c * c / 7 <= 1) m.set(key(a, b - 8, c + 2), [a, b - 8, c + 2, "skin"]);
+  for (const i of [-1, 0, 1]){
+    const x = i * 3.9, ln = i ? 0 : 1.5;
+    tube([[x * .9, -6, 2.2], [x, -1, 2.6], [x, 2.5 + ln, 1.6], [x, 4 + ln, -1.2], [x, 3.8 + ln, -3.6]], 1.6, 1.1, "skin");
+    tube([[x, 3.8 + ln, -3.6], [x, 3.4 + ln, -5.2], [x, 2.6 + ln, -6.8]], 1.0, .35, "bone");
+    ball(x * .92, -4.5, 4.3, .9, "spike");
+  }
+  const out = [];
+  for (const [w, f, u, kind] of m.values()){
+    const has = (a, b, c) => m.has(key(w + a, f + b, u + c));
+    if (has(1, 0, 0) && has(-1, 0, 0) && has(0, 1, 0) && has(0, -1, 0) && has(0, 0, 1) && has(0, 0, -1)) continue;
+    const band = ((f + 2 * w) % 5 + 5) % 5 === 0;                                        // 朝上的一层亮一档，其余暗，每隔几格一道鳞纹
+    out.push([w, f, u, kind === "bone" ? C0.tooth : kind === "spike" ? C0.line : !has(0, 0, 1) ? (band ? C0.mid : C0.light) : band ? C0.line : C0.dark]);
+  }
+  return DRAGON_CLAW = out;
+}
+/* 脖子的一圈体素：椭圆截面的外壳。元素是 [i 横向, j 背腹向, 部位]，部位 0 = 两侧、1 = 背、2 = 腹甲 */
+const NECK_RINGS = new Map();
+function neckRing(rx, rz){
+  let r = NECK_RINGS.get(rx * 16 + rz); if (r) return r;
+  const inside = (i, j) => i * i / (rx * rx) + j * j / (rz * rz) <= 1; r = [];
+  for (let i = -rx; i <= rx; i++) for (let j = -rz; j <= rz; j++) if (inside(i, j) && !(inside(i + 1, j) && inside(i - 1, j) && inside(i, j + 1) && inside(i, j - 1))) r.push([i, j, j > rz * .4 ? 1 : j < -rz * .35 && Math.abs(i) < rx * .78 ? 2 : 0]);
+  NECK_RINGS.set(rx * 16 + rz, r); return r;
+}
+
 /* 传送门（原电梯门位）：门洞里一面紫色光幕 + 盘旋的光点；有人进出时转得更快、更亮 */
 function portalVox(d, t){
   const mc = MAGIC_COL, x = d.x - .1;
@@ -1845,56 +1894,60 @@ function portalVox(d, t){
    召唤越深头探得越远、悬到书案上方俯视；fire>0 时张嘴朝法阵喷火。全部是轴对齐方块，每帧按姿态重新摆放。约 400 盒 */
 function dragonVox(t, s, fire){
   const at = summonAt(); if (!at) return;
-  const g = at.g, dx = at.x, D = DRAGON_COL, Z = SWH + .27, E = .4;
-  const vq = v => Math.max(M, Math.round(v / M) * M);                                                        // 部件尺寸取整到微体素，龙身才是一颗颗方块拼的
-  const Bc = (cx, cy, cz, sx, sy, sz, col, e = E, m = 0) => { sx = vq(sx); sy = vq(sy); sz = vq(sz); add(cx - sx / 2, cy - sy / 2, cz - sz / 2, sx, sy, sz, col, -1, e, m) };
-  // ---- 龙爪：两只扒在墙头，各三根指，指尖越过墙顶向室内弯下，末端骨白色利爪；前臂垂在墙外
-  const rise = 1 - smooth01((s - .05) / .25);
+  const g = at.g, dx = at.x, D = DRAGON_COL, Z = SWH + .27, E = .4, V = DRAGON_VOX;
+  // ---- 龙爪：两只扒在墙头（体素模型见 dragonClaw），召唤初期从墙外升上来；不转动，只平移，所以体素严丝合缝
+  const rise = 1 - smooth01((s - .05) / .25), CL = dragonClaw();
   for (const sg of [-1, 1]){
     const cx = dx + sg * 3.4, oy = -1.1 * rise + Math.sin(t * 1.3 + sg * 2) * .02, oz = Z - 1.9 * rise;
-    for (let i = -1; i <= 1; i++){
-      const fx = cx + i * .54, ln = i ? 0 : .14, tap = Math.max(0, Math.sin(t * 1.6 + sg * 1.7 + i * 1.3)) * .06;
-      Bc(fx, -.45 + oy, oz + .2, .42, .62, .4, D.scale); Bc(fx, -.3 + oy, oz + .46, .16, .16, .14, D.ridge);
-      Bc(fx, .1 + ln / 2 + oy, oz + .16 + tap, .4, .62 + ln, .32, D.scale2);
-      Bc(fx, .5 + ln + oy, oz - .15 + tap, .38, .3, .72, D.scale);
-      Bc(fx, .56 + ln + oy, oz - .63 + tap, .22, .22, .3, D.bone, .3); Bc(fx, .6 + ln + oy, oz - .86 + tap, .13, .13, .2, D.bone, .3);
-    }
-    Bc(cx, -1.05 + oy, oz + .18, 1.8, .72, .56, D.scale); Bc(cx, -1.05 + oy, oz + .5, 1.45, .5, .1, D.ridge);
-    Bc(cx, -1.2 + oy, oz - 1.3, 1.05, .72, 2.5, D.scale2);
+    for (const [w, f, u, col] of CL) add(cx + sg * w * V - V / 2, oy + f * V - V / 2, oz + u * V - V / 2, V, V, V, col, -1, .3, 0);
   }
   if (summonStage(s) < 2) return;
-  // ---- 双翼：从墙后升起。上臂骨 → 翼肘 → 四根指骨，指骨之间的翼膜按格取包围盒（阶梯状），外缘留出扇贝形缺口；缓慢扇动
+  // ---- 双翼：从墙后升起，缓慢扇动。翼膜的轮廓是「翼肘 → 四个指尖 → 翼根」，指尖之间向翼肘凹进去一块（扇贝边）；
+  //      按行扫描把轮廓填成一条条体素高的横条，边缘自然是台阶状。翼骨是压在膜前的一串体素
   const wr = smooth01((s - .3) / .35), flap = Math.sin(t * .9) * .5 + Math.sin(t * 2.3) * .08, wy = -3.3, drop = -7.5 * (1 - wr);
+  const bone = (a, b, w, col) => { const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / V); for (let i = 0; i <= n; i++){ const tt = i / n; add(Math.round(lerp(a[0], b[0], tt) / V) * V - w / 2, wy + V, Math.round(lerp(a[1], b[1], tt) / V) * V - w / 2, w, w, w, col, -1, E, 0) } };
   for (const sg of [-1, 1]){
     const R = [dx + sg * 1.4, 1.2 + drop], El = [dx + sg * 4.6, 6.4 + drop + flap * .3];
     const F = [[9.0, 5.7 + flap], [8.5, 3.3 + flap * .7], [6.8, 1.5 + flap * .4], [4.2, .6]].map(p => [dx + sg * p[0], p[1] + drop]);
-    for (let i = 0; i <= 7; i++){ const u = i / 7; Bc(lerp(R[0], El[0], u), wy, lerp(R[1], El[1], u), .52, .52, .52, D.wing) }
-    Bc(El[0], wy, El[1] + .4, .28, .28, .5, D.bone, .3);
-    const P = (f, u) => [lerp(El[0], F[f][0], u), lerp(El[1], F[f][1], u)];
-    for (let f = 0; f < 4; f++){ for (let i = 1; i <= 8; i++){ const p = P(f, i / 8); Bc(p[0], wy, p[1], .3, .36, .3, D.wing) } Bc(F[f][0], wy, F[f][1] - .18, .16, .2, .3, D.bone, .3) }
-    for (let f = 0; f < 3; f++) for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++){
-      const u0 = .1 + i / 6 * .86, u1 = .1 + (i + 1) / 6 * .86 - (i === 5 && j === 1 ? .1 : 0), xs = [], zs = [];
-      for (const u of [u0, u1]) for (const v of [j / 3, (j + 1) / 3]){ const a = P(f, u), b = P(f + 1, u); xs.push(lerp(a[0], b[0], v)); zs.push(lerp(a[1], b[1], v)) }
-      const x0 = Math.min(...xs), z0 = Math.min(...zs);
-      add(x0, wy + .08, z0, Math.max(...xs) - x0, .12, Math.max(...zs) - z0, f & 1 ? shade(D.membrane, .86) : D.membrane, -1, E, 0);
+    const poly = [El];
+    F.forEach((p, i) => { poly.push(p); if (i < 3){ const q = F[i + 1]; poly.push([lerp((p[0] + q[0]) / 2, El[0], .22), lerp((p[1] + q[1]) / 2, El[1], .22)]) } });
+    poly.push(R);
+    let z0 = Infinity, z1 = -Infinity; for (const q of poly){ z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]) }
+    for (let row = Math.floor(z0 / V); row * V < z1; row++){
+      const zc = (row + .5) * V, xs = [];
+      for (let i = 0; i < poly.length; i++){ const a = poly[i], b = poly[(i + 1) % poly.length]; if ((a[1] > zc) !== (b[1] > zc)) xs.push(a[0] + (zc - a[1]) / (b[1] - a[1]) * (b[0] - a[0])) }
+      xs.sort((a, b) => a - b);
+      for (let i = 0; i + 1 < xs.length; i += 2){ const xa = Math.round(xs[i] / V) * V, xb = Math.round(xs[i + 1] / V) * V; if (xb > xa) add(xa, wy, row * V, xb - xa, V, V, row % 4 ? D.membrane : D.membrane2, -1, E, 0) }
     }
+    bone(R, El, V * 3, D.wing); for (const p of F) bone(El, p, V * 2, D.wing);
+    add(El[0] - V, wy + V, El[1] + V, V * 2, V * 2, V * 3, D.tooth, -1, .3, 0); for (const p of F) add(p[0] - V / 2, wy + V, p[1] - V * 2, V, V, V * 2, D.tooth, -1, .3, 0);   // 翼爪
   }
   // ---- 头的位姿：k 为探入深度。刚出现时头埋在墙后只露出角和眼睛，随 k 抬高、前伸到书案上方；始终略微低头俯视，喷火时压得更低
-  const k = smooth01((s - .3) / .7), up = smooth01((s - .3) / .12), V = DRAGON_VOX, bob = Math.sin(t * 1.1) * .1, sway = Math.sin(t * .6) * .3 * k;
+  const k = smooth01((s - .3) / .7), up = smooth01((s - .3) / .12), bob = Math.sin(t * 1.1) * .1, sway = Math.sin(t * .6) * .3 * k;
   const open = .1 + .5 * fire + .04 * Math.sin(t * 1.7), th = .6 * Math.pow(1 - k, 1.5) + .2 + fire * .2, c = Math.cos(th), sn = Math.sin(th);
   const ax = dx + sway, ay = lerp(-2.6, at.y - at.r - 1.6, k), az = lerp(SWH - .5, 5.0, smooth01(k * 1.5)) + bob - 2.4 * (1 - up);
   const Hp = (lx, ly, lz) => [ax + lx, ay + ly * c + lz * sn, az - ly * sn + lz * c];                        // 头部局部坐标（x 横向、y 朝前、z 向上）→ 世界，绕头心俯仰
-  // ---- 脖子：沿二次贝塞尔曲线排 16 节方块（由粗到细），背侧暗色脊板 + 隔节一根背刺，腹侧暗红鳞板；喷火时靠近头的几节腹板透出火光
-  const P0 = [dx, -3.0, .5], P2 = Hp(0, -6 * V, 3 * V), P1 = [dx + sway * .5, lerp(-3.0, -1.6, k), lerp(SWH + 1.5, SWH + 3.4, k) - 2.4 * (1 - up)], n = 16;
-  for (let i = 0; i < n; i++){
-    const u = i / (n - 1), a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, d = u * u, sz = lerp(1.35, .9, u);
-    const px = a * P0[0] + b * P1[0] + d * P2[0] + Math.sin(t * .8 + i * .5) * .12 * (1 - u), py = a * P0[1] + b * P1[1] + d * P2[1], pz = a * P0[2] + b * P1[2] + d * P2[2];
-    const ty = 2 * (1 - u) * (P1[1] - P0[1]) + 2 * u * (P2[1] - P1[1]), tz = 2 * (1 - u) * (P1[2] - P0[2]) + 2 * u * (P2[2] - P1[2]), tl = Math.hypot(ty, tz) || 1, ny = -tz / tl, nz = ty / tl;
-    const hot = fire > 0 && i >= n - 6;
-    Bc(px, py, pz, sz, sz, sz, i & 1 ? D.scale : D.scale2);
-    Bc(px, py + ny * sz * .36, pz + nz * sz * .36, sz * .6, sz * .6, sz * .6, i & 1 ? D.shine : D.horn);                    // 背上的鳞板比两侧亮一档，蛇颈才有轮廓
-    Bc(px, py - ny * sz * .34, pz - nz * sz * .34, sz * .72, sz * .62, sz * .62, hot ? mixHex(D.belly, D.ember, fire * .8) : D.belly, hot ? 1 : E, hot ? 1 : 0);
-    if (i & 1){ Bc(px, py + ny * (sz * .5 + .2), pz + nz * (sz * .5 + .2), .24, .24, .24, D.ridge); Bc(px, py + ny * (sz * .5 + .44), pz + nz * (sz * .5 + .44), .13, .13, .13, D.tip, .3) }
+  // ---- 脖子：沿二次贝塞尔曲线每隔一格摆一圈体素环（椭圆截面，由粗到细）。背侧暗、两侧带鳞纹，腹侧是一节节灰紫腹甲，隔几圈一根向后倾的背刺；
+  //      喷火时靠近头的那段腹甲透出火光。环随曲线转向，方块本身不转，略放大一点盖住弯道外侧的缝
+  { const P0 = [dx, -3.0, .5], P2 = Hp(0, -6 * V, 3 * V), P1 = [dx + sway * .5, lerp(-3.0, -1.6, k), lerp(SWH + 1.5, SWH + 3.4, k) - 2.4 * (1 - up)], NS = 32, pts = [], ns = V * 1.18;
+    let len = 0;
+    for (let i = 0; i <= NS; i++){ const u = i / NS, a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, d = u * u, q = [a * P0[0] + b * P1[0] + d * P2[0], a * P0[1] + b * P1[1] + d * P2[1], a * P0[2] + b * P1[2] + d * P2[2], 0]; if (i) len += Math.hypot(q[1] - pts[i - 1][1], q[2] - pts[i - 1][2]); q[3] = len; pts.push(q) }
+    const steps = Math.ceil(len / (V * .92)), hotCol = fire > 0 ? mixHex(D.bellyL, D.ember, Math.round(fire * 4) / 4 * .85) : null;
+    for (let st = 0, seg = 1; st <= steps; st++){
+      const sd = Math.min(len, st * V * .92); while (seg < NS && pts[seg][3] < sd) seg++;
+      const A = pts[seg - 1], B = pts[seg], tt = (sd - A[3]) / Math.max(1e-6, B[3] - A[3]), u = (seg - 1 + tt) / NS;
+      const ty = B[1] - A[1], tz = B[2] - A[2], tl = Math.hypot(ty, tz) || 1, ny = -tz / tl, nz = ty / tl;
+      const qx = lerp(A[0], B[0], tt) + Math.sin(t * .8 + u * 8) * .12 * (1 - u), qy = lerp(A[1], B[1], tt), qz = lerp(A[2], B[2], tt);
+      const rz = Math.round(lerp(4.5, 3.2, u)), hot = hotCol && u > .68;
+      for (const [i, j, part] of neckRing(Math.round(lerp(5.5, 4, u)), rz)){
+        const band = ((st + 2 * i) % 5 + 5) % 5 === 0, col = part === 2 ? (hot ? hotCol : (st / 3 | 0) & 1 ? D.bellyL : D.bellyD) : part === 1 ? (band ? D.line : D.dark) : band ? D.dark : D.mid;
+        add(qx + i * V - ns / 2, qy + ny * j * V - ns / 2, qz + nz * j * V - ns / 2, ns, ns, ns, col, -1, hot && part === 2 ? 1 : .3, hot && part === 2 ? 1 : 0);
+      }
+      if (st % 7 === 3 && u > .1 && u < .96) for (let q = 1, sl = 3 + Math.round(Math.sin(u * Math.PI) * 3); q <= sl; q++){
+        const jj = rz + q, back = q * .55;
+        add(qx - ns / 2, qy + (ny * jj - ty / tl * back) * V - ns / 2, qz + (nz * jj - tz / tl * back) * V - ns / 2, ns, ns, ns, q > sl * .6 ? D.line : D.mid, -1, .3, 0);
+      }
+    }
   }
   // ---- 头：整数网格上雕好的体素模型（见 dragonHead），这里只做摆放——整体随头的俯仰转过去，下颌再绕铰链张开；方块本身保持轴对齐，略放大一点盖住转动后的缝
   const HM = dragonHead(), vs = V * 1.16, ja = open * .8, jc = Math.cos(ja), js = Math.sin(ja);
