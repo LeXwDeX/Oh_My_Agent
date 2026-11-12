@@ -33,6 +33,10 @@ header>*{pointer-events:auto}
 .zoom{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:6px;z-index:2}
 .zoom button{width:36px;height:36px;border-radius:11px;border:1px solid #fff;background:var(--card);box-shadow:0 4px 12px #4a5a7a1f;font:inherit;font-size:16px;cursor:pointer;color:var(--ink)}
 .zoom button:hover{background:#fff}
+.ic{display:inline-block;width:.9em;height:.9em;vertical-align:-.1em;flex:none;overflow:visible}   /* SVG 图标：盒子中心落在大写字母/汉字的视觉中线上 */
+.zoom button{display:grid;place-items:center;padding:0}
+.zoom button .ic{width:16px;height:16px}
+.legend em .ic{width:10px;height:10px}
 .legend{position:fixed;left:16px;bottom:16px;z-index:2;display:flex;flex-wrap:wrap;gap:10px;padding:7px 12px;font-size:12px;color:var(--muted);max-width:calc(100% - 90px)}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .legend em{font-style:normal;display:inline-grid;place-items:center;min-width:16px;height:16px;border-radius:8px;color:#fff;font-size:10px;font-weight:700;padding:0 4px}
@@ -89,29 +93,34 @@ header>*{pointer-events:auto}
   <g id="cam"><g id="ground"></g><g id="rooms"></g></g>
 </svg>
 <header>
-  <div class="pill brand" id="brand"><span class="dot"></span>Agent Office <span class="host" id="host"></span><a href="/">泳道视图 →</a></div>
+  <div class="pill brand" id="brand"><span class="dot"></span>Agent Office <span class="host" id="host"></span><a href="/">泳道视图 <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></a></div>
   <div class="pill stat" id="sRooms"></div>
   <div class="pill stat" id="sLeads"></div>
   <div class="pill stat" id="sWork"></div>
   <div class="chips" id="chips"></div>
 </header>
 <div class="pill legend">
-  <span><em style="background:var(--work)">⚙</em>工作中</span>
-  <span><em style="background:#3aa76d">✓</em>已完成</span>
-  <span><em style="background:var(--fail)">!</em>失败</span>
-  <span><em style="background:var(--stop)">❚❚</em>中止</span>
-  <span><em style="background:#8b7fd6">Z</em>待命</span>
+  <span><em style="background:var(--work)"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="2.553 2.553"/><circle cx="8" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="3.2"/></svg></em>工作中</span>
+  <span><em style="background:#3aa76d"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 8.4l3.3 3.3L13 4.6"/></svg></em>已完成</span>
+  <span><em style="background:var(--fail)"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8 3v6"/><circle fill="currentColor" cx="8" cy="12.4" r="1.3"/></svg></em>失败</span>
+  <span><em style="background:var(--stop)"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M4.25 3.5h2.5v9h-2.5zM9.25 3.5h2.5v9h-2.5z"/></svg></em>中止</span>
+  <span><em style="background:#8b7fd6"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4.5 4h7l-7 8h7"/></svg></em>待命</span>
   <span>悬停人物看详情 · 滚轮缩放 · 拖动平移</span>
 </div>
 <div class="zoom">
-  <button id="zin" title="放大">＋</button>
-  <button id="zout" title="缩小">－</button>
-  <button id="zfit" title="适配全部">⤢</button>
+  <button id="zin" title="放大"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M8 3v10M3 8h10"/></svg></button>
+  <button id="zout" title="缩小"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 8h10"/></svg></button>
+  <button id="zfit" title="适配全部"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M9.5 2.5h4v4M13.5 2.5L9.3 6.7M6.5 13.5h-4v-4M2.5 13.5l4.2-4.2"/></svg></button>
 </div>
 <div id="tip"></div>
 <div class="pill" id="empty">暂时没有活跃的任务房间<br><small>主会话上岗后会自动开出新房间</small></div>
 
 <script>
+/* 图标统一用 SVG：都画在 16×16 视框正中，不再用 ▸ ✕ ＋ 等字符（字形重心随字体漂移，看起来不居中） */
+const IC_P = {gear:`<circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="2.553 2.553"/><circle cx="8" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="3.2"/>`,check:`<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 8.4l3.3 3.3L13 4.6"/>`,alert:`<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8 3v6"/><circle fill="currentColor" cx="8" cy="12.4" r="1.3"/>`,pause:`<path fill="currentColor" d="M4.25 3.5h2.5v9h-2.5zM9.25 3.5h2.5v9h-2.5z"/>`,zz:`<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4.5 4h7l-7 8h7"/>`,star:`<path fill="currentColor" d="M8.00 2.39L9.57 6.44L13.90 6.68L10.54 9.42L11.64 13.61L8.00 11.26L4.36 13.61L5.46 9.42L2.10 6.68L6.43 6.44Z"/>`};
+const IC = Object.fromEntries(Object.entries(IC_P).map(([k, p]) => [k, `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${p}</svg>`]));
+/* 在 SVG 里按中心点摆一个图标：size 为边长（px），颜色走 currentColor */
+const icAt = (n, cx, cy, size, color) => { const k = size / 16; return `<g transform="translate(${(cx - 8 * k).toFixed(2)} ${(cy - 8 * k).toFixed(2)}) scale(${k.toFixed(4)})" color="${color}">${IC_P[n]}</g>` };
 "use strict";
 /* ============ 常量与工具 ============ */
 const $ = id => document.getElementById(id);
@@ -181,22 +190,23 @@ function personSVG(o, s){
 }
 
 /* 头顶名牌：状态图标 + 名字 (+ 正在调用的工具)；前后排错开，不会互相遮挡 */
-const ICON = {working: ["#2f9e6f", "⚙"], finished: ["#3aa76d", "✓"], done: ["#b6bec9", "✓"], failed: ["#e5484d", "!"],
-              stopped: ["#9aa1ac", "❚❚"], idle: ["#8b7fd6", "Z"]};
+const ICON = {working: ["#2f9e6f", "gear"], finished: ["#3aa76d", "check"], done: ["#b6bec9", "check"], failed: ["#e5484d", "alert"],
+              stopped: ["#9aa1ac", "pause"], idle: ["#8b7fd6", "zz"]};
 function badgeSVG(o, s){
   const y = -84 * s, st = o.status;
-  const [ic, glyph] = ICON[st] || ["#9aa1ac", "·"];
-  const name = (o.boss ? "★ " : "") + o.name;
+  const [ic, glyph] = ICON[st] || ["#9aa1ac", null];
+  const name = o.name, sw = o.boss ? 12 : 0;            // 主管名字前加一颗星（SVG 图标，宽 9 + 间距 3）
   const tool = st === "working" && o.tool ? clip(toolName(o.tool), 90, 9.5) : "";
   const dots = st === "working" && !o.tool;
-  const nw = textW(name, 10.5), tw = tool ? textW(" · ", 10) + textW(tool, 9.5) * 1.06 : 0, dw = dots ? 22 : 0;
+  const nw = textW(name, 10.5) + sw, tw = tool ? textW(" · ", 10) + textW(tool, 9.5) * 1.06 : 0, dw = dots ? 22 : 0;
   const w = 31 + nw + tw + dw + 9, x0 = -w / 2;
   let g = `<g class="${st === "failed" ? "shake" : ""}">`
     + `<rect x="${f1(x0)}" y="${y-10}" width="${f1(w)}" height="20" rx="10" fill="#fff" stroke="${o.boss ? o.ring : "#e3e7ee"}" stroke-width="${o.boss ? 1.5 : 1}"/>`
     + `<path d="M-4 ${y+9.5} L0 ${y+14} L4 ${y+9.5}Z" fill="#fff"/>`
     + `<circle cx="${f1(x0+16)}" cy="${y}" r="7.5" fill="${ic}"/>`
-    + `<text x="${f1(x0+16)}" y="${y + (glyph === "❚❚" ? 2.4 : 3.6)}" text-anchor="middle" font-size="${glyph === "❚❚" ? 6.5 : 10}" font-weight="800" fill="#fff">${glyph}</text>`
-    + `<text x="${f1(x0+29)}" y="${y+3.7}" font-size="10.5" font-weight="${o.boss ? 700 : 600}" fill="${o.boss ? shade(o.ring, .7) : "#3b4252"}">${h(name)}`
+    + (glyph ? icAt(glyph, x0 + 16, y, glyph === "gear" ? 9 : 9.5, "#fff") : "")
+    + (sw ? icAt("star", x0 + 33.5, y, 9, o.boss ? shade(o.ring, .7) : "#3b4252") : "")
+    + `<text x="${f1(x0+29+sw)}" y="${y+3.7}" font-size="10.5" font-weight="${o.boss ? 700 : 600}" fill="${o.boss ? shade(o.ring, .7) : "#3b4252"}">${h(name)}`
     + (tool ? `<tspan fill="#9aa1ac" font-weight="400"> · </tspan><tspan fill="#2f9e6f" font-size="9.5" font-weight="800" letter-spacing=".04em">${h(tool)}</tspan>` : "")
     + `</text>`;
   if (dots){ const dx = x0 + 29 + nw + 7; g += `<g class="dots" fill="#2f9e6f">` + [0, 6, 12].map(d => `<circle cx="${f1(dx+d)}" cy="${y+1}" r="2"/>`).join("") + `</g>` }
@@ -229,13 +239,14 @@ function stationSVG(o){
 
 /* 走路的小人：原点在脚底；两条腿交替抬起 + 身体轻颠 */
 function walkerSVG(o){
-  const s = o.boss ? 1.12 : 1, nm = (o.boss ? "★ " : "") + o.name, w = textW(nm, 10) + 14;
+  const s = o.boss ? 1.12 : 1, nm = o.name, sw = o.boss ? 12 : 0, tw = textW(nm, 10), w = tw + sw + 14;
   return `<ellipse cx="0" cy="0" rx="${13*s}" ry="${6*s}" fill="#3b4a6b" opacity=".16"/>`
     + `<rect class="lg" x="${-7*s}" y="${-19*s}" width="${5.6*s}" height="${19*s}" rx="${2.6*s}" fill="#4b5563"/>`
     + `<rect class="lg lg2" x="${1.4*s}" y="${-19*s}" width="${5.6*s}" height="${19*s}" rx="${2.6*s}" fill="#4b5563"/>`
     + `<g class="wb"><g transform="translate(0 ${-13*s})">${personSVG({...o, status: "walk"}, s)}</g></g>`
     + `<rect x="${-w/2}" y="${-96*s}" width="${w}" height="16" rx="8" fill="#fff" fill-opacity=".95" stroke="${o.boss ? o.ring : "#e3e7ee"}"/>`
-    + `<text x="0" y="${-96*s + 11.5}" text-anchor="middle" font-size="10" font-weight="600" fill="#3b4252">${h(nm)}</text>`;
+    + (sw ? icAt("star", -(tw + sw) / 2 + 4.5, -96 * s + 8, 9, "#3b4252") : "")
+    + `<text x="${sw / 2}" y="${-96*s + 11.5}" text-anchor="middle" font-size="10" font-weight="600" fill="#3b4252">${h(nm)}</text>`;
 }
 
 /* ============ 房间静态部分 ============ */
@@ -559,7 +570,7 @@ function showTip(e){
   let html;
   if (inf.kind === "lead"){
     const w = d.agents.filter(a => a.status === "working").length;
-    html = `<h4>★ ${h(d.name)} <small>主管 · ${h(ST_ZH[d.status] || d.status)}</small></h4>`
+    html = `<h4>${IC.star}${h(d.name)} <small>主管 · ${h(ST_ZH[d.status] || d.status)}</small></h4>`
       + row("任务", d.title) + row("项目", d.project + (d.branch ? " @ " + d.branch : "")) + row("模型", d.model)
       + row("工具", d.status === "working" && d.tool ? toolName(d.tool) : "")
       + row("员工", `${d.agents.length} 名（工作中 ${w}）`) + row("用时", dur(d.last - d.start) + " · 最后活动 " + dur(now - d.last) + " 前");

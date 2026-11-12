@@ -125,8 +125,9 @@ h1{font-family:var(--sans);font-size:30px;font-weight:700;margin:6px 0 0;letter-
 .l2{display:flex;gap:8px;align-items:baseline;font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:hidden}
 .l2 .task{color:var(--dim);overflow:hidden;text-overflow:ellipsis}
 /* flex 居中：工具徽标与回复文字共用一条中线 */
+.ic{display:inline-block;width:.9em;height:.9em;vertical-align:-.1em;flex:none;overflow:visible}   /* SVG 图标：盒子中心落在大写字母/汉字的视觉中线上 */
 .l3{display:flex;align-items:center;font-size:11px;color:var(--faint);margin-top:3px;white-space:nowrap;overflow:hidden;cursor:pointer;max-width:100%}
-.l3::before{content:"↳";margin-right:.35em;flex:none;color:var(--text)}
+.l3::before{content:"";width:11px;height:11px;margin-right:.35em;flex:none;background:var(--text);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 2.5v6.5h8M9.5 6l3 3-3 3' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 2.5v6.5h8M9.5 6l3 3-3 3' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}   /* ↳ 改用 SVG 遮罩，和徽标、文字同一条中线 */
 .l3 .rt{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .l3 .tool{display:inline-flex;align-items:center;gap:3px;font-size:10px;letter-spacing:.04em;color:var(--work);border:1px solid color-mix(in srgb,var(--work) 40%,transparent);border-radius:4px;padding:3px 5px 3px 3px;margin-right:6px;line-height:9px;flex:none}
 .l3 .tool svg{flex:none;width:9px;height:9px;display:block}
@@ -182,7 +183,7 @@ footer{margin-top:14px;font-size:11px;color:var(--faint);display:flex;justify-co
 <header>
   <div>
     <div class="eyebrow" id="eyebrow">AGENT DECK · 值班台</div>
-    <h1>谁在值班 <a class="viewlink" href="/" title="办公室主视图">OFFICE →</a></h1>
+    <h1>谁在值班 <a class="viewlink" href="/" title="办公室主视图">OFFICE <svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></a></h1>
   </div>
   <div class="clockbox">
     <div>
@@ -193,7 +194,7 @@ footer{margin-top:14px;font-size:11px;color:var(--faint);display:flex;justify-co
   </div>
 </header>
 
-<div class="ticker"><div class="lab">◀ FEED</div><div class="track"><div class="run" id="ticker"></div></div></div>
+<div class="ticker"><div class="lab"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M10.25 3.5L5 8l5.25 4.5z"/></svg> FEED</div><div class="track"><div class="run" id="ticker"></div></div></div>
 
 <section class="stats" id="stats"></section>
 <section class="sources" id="sources"></section>
@@ -217,12 +218,15 @@ footer{margin-top:14px;font-size:11px;color:var(--faint);display:flex;justify-co
 <footer><span id="foot">本机各档位 Agent 会话 · 只读扫描</span><span id="upd"></span></footer>
 
 <script>
+/* 图标统一用 SVG：都画在 16×16 视框正中，不再用 ▸ ✕ ＋ 等字符（字形重心随字体漂移，看起来不居中） */
+const IC_P = {caretD:`<path fill="currentColor" d="M3.5 5.75L8 11l4.5-5.25z"/>`,caretU:`<path fill="currentColor" d="M3.5 10.25L8 5l4.5 5.25z"/>`,close:`<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 4l8 8M12 4l-8 8"/>`,check:`<path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 8.4l3.3 3.3L13 4.6"/>`,stop:`<rect fill="currentColor" x="4" y="4" width="8" height="8" rx="1.5"/>`};
+const IC = Object.fromEntries(Object.entries(IC_P).map(([k, p]) => [k, `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${p}</svg>`]));
 const $ = id => document.getElementById(id);
 const SRC_COLOR = {app:"var(--app)", cli:"var(--cli)", ds:"var(--ds)", qwen:"var(--qwen)"};
 const SRC_HEX = {app:"#e08a5f", cli:"#b8b3a8", ds:"#5b9dff", qwen:"#a884ff"};
 const JOB_PALETTE = ["#ff9a3c","#5b9dff","#6fcf8a","#a884ff","#e8c46a","#4fd1c5","#ff7aa8","#9ccc65","#f0a35e","#7aa2ff"];
 const KIND_LABEL = {on:"ON DUTY", finished:"FINISHED", done:"DONE", stopped:"STOPPED", failed:"FAILED"};
-const ST_LABEL = {working:"WORKING", idle:"IDLE", finished:"✓ FINISHED", done:"✓ DONE", stopped:"■ STOPPED", failed:"✕ FAILED"};
+const ST_LABEL = {working:"WORKING", idle:"IDLE", finished:IC.check+" FINISHED", done:IC.check+" DONE", stopped:IC.stop+" STOPPED", failed:IC.close+" FAILED"};
 /* 齿轮：外沿正好贴满 16×16 视框，徽标里左/上/下与文字间距都等于 3px */
 const GEAR=`<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="2.553 2.553"/><circle cx="8" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="3.2"/></svg>`;
 const VERB = {on:"上岗", finished:"完成", done:"收工", stopped:"中止", failed:"失败"};
@@ -366,7 +370,7 @@ function renderAxis(){
   const step=[5,10,15,30,60,120,180,240,360].find(m=>mins/m<=maxTicks)||720;
   const first=Math.ceil(a/(step*60e3))*step*60e3; let out="";
   for(let t=first;t<b-(b-a)*0.16;t+=step*60e3) out+=`<span style="left:${pct(t)}%">${hm(t)}</span>`;
-  out+=`<span class="now" style="left:auto;right:0;transform:none">NOW ▾</span>`;
+  out+=`<span class="now" style="left:auto;right:0;transform:none">NOW ${IC.caretD}</span>`;
   patch($("axis"),out);
   patch($("win"),[1,3,6,12].map(w=>`<button class="${S.win===w?"on":""}" data-win="${w}">${w}h</button>`).join(""));
 }
@@ -431,8 +435,8 @@ function leadBlock(l, live){
   kids.forEach((a,i)=>{ s+=childRow(a, i<kids.length-1) });
   const rest=l.agents.length-kids.length;
   if(rest>0){const fin=l.agents.slice(kids.length).filter(a=>a.status==="finished").length;
-    s+=`<div class="more">+ ${rest} more · ${fin} 完成 · ${rest-fin} 其他 · <button data-all="${h(l.id)}">▾ 全部展开</button></div>`}
-  else if(all && l.agents.length>LIMIT) s+=`<div class="more"><button data-all="${h(l.id)}">▴ 收起</button></div>`;
+    s+=`<div class="more">+ ${rest} more · ${fin} 完成 · ${rest-fin} 其他 · <button data-all="${h(l.id)}">${IC.caretD} 全部展开</button></div>`}
+  else if(all && l.agents.length>LIMIT) s+=`<div class="more"><button data-all="${h(l.id)}">${IC.caretU} 收起</button></div>`;
   const hot = l.status==="working" || l.agents.some(a=>a.status==="working");
   return `<div class="blk ${hot?"w":""}" style="--sc:${sHex(l.src)}" data-key="l:${h(l.src)}:${h(l.id)}">${s}</div>`;
 }
