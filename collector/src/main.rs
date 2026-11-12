@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-use scan::{Config, Scanner, Source};
+use scan::{expand_user, Config, Scanner, Source};
 use trim::trim_and_encode;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -68,7 +68,8 @@ fn usage() -> ! {
          \x20 --log-file <路径>   日志写入文件并按大小轮转（DECK_LOG_FILE；缺省写 stderr）\n\
          \x20 --once              扫描一次，把 state JSON 打印到 stdout 后退出（不推送）\n\
          其他环境变量：DECK_PID_CHECK、DECK_REGISTRY_TTL_HOURS（同 server.py）、\n\
-         \x20 DECK_LOG_MAX_BYTES（缺省 1048576）、DECK_LOG_KEEP（缺省 3）"
+         \x20 DECK_LOG_MAX_BYTES（缺省 1048576）、DECK_LOG_KEEP（缺省 3）、\n\
+         \x20 DECK_APP_SESSIONS_DIR（Claude App 会话元数据目录，用于隐藏已归档会话；设为空串关闭）"
     );
     exit(2)
 }
@@ -469,7 +470,19 @@ fn main() {
         "DECK_REGISTRY_TTL_HOURS",
         &std::env::var("DECK_REGISTRY_TTL_HOURS").unwrap_or_else(|_| "12".into()),
     ) * 3600.0;
-    let conf = Config { pid_check: env_flag("DECK_PID_CHECK", true), registry_ttl, host: device.clone(), redact: o.redact };
+    // Claude App 会话元数据目录：用来隐藏已归档的会话；DECK_APP_SESSIONS_DIR 设为空串可关闭
+    let app_sessions = match std::env::var("DECK_APP_SESSIONS_DIR") {
+        Ok(v) if v.trim().is_empty() => None,
+        Ok(v) => Some(expand_user(v.trim())),
+        Err(_) => Some(expand_user("~/Library/Application Support/Claude/claude-code-sessions")),
+    };
+    let conf = Config {
+        pid_check: env_flag("DECK_PID_CHECK", true),
+        registry_ttl,
+        host: device.clone(),
+        redact: o.redact,
+        app_sessions,
+    };
     let mut scanner = Scanner::new(conf);
 
     if o.once {

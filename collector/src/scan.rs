@@ -640,6 +640,55 @@ pub struct Config {
     pub registry_ttl: f64, // 秒
     pub host: String,
     pub redact: bool,
+    /// Claude App 的会话元数据目录（claude-code-sessions）；None = 不过滤已归档会话
+    pub app_sessions: Option<PathBuf>,
+}
+
+// ---------------------------------------------------------------- Claude App 归档标记
+
+/// App 元数据单个文件最多读这么多（文件里带 MCP 工具清单，常见几十 KiB）
+const APP_META_MAX: u64 = 8 * 1024 * 1024;
+
+/// 一个 App 会话（local_*.json）：是否已归档 + 它用过的 CLI 会话 id
+#[derive(Clone)]
+struct AppMeta {
+    archived: bool,
+    ids: Vec<String>,
+}
+
+fn summarize_app_meta(path: &Path, _size: u64, _prev: Option<(u64, &AppMeta)>) -> io::Result<AppMeta> {
+    let mut buf = Vec::new();
+    File::open(path)?.take(APP_META_MAX).read_to_end(&mut buf)?;
+    let Value::Object(o) = serde_json::from_slice::<Value>(&buf).map_err(io::Error::other)? else {
+        return Err(io::Error::other("not an object"));
+    };
+    let mut ids: Vec<String> = Vec::new();
+    let mut add = |v: Option<&Value>| {
+        if let Some(s) = v.and_then(Value::as_str).filter(|s| !s.is_empty()) {
+            ids.push(s.to_owned());
+        }
+    };
+    add(o.get("cliSessionId"));
+    add(o.get("lastAssistantCliSessionId"));
+    if let Some(Value::Array(a)) = o.get("priorCliSessionIds") {
+        a.iter().for_each(|v| add(Some(v)));
+    }
+    Ok(AppMeta { archived: o.get("isArchived") == Some(&Value::Bool(true)), ids })
+}
+
+/// 列出 root 下（最多 3 层）的 local_*.json
+fn app_meta_files(root: &Path, depth: u8, out: &mut Vec<PathBuf>) {
+    let Ok(rd) = fs::read_dir(root) else { return };
+    for e in rd.flatten() {
+        let Ok(ft) = e.file_type() else { continue };
+        let name = e.file_name();
+        let name = name.to_string_lossy();
+        if ft.is_dir() && depth > 0 {
+            app_meta_files(&e.path(), depth - 1, out);
+        } else if ft.is_file() && name.starts_with("local_") && name.ends_with(".json") {
+            out.push(e.path());
+        }
+    }
 }
 
 fn load_registry(cfg: &Path, conf: &Config) -> HashMap<String, Obj> {
@@ -772,12 +821,31 @@ pub struct Scanner {
     lead_names: Vec<String>,
     sess_cache: FileCache<SessInfo>,
     sub_cache: FileCache<SubInfo>,
+    app_cache: FileCache<AppMeta>,
 }
 
 impl Scanner {
     pub fn new(conf: Config) -> Self {
         let (names, lead_names) = name_pools();
-        Scanner { conf, names, lead_names, sess_cache: FileCache::new(), sub_cache: FileCache::new() }
+        Scanner { conf, names, lead_names, sess_cache: FileCache::new(), sub_cache: FileCache::new(), app_cache: FileCache::new() }
+    }
+
+    /// 在 Claude App 里已归档的 CLI 会话 id。同一 id 也出现在未归档的 App 会话里时不算归档。
+    fn archived_ids(&mut self) -> HashSet<String> {
+        let mut out = HashSet::new();
+        let Some(root) = self.conf.app_sessions.clone() else { return out };
+        let mut files = Vec::new();
+        app_meta_files(&root, 3, &mut files);
+        let mut keep = HashSet::new();
+        for f in files {
+            let Ok(m) = fs::metadata(&f) else { continue };
+            let Some(meta) = self.app_cache.get(&f, &m, summarize_app_meta) else { continue };
+            let set = if meta.archived { &mut out } else { &mut keep };
+            set.extend(meta.ids);
+        }
+        self.app_cache.sweep();
+        out.retain(|id| !keep.contains(id));
+        out
     }
 
     pub fn scan(&mut self, sources: &[Source], hours: f64) -> State {
@@ -786,6 +854,7 @@ impl Scanner {
         let mut leads: Vec<Lead> = Vec::new();
         let mut events: Vec<Event> = Vec::new();
         let mut src_stats: Vec<SrcStat> = Vec::new();
+        let archived = self.archived_ids();
 
         // 按 dir 原样分组，保持首次出现顺序
         let mut by_dir: Vec<(String, Vec<&Source>)> = Vec::new();
@@ -836,6 +905,9 @@ impl Scanner {
                         continue;
                     }
                     let sid = stem(&jname).to_owned();
+                    if archived.contains(&sid) {
+                        continue; // 已在 Claude App 里归档：不再上报
+                    }
                     let subdir = pdir.join(&sid).join("subagents");
                     let mut sub_files: Vec<(String, PathBuf, fs::Metadata)> = Vec::new();
                     if is_dir(&subdir) {
@@ -1051,6 +1123,24 @@ impl Scanner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn archived_ids_from_app_meta() {
+        let root = std::env::temp_dir().join(format!("deck-push-test-{}-app", std::process::id()));
+        let d = root.join("acct").join("org");
+        fs::create_dir_all(&d).unwrap();
+        let w = |n: &str, v: &str| fs::write(d.join(n), v).unwrap();
+        w("local_a.json", r#"{"isArchived":true,"cliSessionId":"s1","priorCliSessionIds":["s0","shared"]}"#);
+        w("local_b.json", r#"{"isArchived":false,"cliSessionId":"s2","priorCliSessionIds":["shared"]}"#);
+        w("local_c.json", "not json");
+        w("deleted_x", "1");
+        let conf = Config { pid_check: false, registry_ttl: 0.0, host: String::new(), redact: false, app_sessions: Some(root.clone()) };
+        let mut sc = Scanner::new(conf);
+        let mut got: Vec<String> = sc.archived_ids().into_iter().collect();
+        got.sort();
+        assert_eq!(got, vec!["s0", "s1"]);
+        fs::remove_dir_all(&root).unwrap();
+    }
 
     #[test]
     fn pick_matches_python() {

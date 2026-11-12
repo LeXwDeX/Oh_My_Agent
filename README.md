@@ -21,7 +21,7 @@ hub（`server.py`）零依赖：Python 3 标准库 + 手写前端页面（`index
 主页面 `index.html` 自上而下：
 
 - 顶部：值班台标题、WORKING / FINISHED / STOPPED·FAILED / ONLINE 四项统计、LIVE 与时钟、FEED 跑马灯。
-- 任务栏：一台设备一行，左边是机器名与该机器的任务数 / 在忙人数，右边是这台机器上的任务标签（每个任务 = 一个主 agent 会话，显示状态点、任务名、在忙人数和子 agent 数；已结束的任务显示“已结束 · 多久前”）；标签多时可横向滚动，点击标签或按 `←` / `→` 切换下方办公室。
+- 任务栏：一台设备一行，左边是机器名与该机器的任务数 / 在忙人数，右边是这台机器上的任务标签（每个任务 = 一个主 agent 会话，显示状态点、任务名、在忙人数和子 agent 数；已结束的任务显示“已结束 · 多久前”）；标签多时可横向滚动，点击标签或按 `←` / `→` 切换下方办公室。已在 Claude App 里归档的会话会自动隐藏（见 `DECK_APP_SESSIONS_DIR`）；项目名（任务栏标签、办公室名牌、泳道）以全大写显示，下划线显示为空格，如 `Oh_My_Agent` 显示为 `OH MY AGENT`（只影响显示）。
 - 常规栏：主题（自动 / 白天 / 夜晚，自动档按服务器时间切换，6:00–18:00 为白天）、办公室版式（4 种）；右侧“排班 · 泳道图”按钮会从办公室右侧推出泳道图抽屉。
 - 办公室：WebGL2 体素场景，只显示当前选中的任务。主管戴王冠坐课长席，子 agent 坐工位；讨论类去会议室，运维类去机房；最近完成的几位去休息区，其余完成的留在工位上亮“✓”气泡；每个任务最多 3 个岛、36 人（每岛 12 个子 agent）。天色默认跟随页面主题，也可单独选早上 / 中午 / 黄昏 / 夜晚。
     - 悬停小人查看详情；排班抽屉开着时，点击小人可在排班里定位到对应条目。
@@ -130,6 +130,7 @@ docker compose -f deploy/linux/docker-compose.push.yml up -d --build
 | `--sources` | `DECK_SOURCES` | 内置档位 | 档位 JSON 文件；环境变量则直接给 JSON 字符串 |
 | - | `DECK_PID_CHECK` | `1` | `0` 时不检查进程，改用登记文件新鲜度 |
 | - | `DECK_REGISTRY_TTL_HOURS` | `12` | 关闭 PID 检查时，登记文件多久未更新视为离线 |
+| - | `DECK_APP_SESSIONS_DIR` | `~/Library/Application Support/Claude/claude-code-sessions` | Claude App 会话元数据目录，据此不再上报已在 App 里归档的会话（含子 agent）；设为空串关闭，目录不存在（如 Linux 容器）时无效果 |
 | `--redact` | `DECK_REDACT` | 关 | 脱敏，见“隐私” |
 | `--log-file` | `DECK_LOG_FILE` | stderr | 日志写入文件并按大小轮转 |
 | - | `DECK_LOG_MAX_BYTES` | `1048576` | 单个日志文件上限 |
@@ -186,7 +187,7 @@ python3 server.py [--port 7788] [--host 127.0.0.1] [--hours 12] [--sources sourc
 docker compose -f docker-compose.local.yml up -d --build
 ```
 
-然后打开 `http://127.0.0.1:7788`。前端每 3 秒轮询一次 `/api/state`。compose 版以 root 运行（需读取权限为 600 的会话文件），只读挂载各档位的 `projects` 与 `sessions`，并设置 `DECK_PID_CHECK=0`。
+然后打开 `http://127.0.0.1:7788`。前端每 3 秒轮询一次 `/api/state`。compose 版以 root 运行（需读取权限为 600 的会话文件），只读挂载各档位的 `projects` 与 `sessions`，并设置 `DECK_PID_CHECK=0`。`server.py` 同样支持环境变量 `DECK_APP_SESSIONS_DIR`（含义与默认值见“deck-push 参数与环境变量”），直接运行时会隐藏已在 Claude App 里归档的会话；compose 版没有挂载该目录，默认不生效。
 
 ## 数据来源与状态判定
 
@@ -195,6 +196,7 @@ docker compose -f docker-compose.local.yml up -d --build
 - `sessions/<pid>.json`：进程是否存活，以及 busy / idle 状态。
 - `projects/**/<session>.jsonl`：会话开始时间、模型、标题、cwd、最后一条回复。
 - `projects/**/<session>/subagents/agent-*.jsonl` 与同名 `.meta.json`：子 agent 类型（`agentType`）、任务描述、模型、起止时间。
+- Claude App 会话元数据（`DECK_APP_SESSIONS_DIR` 下的 `local_*.json`）：只取 `isArchived` 与关联的 CLI 会话 id，已归档的会话不显示。
 
 大文件只读头尾部分，并按 (mtime, size) 缓存解析结果。
 
@@ -225,7 +227,7 @@ docker compose -f docker-compose.local.yml up -d --build
 - 面板公开部署时，上述内容对所有访问者可见，公开部署时请注意这一点。
 - 推送端可开启 `--redact`（`DECK_REDACT=1`）脱敏：标题只用项目名，不上报分支、子 agent 任务描述和最后回复。脱敏由 `deck-push` 实现，local 模式的 `server.py` 没有该开关。
 - `/api/ingest` 无密钥，访问控制依赖 nginx 的内网限制，见“部署 hub”。
-- 服务与采集器只读取配置目录下的文件，不写入、不修改。
+- 服务与采集器只读取各档位配置目录与 Claude App 会话元数据目录下的文件，不写入、不修改。
 - `tools/gen_avatars.py` 所需的接口地址与密钥只通过环境变量提供，不要写入仓库；`.env` 已被 `.gitignore` 忽略。
 
 ## 演示数据
