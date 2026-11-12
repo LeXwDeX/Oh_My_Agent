@@ -1894,7 +1894,7 @@ function portalVox(d, t){
    召唤越深头探得越远、悬到书案上方俯视；fire>0 时张嘴朝法阵喷火。全部是轴对齐方块，每帧按姿态重新摆放。约 400 盒 */
 function dragonVox(t, s, fire){
   const at = summonAt(); if (!at) return;
-  const g = at.g, dx = at.x, D = DRAGON_COL, Z = SWH + .27, E = .4, V = DRAGON_VOX;
+  const dx = at.x, D = DRAGON_COL, Z = SWH + .27, E = .4, V = DRAGON_VOX;
   // ---- 龙爪：两只扒在墙头（体素模型见 dragonClaw），召唤初期从墙外升上来；不转动，只平移，所以体素严丝合缝
   const rise = 1 - smooth01((s - .05) / .25), CL = dragonClaw();
   for (const sg of [-1, 1]){
@@ -1922,14 +1922,16 @@ function dragonVox(t, s, fire){
     bone(R, El, V * 3, D.wing); for (const p of F) bone(El, p, V * 2, D.wing);
     add(El[0] - V, wy + V, El[1] + V, V * 2, V * 2, V * 3, D.tooth, -1, .3, 0); for (const p of F) add(p[0] - V / 2, wy + V, p[1] - V * 2, V, V, V * 2, D.tooth, -1, .3, 0);   // 翼爪
   }
-  // ---- 头的位姿：k 为探入深度。刚出现时头埋在墙后只露出角和眼睛，随 k 抬高、前伸到书案上方；始终略微低头俯视，喷火时压得更低
-  const k = smooth01((s - .3) / .7), up = smooth01((s - .3) / .12), bob = Math.sin(t * 1.1) * .1, sway = Math.sin(t * .6) * .3 * k;
-  const open = .1 + .5 * fire + .04 * Math.sin(t * 1.7), th = .6 * Math.pow(1 - k, 1.5) + .2 + fire * .2, c = Math.cos(th), sn = Math.sin(th);
-  const ax = dx + sway, ay = lerp(-2.6, at.y - at.r - 1.6, k), az = lerp(SWH - .5, 5.0, smooth01(k * 1.5)) + bob - 2.4 * (1 - up);
+  // ---- 头的位姿：k 为探入深度，分三段走，全程不穿墙——
+  //      ① 在墙后远处抬头升起（头是平的，吻尖也在墙外），一个人施法时只有角露出墙头；② 升到墙头和扶壁尖塔之上，再越过墙头前伸；
+  //      ③ 到法阵上方才低头压下来，喷火时压得更低
+  const k = smooth01((s - .3) / .7), kr = smooth01(k / .35), kf = smooth01((k - .3) / .4), kd = smooth01((k - .65) / .35), bob = Math.sin(t * 1.1) * .1 * kr, sway = Math.sin(t * .6) * .3 * kf;
+  const open = .1 + .5 * fire + .04 * Math.sin(t * 1.7), th = -.2 * kr * (1 - kd) + (.24 + fire * .2) * kd, c = Math.cos(th), sn = Math.sin(th);
+  const ax = dx + sway, ay = lerp(-4.4, at.y - at.r - .9, kf), az = lerp(-3, 7.0, kr) - 1.6 * kd + bob;
   const Hp = (lx, ly, lz) => [ax + lx, ay + ly * c + lz * sn, az - ly * sn + lz * c];                        // 头部局部坐标（x 横向、y 朝前、z 向上）→ 世界，绕头心俯仰
   // ---- 脖子：沿二次贝塞尔曲线每隔一格摆一圈体素环（椭圆截面，由粗到细）。背侧暗、两侧带鳞纹，腹侧是一节节灰紫腹甲，隔几圈一根向后倾的背刺；
   //      喷火时靠近头的那段腹甲透出火光。环随曲线转向，方块本身不转，略放大一点盖住弯道外侧的缝
-  { const P0 = [dx, -3.0, .5], P2 = Hp(0, -6 * V, 3 * V), P1 = [dx + sway * .5, lerp(-3.0, -1.6, k), lerp(SWH + 1.5, SWH + 3.4, k) - 2.4 * (1 - up)], NS = 32, pts = [], ns = V * 1.18;
+  { const P0 = [dx, -3.0, .5], P2 = Hp(0, -6 * V, 3 * V), P1 = [dx + sway * .5, lerp(-4.2, -1.6, kf), Math.max(az + .4, lerp(az * .7, SWH + 3.6, kf))], NS = 32, pts = [], ns = V * 1.18;
     let len = 0;
     for (let i = 0; i <= NS; i++){ const u = i / NS, a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, d = u * u, q = [a * P0[0] + b * P1[0] + d * P2[0], a * P0[1] + b * P1[1] + d * P2[1], a * P0[2] + b * P1[2] + d * P2[2], 0]; if (i) len += Math.hypot(q[1] - pts[i - 1][1], q[2] - pts[i - 1][2]); q[3] = len; pts.push(q) }
     const steps = Math.ceil(len / (V * .92)), hotCol = fire > 0 ? mixHex(D.bellyL, D.ember, Math.round(fire * 4) / 4 * .85) : null;
