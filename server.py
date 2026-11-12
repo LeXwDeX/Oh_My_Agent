@@ -525,6 +525,202 @@ def scan(sources: list[dict], hours: float) -> dict:
     }
 
 
+# ---------------------------------------------------------------- 任务类型分类（按标题，交给大模型）
+# 只把标题文本发给 OpenAI 兼容接口，要求返回结构化 JSON；结果按标题缓存在内存里。
+# 未配置 DECK_LLM_URL / DECK_LLM_KEY、接口出错或尚未分类时，kind 为 null，前端退回本地规则。
+TASK_KINDS = {
+    "ci": "持续集成：跑/修 CI、流水线、构建、自动化测试任务",
+    "ops": "运维部署：发布、部署、上线、服务器、容器、监控、数据库运维",
+    "review": "评审核对：代码评审、审查、复核、验收、对抗性检查",
+    "plan": "方案讨论：架构/方案设计、规划、需求取舍、咨询决策",
+    "research": "调研探索：查资料、联网调研、阅读/探索代码、定位问题",
+    "code": "编码实现：写代码、修 bug、重构、补测试",
+    "docs": "文档写作：README、CHANGELOG、说明、翻译润色",
+    "other": "以上都不是",
+}
+
+
+class TaskClassifier:
+    BATCH, CAP = 20, 4000
+
+    def __init__(self):
+        env = os.environ.get
+        self.url = (env("DECK_LLM_URL") or "").rstrip("/")
+        self.key = env("DECK_LLM_KEY") or ""
+        self.model = env("DECK_LLM_MODEL") or "deepseek"
+        self.effort = env("DECK_LLM_EFFORT") or "low"
+        self.on = bool(self.url and self.key)
+        self.lock = threading.Lock()
+        self.cache: dict[str, str] = {}
+        self.pending: dict[str, None] = {}  # 有序去重队列
+        self.miss: dict[str, int] = {}      # 标题被模型漏掉的次数
+        self.wake = threading.Event()
+        self.err = None
+        if self.on:
+            threading.Thread(target=self._loop, daemon=True, name="task-classifier").start()
+
+    def kind(self, title):
+        """取分类结果；没有就排队，本次返回 None。"""
+        if not self.on or not isinstance(title, str) or not title.strip():
+            return None
+        t = title.strip()[:160]
+        with self.lock:
+            k = self.cache.get(t)
+            if k is None and t not in self.pending:
+                self.pending[t] = None
+                self.wake.set()
+        return k
+
+    def annotate(self, leads):
+        """给主 agent（会话标题）和子 agent（子任务标题）各自标上 kind，返回新列表，不改原数据。"""
+        return [{**l, "kind": self.kind(l.get("title")),
+                 "agents": [{**a, "kind": self.kind(a.get("task"))} for a in l.get("agents", [])]} for l in leads]
+
+    def _loop(self):
+        backoff = 0.0
+        while True:
+            self.wake.wait(timeout=30)
+            self.wake.clear()
+            with self.lock:
+                batch = list(self.pending)[: self.BATCH]
+            if not batch:
+                continue
+            try:
+                got = self._ask(batch)
+                backoff = 0.0
+                if self.err:
+                    print("任务分类恢复正常", flush=True)
+                self.err = None
+            except Exception as e:  # 网络/鉴权/格式错误：保留队列，退避后重试
+                msg = f"{type(e).__name__}: {e}"[:200]
+                if msg != self.err:
+                    print(f"任务分类失败（{msg}），稍后重试", flush=True)
+                self.err = msg
+                backoff = min(300.0, backoff * 2 or 15.0)
+                time.sleep(backoff)
+                self.wake.set()
+                continue
+            with self.lock:
+                for t in batch:
+                    if t in got:
+                        self.pending.pop(t, None)
+                        self.miss.pop(t, None)
+                        self.cache[t] = got[t]
+                    elif self.miss.get(t, 0) + 1 >= self.TRIES:  # 模型屡次漏掉这条：归为 other，不再排队
+                        self.pending.pop(t, None)
+                        self.miss.pop(t, None)
+                        self.cache[t] = "other"
+                    else:  # 漏掉的移到队尾，下一批再问
+                        self.miss[t] = self.miss.get(t, 0) + 1
+                        self.pending.pop(t, None)
+                        self.pending[t] = None
+                while len(self.cache) > self.CAP:
+                    self.cache.pop(next(iter(self.cache)))
+                if self.pending:
+                    self.wake.set()
+
+    SYSTEM_PROMPT = """你是任务分类器。用户会给出若干行任务标题，每行格式为「序号. 标题」。
+请只依据标题文字判断每个任务属于哪一类，不要猜测标题以外的信息，并用 JSON 格式输出。
+可选类别（kind 只能取下面的英文值）：
+{kinds}
+
+EXAMPLE INPUT:
+0. 修复 GitHub CI 缓存失效
+1. 调研上游 3D API 的质量参数
+2. 实现 Blender 实时建模工具集
+3. 部署 v1.4.0 到生产并验收
+
+EXAMPLE JSON OUTPUT:
+{{
+    "items": [
+        {{"i": 0, "kind": "ci"}},
+        {{"i": 1, "kind": "research"}},
+        {{"i": 2, "kind": "code"}},
+        {{"i": 3, "kind": "ops"}}
+    ]
+}}
+
+每个标题输出一项，i 与输入序号一致；只输出这个 JSON 对象，不要输出其他文字。"""
+    TRIES = 3  # 接口返回空内容或 JSON 解析失败时，立即重试的次数
+
+    @staticmethod
+    def extract_json(text: str):
+        """从模型输出里取出 JSON 对象：先整段解析，再去掉 ``` 代码块，最后逐个尝试从每个 { 起解析出第一个完整对象。"""
+        text = (text or "").strip()
+        if not text:
+            raise ValueError("模型返回了空内容")
+        cands = [text]
+        fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.S | re.I)
+        if fence:
+            cands.append(fence.group(1).strip())
+        for c in cands:
+            try:
+                v = json.loads(c)
+                if isinstance(v, dict):
+                    return v
+            except ValueError:
+                pass
+        dec = json.JSONDecoder()
+        for m in re.finditer(r"\{", text):
+            try:
+                v, _ = dec.raw_decode(text, m.start())
+                if isinstance(v, dict):
+                    return v
+            except ValueError:
+                continue
+        raise ValueError("模型输出里找不到合法的 JSON 对象")
+
+    def parse_items(self, obj: dict, titles: list[str]) -> dict[str, str]:
+        """校验结构：items 是列表，每项 i 为有效序号、kind 为已知类别（未知类别归 other）。"""
+        items = obj.get("items") if isinstance(obj, dict) else None
+        if not isinstance(items, list):
+            raise ValueError("JSON 里缺少 items 列表")
+        out = {}
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            i = it.get("i")
+            if isinstance(i, str) and i.strip().isdigit():
+                i = int(i)
+            if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < len(titles):
+                k = str(it.get("kind") or "").strip().lower()
+                out[titles[i]] = k if k in TASK_KINDS else "other"
+        if not out:
+            raise ValueError("items 里没有可用的分类结果")
+        return out
+
+    def _ask(self, titles):
+        import urllib.request
+        kinds = "\n".join(f"- {k}：{v}" for k, v in TASK_KINDS.items())
+        user_p = "\n".join(f"{i}. {t}" for i, t in enumerate(titles))
+        # 思考过程也占 max_tokens，预留充足
+        body = {"model": self.model, "temperature": 0, "max_tokens": 1200 + 30 * len(titles),
+                "response_format": {"type": "json_object"},
+                "messages": [{"role": "system", "content": self.SYSTEM_PROMPT.format(kinds=kinds)},
+                             {"role": "user", "content": user_p}]}
+        if self.effort and self.effort != "off":
+            body["reasoning_effort"] = self.effort
+        data = json.dumps(body).encode()
+        last = None
+        for _ in range(self.TRIES):
+            req = urllib.request.Request(self.url + "/chat/completions", data=data,
+                                         headers={"Content-Type": "application/json", "Authorization": "Bearer " + self.key})
+            with urllib.request.urlopen(req, timeout=60) as r:  # 网络 / HTTP 错误直接抛出，由 _loop 退避重试
+                resp = json.loads(r.read())
+            try:
+                text = resp["choices"][0]["message"].get("content")
+                got = self.parse_items(self.extract_json(text), titles)
+            except (ValueError, KeyError, IndexError, TypeError, AttributeError) as e:
+                last = e  # 空内容 / JSON 解析失败 / 结构不对：立即重试
+                continue
+            # 漏掉的标题本轮不写缓存，留在队列里下次再分
+            return got
+        raise ValueError(f"连续 {self.TRIES} 次没拿到合法 JSON：{last}")
+
+
+CLASSIFIER = TaskClassifier()
+
+
 class State:
     """本地模式：直接扫描本机文件（2 秒缓存）。"""
 
@@ -537,6 +733,7 @@ class State:
         with self.lock:
             if self.data is None or time.time() - self.at > 2.0:
                 self.data = scan(self.sources, self.hours)
+                self.data["leads"] = CLASSIFIER.annotate(self.data["leads"])
                 self.data["avatars"] = avatar_names()
                 self.at = time.time()
             return self.data
@@ -697,6 +894,7 @@ class Hub:
         out["leads"].sort(key=lambda l: (order.get(l["status"], 9), -l["last"]))
         out["events"].sort(key=lambda e: -e["at"])
         out["events"] = out["events"][:400]
+        out["leads"] = CLASSIFIER.annotate(out["leads"])
         out["host"] = next(iter(live)) if len(live) == 1 else (self.name if not live else f"{self.name} · {len(live)} 台设备")
         return out
 

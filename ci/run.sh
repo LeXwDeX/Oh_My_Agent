@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 TAG="agent-deck-ci-$$"
 PY_IMG="python:3.13-alpine"
 RS_IMG="rust:1.97-alpine"
+NODE_IMG="node:22-alpine"
 
 cleanup() {
   docker rm -f "${TAG}-hub" >/dev/null 2>&1 || true
@@ -17,6 +18,13 @@ step() { printf '\n==> %s\n' "$*"; }
 step "Python 语法检查"
 docker run --rm -v "$PWD":/src:ro -w /src -e PYTHONDONTWRITEBYTECODE=1 "$PY_IMG" \
   python -c "import ast,sys; [ast.parse(open(f).read(), f) for f in ('server.py','tools/gen_avatars.py','tools/demo_push.py')]; print('ok')"
+
+step "任务分类器单测（unittest，不访问网络）"
+docker run --rm -v "$PWD":/src:ro -w /src -e PYTHONDONTWRITEBYTECODE=1 "$PY_IMG" \
+  python -m unittest discover -s tests -v
+
+step "前端：去处规则单测（node --test）"
+docker run --rm -v "$PWD":/src:ro -w /src "$NODE_IMG" node --test tests/
 
 step "compose 配置校验"
 for f in docker-compose.yml docker-compose.local.yml deploy/linux/docker-compose.push.yml; do
