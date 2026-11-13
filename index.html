@@ -458,10 +458,10 @@ function dur(ms){ const s = Math.max(0, Math.round(ms / 1000)); if (s < 60) retu
 
 /* ---------------- 体素写入 ---------------- */
 const STRIDE = 13;
-let OUT = [], RND = Math.random, EM = 0, HL = 0;
+let OUT = [], RND = Math.random, EM = 0, HL = 0, CLEAN = 0;   // CLEAN = 2：这块体素不叠微体素颗粒（小人、光球用纯净的平涂色）
 function add(x, y, z, sx, sy, sz, hx, t0, e = EM, m = 0, j = 0){
   const c = rgbOf(hx), f = j ? 1 + (RND() * 2 - 1) * j : 1;
-  OUT.push(x, y, z, sx, sy, sz, c[0] * f, c[1] * f, c[2] * f, t0, e, m, HL);
+  OUT.push(x, y, z, sx, sy, sz, c[0] * f, c[1] * f, c[2] * f, t0, e, m, HL + CLEAN);
 }
 
 /* ---------------- 调色板 ---------------- */
@@ -890,14 +890,17 @@ function buildOffice(off, oi, X0, opt, W0){
     for (let i = 0; i < 4; i++){ add(ox + .25, oy - .06, .45 + i * .32, .012, .12, .2, i & 1 ? mc.core : mc.arcane, t + .1 + i * .02, 1, 1); add(ox - .06, oy + .25, .45 + i * .32, .12, .012, .2, i & 1 ? mc.arcane : mc.core, t + .1 + i * .02, 1, 1) }
     add(ox - .0625, oy - .0625, 2.0, .125, .125, .25, mc.arcane, t + .12, 1, 1);
   }
-  /* 召唤大厅（原任务岛位）：一个项目一座大法阵，不管有几个会话。第一圈站各会话的 leader，外圈按各自 leader 所在的扇区站子 agent；
-     所有人面向法阵站着施法。座位键与办公室相同，只是位置换成环上的点；外圈的圈数按人数定，圈数越少法阵越大 */
+  /* 召唤大厅（原任务岛位）：一个项目一座大法阵，不管有几个会话。所有人贴着法阵外沿站成一圈、面向法阵施法：
+     每个会话占一个扇区，leader 站扇区正中，子 agent 和 leader 站在同一圈上，按"离已经站了人的位置最远"的顺序落位（见 ringOrder），
+     所以人少时也是散开围住法阵，不是在 leader 身后排队；一圈站不下才往外加圈。座位键与办公室相同，只是位置换成环上的点 */
   function summonHall(){
     const sc = SANC, zs = off.zones, n = Math.max(1, zs.length), dA = 6.2832 / n, GAP = .84, DR = .8;
     const x0 = X0 + TX0 - .4, x1 = X0 + W - .3, cx = (x0 + x1) / 2, cy = BD1 / 2 + .05, Rmax = Math.min(BD1 / 2 - .4, (x1 - x0) / 2 - .5);
-    const fits = (rg, R) => zs.every(Z => { let cap = 0; for (let k = 1; k <= rg; k++) cap += Math.max(1, Math.floor(dA * (R + .6 + k * DR) / GAP)); return cap >= Z.pairs * 2 });
-    let rings = 1; while (rings < 5 && !fits(rings, Math.max(1.5, Rmax - .6 - rings * DR))) rings++;
-    const R = Math.max(1.5, Rmax - .6 - rings * DR), r0 = R + .6, tC = T0(cx, cy, .3);
+    const slots = (k, R) => Math.max(1, Math.floor(dA * (R + .7 + k * DR) / GAP));                 // 第 k 圈每个扇区能站几个人（第 0 圈含 leader）
+    const fits = (rg, R) => zs.every(Z => { let cap = -1; for (let k = 0; k < rg; k++) cap += slots(k, R); return cap >= Z.pairs * 2 });
+    const Rof = rg => Math.max(1.5, Rmax - .7 - (rg - 1) * DR);
+    let rings = 1; while (rings < 5 && !fits(rings, Rof(rings))) rings++;
+    const R = Rof(rings), r0 = R + .7, m0 = slots(0, R), tC = T0(cx, cy, .3);
     W0.geo[oi].circle = {x: cx, y: cy, r: R};
     // 法阵石台：两层圆台，按行取弦长拼出阶梯状的圆边
     for (const [rr, z, hgt, col] of [[R + .375, .001, .05, sc.stDk], [R + .125, .051, .03, "#2c2742"]])
@@ -914,17 +917,19 @@ function buildOffice(off, oi, X0, opt, W0){
     };
     zs.forEach((Z, i) => {
       const c = 1.5708 + i * dA, list = [], at = (r, o) => [cx + Math.cos(c + o) * r, cy + Math.sin(c + o) * r], lead = at(r0, 0);
-      for (let k = 1; k <= rings; k++){
-        const r = r0 + k * DR, m = Math.max(1, Math.floor(dA * r / GAP)), row = [];
+      for (const j of ringOrder(m0)) list.push(at(r0, j * dA / m0));                          // 第一圈：和 leader 同圈，散开围住法阵
+      for (let k = 1; k < rings; k++){
+        const r = r0 + k * DR, m = slots(k, R), row = [];
         for (let j = 0; j < m; j++) row.push((j - (m - 1) / 2) * dA / m);
         row.sort((a, b) => Math.abs(a) - Math.abs(b) || a - b);                               // 从扇区正中往两边排，靠近自己的 leader
         for (const o of row) list.push(at(r, o));
       }
       if (!Z.part){ put(Z.key + "|boss", lead, T0(lead[0], lead[1], .9)); add(lead[0] - .25, lead[1] - .25, .001, .5, .5, .014, shade(Z.hex, .8), T0(lead[0], lead[1], .5)); add(lead[0] - .125, lead[1] - .125, .015, .25, .25, .004, SANC.gold, T0(lead[0], lead[1], .55)) }
       for (const a of Z.subs){ const p = list[Math.min(a.slot, list.length - 1)]; put(Z.key + "|" + a.id, p, T0(p[0], p[1], .9)); add(p[0] - .1875, p[1] - .1875, .001, .375, .375, .012, shade(Z.hex, .55), T0(p[0], p[1], .5)) }
-      // 队旗：立在扇区外沿，旗面用团队色
-      const lp = at(Math.min(r0 + rings * DR + .55, Rmax + .3), 0), tl = T0(lp[0], lp[1], .7);
-      add(lp[0] - .03, lp[1] - .03, 0, .06, .06, 1.5, sc.woodDk, tl); add(lp[0] + .03, lp[1] - .02, 1.0, .375, .04, .45, Z.hex, tl + .05); add(lp[0] - .04, lp[1] - .04, 1.5, .08, .08, .08, sc.gold, tl + .06);
+      // 队旗：立在 leader 身后的外沿，旗面用团队色
+      // 插在 leader 和邻位之间的空档后面，两个空档里挑离镜头远的那个（x+y 小），旗面朝背离 leader 的一侧展开——这样靠镜头这边的旗子也不会挡住 leader
+      const rl = Math.min(r0 + (rings - 1) * DR + .55, Rmax + .3), ho = m0 > 1 ? dA / m0 / 2 : 0, la = at(rl, ho), lb = at(rl, -ho), lp = la[0] + la[1] <= lb[0] + lb[1] ? la : lb, tl = T0(lp[0], lp[1], .7);
+      add(lp[0] - .03, lp[1] - .03, 0, .06, .06, 1.5, sc.woodDk, tl); add(lp[0] >= lead[0] ? lp[0] + .03 : lp[0] - .405, lp[1] - .02, 1.0, .375, .04, .45, Z.hex, tl + .05); add(lp[0] - .04, lp[1] - .04, 1.5, .08, .08, .08, sc.gold, tl + .06);
       W0.zoneLabels.push({x: lp[0], y: lp[1], z: 1.85, t: tl + .1, ...(Z.part ? {amen: "第 " + (Z.part + 1) + " 组"} : {Z}), oi, cx: lead[0], cy: lead[1]});
     });
     for (const sx of [-1, 1]) for (const sy of [-1, 1]){ const ox = cx + sx * Math.min((x1 - x0) / 2 - .7, Rmax + 1.7), oy = cy + sy * (BD1 / 2 - .8); obelisk(ox, oy, T0(ox, oy, .4)) }
@@ -1560,10 +1565,11 @@ function toolIcon(tool){
    正常人比例：站高约 1.3 格（头 3 微体素），和 0.68 高的办公桌、0.35 高的沙发坐面相称。
    姿势：坐（工位 / 会议椅 / 沙发）、站（机房控制台前）、走路。 */
 function personVox(P, t){
-  const MG = !!LY.magic, L = MG ? wizLook(P) : P.look, f = DIRS[P.dir], s = [-f[1], f[0]], T = P.t0, legc = MG ? shade(L.shirt, .8) : L.pants;   // 魔法学院：长袍到脚，腿用袍色
+  const MG = !!LY.magic, L = MG ? wizLook(P) : P.look, f = DIRS[P.dir], s = [-f[1], f[0]], T = P.t0, legc = MG ? shade(L.shirt, .86) : L.pants, lum = MG && P.boss ? L.shirt : null;   // 魔法学院：长袍到脚，腿用袍色
   const bx = (u0, u1, v0, v1, a, b, hx, e = .3, m = 0) => {
     const xs = [P.x + (f[0] * u0 + s[0] * v0) * M, P.x + (f[0] * u1 + s[0] * v1) * M], ys = [P.y + (f[1] * u0 + s[1] * v0) * M, P.y + (f[1] * u1 + s[1] * v1) * M];
     const x0 = Math.min(...xs), y0 = Math.min(...ys);
+    if (lum && (hx === lum || hx === legc)){ e = .5; m = 1 }                         // 圣堂 leader 的白袍白帽微微自发光：夜里的暖光会把白布染成和肤色一样的土黄，发一点光才是干净的白
     add(x0, y0, a * M, Math.max(...xs) - x0, Math.max(...ys) - y0, (b - a) * M, hx, T, e, m);
   };
   const sit = P.state === "seat", stand = P.state === "stand", rest = sit || stand, st = P.status, work = rest && st === "working";
@@ -1586,9 +1592,20 @@ function personVox(P, t){
   bx(-.7 + lean, .7 + lean, -1.1, 1.1, tb, tb + TH, L.shirt);
   if (P.boss) bx(.7 + lean, .76 + lean, -.2, .2, tb + .6, tb + TH, MG ? MAGIC_COL.gold : C.tie);
   // 手臂：工作时双臂前伸（交替起落 = 打字 / 操作控制台），否则垂在两侧（走路时前后摆）
-  if (work && MG && stand){                                     // 施法：双臂举向法阵，随咒语一高一低
-    const up = Math.sin(t * 3 + P.phase) * .3;
-    for (const [v0, v1, o] of [[-1.6, -1.13, up], [1.13, 1.6, -up]]){ bx(-.2, 1.5, v0, v1, tb + 1.9, tb + 2.5, L.shirt); bx(1.0, 1.6, v0, v1, tb + 2.5, tb + 3.6 + o, L.shirt); bx(1.05, 1.55, v0 + .05, v1 - .05, tb + 3.6 + o, tb + 4.0 + o, L.skin) }
+  const cast = work && MG && stand && !(P.at && P.at.kind);     // 站在法阵边上施法（机房控制台前站着的不算）
+  if (cast){
+    // 召唤：双臂向两侧高举过头、掌心朝天。上臂连着肩不动；前臂和手整体发抖——两个互不成倍数的高频叠在一起，幅度跟着咒语一阵强一阵弱，
+    // 左右手各抖各的，以上下抖为主（幅度约半个微体素，镜头拉远了也看得出）。抖的是位置不是尺寸，方块大小始终不变
+    const surge = .5 + .5 * Math.sin(t * 1.7 + P.phase), amp = .4 + .6 * surge, lift = Math.sin(t * 1.1 + P.phase) * .35, cuff = shade(L.shirt, .86);
+    for (const sg of [-1, 1]){
+      const q = t * 46 + P.phase * 3 + sg * 1.9, jv = (Math.sin(q) * .14 + Math.sin(q * .61) * .08) * amp, jz = (Math.cos(q * .83) * .38 + Math.sin(q * .47) * .2) * amp, z0 = tb + lift + jz;
+      bx(-.35, .35, sg * 1.1, sg * 2.0, tb + 1.75, tb + 2.45, L.shirt);                                         // 上臂：从肩平伸出去
+      bx(-.3, .4, sg * (1.8 + jv * .5), sg * (2.65 + jv * .5), tb + 2.3 + (lift + jz) * .5, tb + 3.15 + (lift + jz) * .5, L.shirt);   // 肘
+      bx(-.2, .45, sg * (2.5 + jv), sg * (3.1 + jv), z0 + 3.0, z0 + 6.4, L.shirt);                               // 前臂：竖直举过头顶
+      bx(-.4, .6, sg * (2.38 + jv), sg * (3.22 + jv), z0 + 2.9, z0 + 3.8, cuff);                                // 滑落到肘上的宽袖口
+      bx(-.15, .4, sg * (2.53 + jv), sg * (3.07 + jv), z0 + 6.4, z0 + 7.15, L.skin);                             // 手
+      if (surge > .35) bx(-.03, .28, sg * (2.64 + jv), sg * (2.96 + jv), z0 + 7.4, z0 + 7.72, tint(L.shirt, .45), 1, 1);   // 掌心上方聚起的一点光
+    }
   } else if (work){
     const ph = Math.sin(t * 15 + P.phase) > 0 ? .25 : 0;
     bx(-.3 + lean, 2.2, -1.6, -1.13, tb + 1.2 + ph, tb + 1.75 + ph, L.shirt);
@@ -1616,7 +1633,7 @@ function personVox(P, t){
       for (const [c, hh] of [[-.8, .55], [0, .8], [.8, .55]]) bx(cu0 + .3, cu1 - .3, c - .25 + v, c + .25 + v, cz + .35, cz + .35 + hh, C.gold, 1, 1);
     }
   }
-  if (MG && stand && st === "working") wizardStaff(bx, L, tb, P.boss, s[0] + s[1] > 0 ? 1 : -1);   // 机房控制台前手持法杖
+  if (MG && stand && work && !cast) wizardStaff(bx, L, tb, P.boss, s[0] + s[1] > 0 ? 1 : -1);   // 机房控制台前手持法杖
   // 头顶气泡（坐 / 站时）：工作中 = 白气泡 + 工具图标（底部绿条）；其它状态 = 彩色气泡 + 白色符号
   if (rest){
     const pz = hb + (P.boss ? 4.9 : 4) + Math.sin(t * 2.2 + P.phase) * .2;
@@ -1653,7 +1670,7 @@ function personVox(P, t){
 function wizardHead(bx, L, boss, hb, u0, u1, HW, v){
   const HV = HW + .15, G = MAGIC_COL.gold, back = z0 => bx(u0 - .15, u0 + .6, -HV + v, HV + v, z0, hb + 2.1, L.hair);
   if (boss){
-    const hp = "#e9e4d6", t0 = u0 - 1.2, t1 = u0 - .6;
+    const hp = ROBE.lead, t0 = u0 - 1.2, t1 = u0 - .6;
     back(hb + .7);
     bx(u0 - .7, u1 + .7, -HW - .75 + v, HW + .75 + v, hb + 2.1, hb + 2.45, hp);                              // 帽檐
     bx(u0 + .05, u1 - .2, -1.35 + v, 1.35 + v, hb + 2.45, hb + 3.7, hp);                                       // 帽身，逐层收窄并向后垂；帽尖要比头顶气泡（顶在 hb+8.7）更高
@@ -1665,7 +1682,7 @@ function wizardHead(bx, L, boss, hb, u0, u1, HW, v){
     bx(t0, t1, -.3 + v, .3 + v, hb + 8.8, hb + 9.4, G, 1, 1); bx(t0, t1, -.7 + v, .7 + v, hb + 8.95, hb + 9.25, G, 1, 1);   // 帽尖上的发光金星（十字）
     bx(t0 - .45, t1 + .45, -.3 + v, .3 + v, hb + 8.95, hb + 9.25, G, 1, 1); bx(t0 + .1, t1 - .1, -.12 + v, .12 + v, hb + 9.4, hb + 9.9, G, 1, 1);
   } else if (L.style === 0){
-    const hc = shade(L.shirt, .55);
+    const hc = shade(L.shirt, .72);
     back(hb + .7);
     bx(u0 - .5, u1 + .5, -HW - .55 + v, HW + .55 + v, hb + 2.1, hb + 2.45, hc);                                // 宽帽檐
     bx(u0 + .05, u1 - .25, -1.3 + v, 1.3 + v, hb + 2.45, hb + 3.35, hc);                                        // 帽尖三层，逐级收窄并向后垂
@@ -1674,7 +1691,7 @@ function wizardHead(bx, L, boss, hb, u0, u1, HW, v){
     bx(u0 - .35, u0 + .45, -.5 + v, .5 + v, hb + 4.1, hb + 4.8, hc);
     bx(u0 - .65, u0 - .05, -.25 + v, .25 + v, hb + 4.8, hb + 5.35, hc);
   } else if (L.style === 1){
-    const hd = shade(L.shirt, .8);
+    const hd = shade(L.shirt, .86);
     bx(u0 - .4, u1 + .1, -HV - .2 + v, HV + .2 + v, hb + 2.0, hb + 3.5, hd);                                   // 头顶
     bx(u0 - .4, u0 + .7, -HV - .2 + v, HV + .2 + v, hb - 1.0, hb + 2.0, hd);                                   // 后脑垂到肩
     bx(u0 - .75, u0 + .05, -.9 + v, .9 + v, hb + 3.5, hb + 4.1, hd);                                           // 兜帽尖
@@ -1696,8 +1713,9 @@ function wizardStaff(bx, L, tb, boss, sg){
   bx(1.25, 1.85, v0 - sg * .1, v1 + sg * .1, tb + 9.6, tb + 10.1, MAGIC_COL.gold); bx(1.4, 1.7, v0 + sg * .05, v1 - sg * .05, tb + 10.1, tb + 11.1, gem, 1, 1);
 }
 
-/* 圣堂里按身份定袍色：leader 白袍；子 agent 按任务类别——编码红袍、运维黄袍、CI 橙袍、评审紫袍、方案蓝袍、调研绿袍、文档褐袍，其余灰袍 */
-const ROBE = {lead: "#ebe6d6", code: "#a8242e", ops: "#d9ad2b", ci: "#c9702a", review: "#6d3fb0", plan: "#2f5fb8", research: "#2f8a6a", docs: "#8a6a48", other: "#5d6276"};
+/* 圣堂里按身份定袍色：leader 白袍；子 agent 按任务类别——编码红袍、运维黄袍、CI 橙袍、评审紫袍、方案蓝袍、调研绿袍、文档褐袍，其余灰蓝袍。
+   袍色取干净饱满的纯色，帽子 / 袍摆只比袍子暗一档：颜色太灰太暗的话，夜里的小人看上去像披着破布 */
+const ROBE = {lead: "#f1f3fb", code: "#c8323e", ops: "#ecc23e", ci: "#e5863a", review: "#8453d0", plan: "#3b74d8", research: "#34a883", docs: "#bd8c58", other: "#8089ad"};
 function wizLook(P){
   const k = P.boss ? "lead" : (P.d && P.d.kind) || "code";
   if (P.robeKey !== k){ P.robeKey = k; P.robe = {...P.look, shirt: ROBE[k] || ROBE.other} }
@@ -1711,6 +1729,28 @@ function summonTarget(working, total){ if (!(working > 0)) return 0; const span 
 function summonStage(level){ return level < .05 ? 0 : level < .3 ? 1 : level < .8 ? 2 : 3 }
 /* 吐火包络：阶段 3 时每 10 秒喷 3 秒，起止各 .4 秒渐变；返回 0..1 */
 function fireAt(level, t){ if (level < .8) return 0; const u = ((t % 10) + 10) % 10; if (u >= 3) return 0; return Math.min(1, u / .4, (3 - u) / .4) }
+/* 围阵落位顺序：一个扇区在第一圈上有 m 个等距站位，leader 占正中的 0 号；返回其余 m-1 个站位（相对 leader 的偏移格数）的落位顺序——
+   每次挑离"已站了人的位置"最远的一个，并列时取靠近 leader、偏正的。距离按 m 取模：相邻扇区按同样的顺序落位，它们的人就在 ±m 格之外
+   （只有一个会话时扇区就是整圈，绕回来的是自己）。所以第一个子 agent 站 leader 正对面 / 两个 leader 正中间，第二、三个站两侧，依次对半插空 */
+function ringOrder(m){
+  const lo = -Math.floor((m - 1) / 2), hi = Math.floor(m / 2), taken = [0], out = [];
+  while (out.length < m - 1){
+    let best = null, bd = -1;
+    for (let j = lo; j <= hi; j++){
+      if (taken.includes(j)) continue;
+      const d = Math.min(...taken.map(x => { const k = Math.abs(x - j) % m; return Math.min(k, m - k) }));
+      if (d > bd || (d === bd && (Math.abs(j) < Math.abs(best) || (Math.abs(j) === Math.abs(best) && j > best)))){ bd = d; best = j }
+    }
+    taken.push(best); out.push(best);
+  }
+  return out;
+}
+/* 祭坛上方光球的状态：看各会话 leader（一个 leader 都不在场时看所有人）。有人在进行中 = working；否则按 失败 > 已完成 > 待命 > 已中止 取最要紧的；没人 = done */
+function orbStatus(people){
+  const lead = people.filter(p => p.boss), list = (lead.length ? lead : people).map(p => p.status);
+  for (const st of ["working", "failed", "finished", "idle", "stopped"]) if (list.includes(st)) return st;
+  return "done";
+}
 // </summon>
 
 /* 黑龙配色集中在这里。龙身带一点自发光（E），不然夜色里的黑龙只剩一团黑 */
@@ -1790,7 +1830,7 @@ function summonVox(t, dt){
   const target = S.summonForce != null ? S.summonForce : t < S.world.maxT ? 0 : summonTarget(working, total);   // 学院还在铺设时不召唤，等"完成"之后龙再来；强制值（?summon=）不受限
   S.summon = lerp(S.summon, target, Math.min(1, dt * .8));
   const s = S.summon;
-  circleVox(t, s); moteVox(t);
+  circleVox(t, s); orbVox(t, dt, at); moteVox(t);
   if (summonStage(s) > 0) dragonVox(t, s, fireAt(s, t));
 }
 
@@ -1816,17 +1856,57 @@ function circleVox(t, s){
   }
 }
 
-/* 施法光粒：每个 working 的人 3 颗小发光方块，从头顶上方沿抛物线飞向法阵中心 */
+/* 施法光粒：每个在法阵边施法的人 4 颗小发光方块，左右手轮流放出，从举起的掌心沿抛物线飞进祭坛上方的光球 */
 function moteVox(t){
   const at = summonAt(); if (!at) return;
+  const oz = orbZ(t);
   for (const P of S.people.values()){
-    if (P.status !== "working") continue;
-    const col = tint(P.look.shirt, .35), ph = P.phase / 6.2832, arc = Math.min(1.6, .6 + .04 * Math.hypot(at.x - P.x, at.y - P.y));
-    for (let k = 0; k < 3; k++){
-      const u = fract1(t * .4 + ph + k / 3), sz = .09 * (1 - u * u * u);
-      add(lerp(P.x, at.x, u) - sz / 2, lerp(P.y, at.y, u) - sz / 2, lerp(1.6, .3, u) + 4 * u * (1 - u) * arc - sz / 2, sz, sz, sz, col, -1, 1, 1);
+    if (P.status !== "working" || P.state !== "stand" || (P.at && P.at.kind)) continue;
+    const col = tint((P.robe || P.look).shirt, .4), ph = P.phase / 6.2832, f = DIRS[P.dir], arc = Math.min(1.1, .35 + .08 * Math.hypot(at.x - P.x, at.y - P.y));
+    for (let k = 0; k < 4; k++){
+      const u = fract1(t * .45 + ph + k / 4), sz = .1 * (1 - u * u * u), sg = k & 1 ? 1 : -1, hx = P.x - f[1] * sg * 2.8 * M, hy = P.y + f[0] * sg * 2.8 * M;
+      add(lerp(hx, at.x, u) - sz / 2, lerp(hy, at.y, u) - sz / 2, lerp(1.5, oz, u) + 4 * u * (1 - u) * arc - sz / 2, sz, sz, sz, col, -1, 1, 1);
     }
   }
+}
+
+/* 祭坛正上方的光球：悬在龙蛋尖上，颜色就是全场状态（进行中绿 / 失败红 / 已完成蓝 / 待命紫 / 中止、结束灰，与头顶气泡同一套色）。
+   球是一颗 5 格直径的体素球，只画表面一层，按朝上朝镜头的程度分三档明暗，一道亮带自下而上扫过球面；外面绕着几颗小光点，
+   进行中时龙蛋尖上有光屑不断升进球里。换状态时颜色分 6 步渐变过去 */
+const ORB_CELLS = (() => {
+  const inside = (a, b, c) => a * a + b * b + c * c <= 5.6, out = [];
+  for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) for (let c = -2; c <= 2; c++){
+    if (!inside(a, b, c) || (inside(a + 1, b, c) && inside(a - 1, b, c) && inside(a, b + 1, c) && inside(a, b - 1, c) && inside(a, b, c + 1) && inside(a, b, c - 1))) continue;
+    const d = (c * .75 + a * .45 + b * .45) / 2.4;
+    out.push([a, b, c, d > .7 ? 0 : d > -.05 ? 1 : 2]);
+  }
+  return out;
+})();
+const ORB_TONES = new Map();
+function orbTones(a, b, q){                                    // 从状态 a 渐变到 b 的第 q/6 步：[高光, 亮, 本色, 暗]
+  const key = a + "|" + b + "|" + q; let r = ORB_TONES.get(key);
+  if (!r){ const c = mixHex(ST_COL[a] || ST_COL.done, ST_COL[b] || ST_COL.done, q / 6); r = [tint(c, .5), tint(c, .12), shade(c, .9), shade(c, .72)]; ORB_TONES.set(key, r) }
+  return r;
+}
+const orbZ = t => 2.42 + Math.sin(t * 1.4) * .06;
+function orbVox(t, dt, at){
+  const st = orbStatus([...S.people.values()]), o = S.orb || (S.orb = {from: st, to: st, k: 1});
+  if (st !== o.to){ o.from = o.to; o.to = st; o.k = 0 }
+  o.k = Math.min(1, o.k + dt * 1.6);
+  const T = orbTones(o.from, o.to, Math.round(o.k * 6)), live = st === "working", cz = orbZ(t), V = M, cx = at.x, cy = at.y, keep = CLEAN;
+  const E = st === "done" || st === "stopped" ? .4 : 1;                                           // 中止 / 结束时球是暗的，不然灰色一发光就成了白球
+  CLEAN = 2;
+  const band = Math.floor(fract1(t * (live ? .55 : .22)) * 9) - 2;                                // 亮带所在的层：-2..2 扫过球面，其余时间在球外
+  for (const [a, b, c, tone] of ORB_CELLS) add(cx + (a - .5) * V, cy + (b - .5) * V, cz + (c - .5) * V, V, V, V, T[Math.max(0, tone - (c === band ? 1 : 0))], -1, E, 1);
+  for (let i = 0; i < 6; i++){                                                                    // 绕球的小光点：两条倾斜的轨道
+    const a = t * (live ? 1.9 : .8) * (i & 1 ? 1 : -1) + i * 1.047, r = .52 + .06 * Math.sin(t * 2.3 + i), tilt = i & 1 ? .5 : -.4, sz = i % 3 ? .0625 : .09375;
+    add(cx + Math.cos(a) * r - sz / 2, cy + Math.sin(a) * r * Math.cos(tilt) - sz / 2, cz + Math.sin(a) * r * Math.sin(tilt) - sz / 2, sz, sz, sz, T[i % 3 ? 1 : 0], -1, E, 1);
+  }
+  if (live) for (let i = 0; i < 5; i++){                                                          // 进行中：光屑从龙蛋尖升进球里
+    const p = fract1(t * .9 + i / 5), sz = .0625, w = Math.sin(t * 3 + i * 2.1) * .07 * (1 - p);
+    add(cx + w - sz / 2, cy + Math.cos(t * 2.6 + i * 1.7) * .07 * (1 - p) - sz / 2, lerp(1.66, cz - .34, p), sz, sz, sz, T[1], -1, 1, 1);
+  }
+  CLEAN = keep;
 }
 
 /* 龙爪的体素模型（只算一次）：手背是个扁椭球，三根手指是由粗到细的体素管，从墙外搭上墙头再向室内弯下去，末端骨白色利爪；前臂垂在墙外。
@@ -1989,7 +2069,7 @@ const VS = `#version 300 es
 layout(location=0) in vec3 aC; layout(location=1) in vec3 aN; layout(location=2) in vec2 aUV;
 layout(location=3) in vec3 iP; layout(location=4) in vec3 iS; layout(location=5) in vec3 iCol; layout(location=6) in vec3 iX; layout(location=7) in float iH;
 uniform mat4 uVP; uniform float uTime;
-out vec3 vCol; out vec3 vN; out vec2 vE; out vec2 vD; out float vEm; out float vMode; out float vZ; out float vHL; out vec3 vW; out float vSeed;
+out vec3 vCol; out vec3 vN; out vec2 vE; out vec2 vD; out float vEm; out float vMode; out float vZ; out float vHL; out vec3 vW; out float vSeed; out float vClean;
 void main(){
   float t0 = iX.x;
   float s = 1.0, dz = 0.0;
@@ -2005,14 +2085,14 @@ void main(){
   gl_Position = uVP * vec4(p, 1.0);
   float thin = min(min(iS.x, iS.y), iS.z);
   gl_Position.z -= (1.0 - smoothstep(0.004, 0.06, thin)) * 0.00015;
-  vN = aN; vCol = iCol; vEm = iX.y; vMode = iX.z; vZ = p.z; vHL = iH; vW = p;
+  vN = aN; vCol = iCol; vEm = iX.y; vMode = iX.z; vZ = p.z; vClean = step(1.5, iH); vHL = iH - 2.0 * vClean; vW = p;
   vD = abs(aN.x) > 0.5 ? iS.yz : (abs(aN.y) > 0.5 ? iS.xz : iS.xy);
   vE = aUV * vD;
   vSeed = fract(sin(dot(iCol, vec3(12.9898, 78.233, 37.719)) + dot(iS, vec3(3.1, 5.7, 7.3))) * 43758.5453);   // 按方块的颜色和尺寸取种子：方块移动时花纹跟着走，不闪
 }`;
 const FS = `#version 300 es
 precision highp float;
-in vec3 vCol; in vec3 vN; in vec2 vE; in vec2 vD; in float vEm; in float vMode; in float vZ; in float vHL; in vec3 vW; in float vSeed;
+in vec3 vCol; in vec3 vN; in vec2 vE; in vec2 vD; in float vEm; in float vMode; in float vZ; in float vHL; in vec3 vW; in float vSeed; in float vClean;
 uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uSky; uniform vec3 uGnd; uniform vec3 uWin; uniform float uNight;
 uniform float uIn; uniform vec3 uLamp; uniform vec4 uRoom[8]; uniform int uRoomN;
 uniform float uEmMin; uniform vec3 uTint; uniform float uVox;
@@ -2055,7 +2135,7 @@ void main(){
     float en = (vMode > 0.5 && vMode < 1.5) ? max(uNight, uEmMin) : uNight;
     c = mix(c, glow, clamp(vEm * en, 0.0, 1.0));
   }
-  if (uVox > 0.0){
+  if (uVox > 0.0 && vClean < 0.5){                       // 小人和光球不叠颗粒：逐块改明暗会让小块的衣服、皮肤显得又脏又破
     // 微体素质感：每个面按 1/8 格切成小方块，逐块轻微改变明暗（像素画里一格一色的颗粒感）；镜头拉近后显出方块之间的缝
     vec2 g = vE * 8.0, cell = floor(g + 0.001), f = g - cell, e = min(f, 1.0 - f);
     float r = fract(sin(dot(cell, vec2(127.1, 311.7)) + vSeed * 91.7 + dot(n, vec3(1.3, 2.7, 4.1))) * 43758.5453);
@@ -2227,7 +2307,7 @@ function skyPos(s){
 const COOL_MS = 60 * 60e3;                                     // 结束（完成 / 失败 / 中止）超过 1 小时的子 agent 下班：从工位或休息区走回电梯离开
 const S = {world: null, start: performance.now(), autoFit: true, skew: 0, data: null, sig: "", slots: new Map(), held: new Map(),
            hourMode: "auto", themeMode: "auto", hourShown: null, people: new Map(), labelEls: [], zoneEls: [], lastFrame: 0, raf: 0,
-           animEnd: 0, hover: null, tween: null, down: null, layout: "jp", summon: 0, summonForce: null};
+           animEnd: 0, hover: null, tween: null, down: null, layout: "jp", summon: 0, summonForce: null, orb: null};
 // 版式：链接参数 ?layout= 优先，其次本地记忆
 try { const q = new URLSearchParams(location.search).get("layout"), m = localStorage.getItem("office.layout"); S.layout = LAYOUTS[q] ? q : LAYOUTS[m] ? m : "jp" } catch {}
 // 魔法学院的召唤进度：?summon=0..1 强制使用该值（演示 / 截图用），否则按施法人数算
@@ -2496,8 +2576,9 @@ function stepPeople(dt){
 function dynamic(t, dt){
   OUT = []; EM = 0; HL = 0;
   stepPeople(dt);
+  CLEAN = 2;
   for (const p of S.people.values()){ HL = S.hover === p.key ? 1 : 0; personVox(p, t) }
-  HL = 0;
+  HL = 0; CLEAN = 0;
   if (LY.magic) summonVox(t, dt);                              // 魔法学院：法阵 / 施法光粒 / 巨龙
   // 电梯门：有人在门口附近就打开
   for (const d of S.world.doors){
