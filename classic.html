@@ -274,18 +274,7 @@ function now(){return Date.now()+S.skew}
 function dur(ms){ms=Math.max(0,ms);const s=Math.round(ms/1000);if(s<60)return s+"s";const m=Math.floor(s/60);if(m<60)return m+"m "+String(s%60).padStart(2,"0")+"s";return Math.floor(m/60)+"h "+String(m%60).padStart(2,"0")+"m"}
 function ago(t){const s=Math.round((now()-t)/1000);if(s<60)return s+"s 前";const m=Math.round(s/60);if(m<120)return m+"m 前";return Math.round(m/60)+"h 前"}
 function hm(t,sec){const d=new Date(t);const p=n=>String(n).padStart(2,"0");return p(d.getHours())+":"+p(d.getMinutes())+(sec?":"+p(d.getSeconds()):"")}
-// <model> 模型显示名：transcript 里是代理真实回报的 id，同一模型会混着 qwen-max / qwen4-max / qwen-max[1m]，这里归一
-function modelName(m){
-  if(!m) return "";
-  const s=String(m).replace(/\[[^\]]*\]$/,"").trim(), k=s.toLowerCase();
-  if(k.startsWith("deepseek")) return "DeepSeek";
-  if(k.startsWith("qwen")) return k.includes("max") ? "Qwen Max" : k.includes("flash") ? "Qwen Flash" : "Qwen";
-  return s.replace(/^claude-/,"").replace(/-(\d+)-(\d+)$/,"-$1.$2");
-}
-// 详情里显示名 + 原始 id（两者不同时）
-function modelFull(m){const n=modelName(m);return n&&n!==String(m)?n+"（"+m+"）":n}
-// </model>
-const shortModel = modelName;
+function shortModel(m){return m?m.replace(/^claude-/,"").replace(/-(\d+)-(\d+)$/,"-$1.$2"):""}
 
 /* 像素头像：按 id 生成 8x8 左右对称小人，颜色由哈希决定 */
 const AV_CACHE = new Map();

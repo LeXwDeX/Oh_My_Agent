@@ -192,7 +192,7 @@ docker compose -f deploy/linux/docker-compose.push.yml up -d --build
 | `label` | 显示名 |
 | `dir` | 该档位的配置目录，支持 `~` |
 | `entry` | 按会话 `entrypoint` 过滤：`null` 不过滤，`"x"` 等于 x，`"!x"` 不等于 x。同一目录下多个档位按列表顺序匹配，先匹配到的生效 |
-| `model_label` | 可选，强制该档位统一显示的模型名。默认不设：显示 transcript 里代理真实回报的模型，页面再归一成统一显示名（`qwen-max` / `qwen4-max` / `qwen-max[1m]` → `Qwen Max`，`deepseek*` → `DeepSeek`） |
+| `model_label` | 可选，强制该档位统一显示的模型名。默认不设：原样显示调用时用的模型名（transcript 的 `requestedModel`，如 `qwen-max[1m]`），旧记录没有该字段时显示 `message.model` |
 
 ```json
 [
