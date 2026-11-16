@@ -157,6 +157,17 @@ function clip(s, maxW, size){
   let out = ""; for (const c of s){ if (textW(out + c + "…", size) > maxW) break; out += c } return out + "…";
 }
 const toolName = t => (String(t).replace(/^mcp(?=_)/i, "").replace(/_+/g, " ").trim() || String(t)).toUpperCase();
+// <model> 模型显示名：transcript 里是代理真实回报的 id，同一模型会混着 qwen-max / qwen4-max / qwen-max[1m]，这里归一
+function modelName(m){
+  if(!m) return "";
+  const s=String(m).replace(/\[[^\]]*\]$/,"").trim(), k=s.toLowerCase();
+  if(k.startsWith("deepseek")) return "DeepSeek";
+  if(k.startsWith("qwen")) return k.includes("max") ? "Qwen Max" : k.includes("flash") ? "Qwen Flash" : "Qwen";
+  return s.replace(/^claude-/,"").replace(/-(\d+)-(\d+)$/,"-$1.$2");
+}
+// 详情里显示名 + 原始 id（两者不同时）
+function modelFull(m){const n=modelName(m);return n&&n!==String(m)?n+"（"+m+"）":n}
+// </model>
 function dur(ms){
   const s = Math.max(0, Math.round(ms / 1000)); if (s < 60) return s + "s";
   const m = Math.round(s / 60); if (m < 60) return m + "m";
@@ -571,12 +582,12 @@ function showTip(e){
   if (inf.kind === "lead"){
     const w = d.agents.filter(a => a.status === "working").length;
     html = `<h4>${IC.star}${h(d.name)} <small>主管 · ${h(ST_ZH[d.status] || d.status)}</small></h4>`
-      + row("任务", d.title) + row("项目", d.project + (d.branch ? " @ " + d.branch : "")) + row("模型", d.model)
+      + row("任务", d.title) + row("项目", d.project + (d.branch ? " @ " + d.branch : "")) + row("模型", modelFull(d.model))
       + row("工具", d.status === "working" && d.tool ? toolName(d.tool) : "")
       + row("员工", `${d.agents.length} 名（工作中 ${w}）`) + row("用时", dur(d.last - d.start) + " · 最后活动 " + dur(now - d.last) + " 前");
   } else {
     html = `<h4>${h(d.name)} <small>${h(d.type)}${d.bg ? " · 后台" : ""} · ${h(ST_ZH[d.status] || d.status)}</small></h4>`
-      + row("任务", d.task) + row("主管", inf.lead.name) + row("模型", d.model)
+      + row("任务", d.task) + row("主管", inf.lead.name) + row("模型", modelFull(d.model))
       + row("工具", d.status === "working" && d.tool ? toolName(d.tool) : "")
       + row("用时", dur(d.last - d.start) + (d.status === "working" ? "" : " · " + dur(now - d.last) + " 前结束"));
   }

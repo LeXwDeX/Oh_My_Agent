@@ -21,8 +21,8 @@ services:
       DECK_REGISTRY_TTL_HOURS: "12"
       TZ: "CST-8"                      # alpine 无时区库，用 POSIX 写法表示 UTC+8（日志时间用）
       DECK_SOURCES: >-
-        [{"id": "cli", "label": "claude", "dir": "/data/claude", "entry": null, "model_label": "DeepSeek"}]
-      # model_label：该档位统一显示的模型名（本机 claude 走的是 DeepSeek 时这样写；不设则显示真实模型名）
+        [{"id": "cli", "label": "claude", "dir": "/data/claude", "entry": null}]
+      # model_label（可选）：强制该档位统一显示的模型名；不设则显示代理真实回报的模型（推荐）
     volumes:   # 只读挂载会话记录与在线登记，不挂整个 ~/.claude，避免把凭据暴露给容器
       - /root/.claude/projects:/data/claude/projects:ro
       - /root/.claude/sessions:/data/claude/sessions:ro
