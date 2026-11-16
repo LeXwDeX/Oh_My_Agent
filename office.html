@@ -157,6 +157,19 @@ function clip(s, maxW, size){
   let out = ""; for (const c of s){ if (textW(out + c + "…", size) > maxW) break; out += c } return out + "…";
 }
 const toolName = t => (String(t).replace(/^mcp(?=_)/i, "").replace(/_+/g, " ").trim() || String(t)).toUpperCase();
+// <model> 模型名给人看：只改写法，不换名字。claude-opus-5-5 → Opus 5.5；后缀 [1m] → · 1M；第三方别名原样
+function shortModel(m){
+  if(!m) return "";
+  let s=String(m).trim(), ctx="";
+  const b=s.match(/^(.*?)\[(\d+)([km])\]$/i);
+  if(b){ s=b[1]; ctx=" · "+b[2]+b[3].toUpperCase(); }
+  let c=s.match(/^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/i);          // claude-opus-5-5[-20260101]
+  if(c) return c[1][0].toUpperCase()+c[1].slice(1).toLowerCase()+" "+c[2]+(c[3]?"."+c[3]:"")+ctx;
+  c=s.match(/^claude-(\d+)(?:-(\d{1,2}))?-([a-z]+)(?:-\d{8})?$/i);              // 旧式 claude-3-5-sonnet-20241022
+  if(c) return c[3][0].toUpperCase()+c[3].slice(1).toLowerCase()+" "+c[1]+(c[2]?"."+c[2]:"")+ctx;
+  return s+ctx;
+}
+// </model>
 function dur(ms){
   const s = Math.max(0, Math.round(ms / 1000)); if (s < 60) return s + "s";
   const m = Math.round(s / 60); if (m < 60) return m + "m";
@@ -571,12 +584,12 @@ function showTip(e){
   if (inf.kind === "lead"){
     const w = d.agents.filter(a => a.status === "working").length;
     html = `<h4>${IC.star}${h(d.name)} <small>主管 · ${h(ST_ZH[d.status] || d.status)}</small></h4>`
-      + row("任务", d.title) + row("项目", d.project + (d.branch ? " @ " + d.branch : "")) + row("模型", d.model)
+      + row("任务", d.title) + row("项目", d.project + (d.branch ? " @ " + d.branch : "")) + row("模型", shortModel(d.model))
       + row("工具", d.status === "working" && d.tool ? toolName(d.tool) : "")
       + row("员工", `${d.agents.length} 名（工作中 ${w}）`) + row("用时", dur(d.last - d.start) + " · 最后活动 " + dur(now - d.last) + " 前");
   } else {
     html = `<h4>${h(d.name)} <small>${h(d.type)}${d.bg ? " · 后台" : ""} · ${h(ST_ZH[d.status] || d.status)}</small></h4>`
-      + row("任务", d.task) + row("主管", inf.lead.name) + row("模型", d.model)
+      + row("任务", d.task) + row("主管", inf.lead.name) + row("模型", shortModel(d.model))
       + row("工具", d.status === "working" && d.tool ? toolName(d.tool) : "")
       + row("用时", dur(d.last - d.start) + (d.status === "working" ? "" : " · " + dur(now - d.last) + " 前结束"));
   }
