@@ -23,7 +23,7 @@ HOME = Path.home()
 HERE = Path(__file__).resolve().parent
 
 # 档位定义：id、显示名、配置目录、入口过滤（None = 不过滤）、model_label（可选：强制该档位统一显示的模型名；
-# 默认不设，显示 transcript 里代理真实回报的模型，前端再还原成调用别名 qwen-max / deepseek）
+# 默认不设，显示调用时用的模型名（transcript 的 requestedModel），原样显示）
 DEFAULT_SOURCES = [
     {"id": "app", "label": "Claude App", "dir": "~/.claude", "entry": "claude-desktop"},
     {"id": "cli", "label": "claude", "dir": "~/.claude", "entry": "!claude-desktop"},
@@ -147,10 +147,12 @@ CACHE = FileCache()
 
 
 def models_in(lines: list[dict]) -> list[str]:
+    """assistant 消息的模型：优先 requestedModel（调用时用的名字，如别名 qwen-max[1m]），
+    旧记录没有该字段时回落 message.model（代理回报的实际 id）。"""
     out = []
     for o in lines:
         if o.get("type") == "assistant":
-            m = (o.get("message") or {}).get("model")
+            m = o.get("requestedModel") or (o.get("message") or {}).get("model")
             if m and m != "<synthetic>":
                 out.append(m)
     return out

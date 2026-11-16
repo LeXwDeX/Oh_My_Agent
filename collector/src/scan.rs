@@ -341,11 +341,14 @@ fn message_of(o: &Obj) -> Option<&Obj> {
     tget(o, "message").and_then(Value::as_object)
 }
 
+/// assistant 消息的模型：优先 requestedModel（调用时用的名字，如别名 qwen-max[1m]），
+/// 旧记录没有该字段时回落 message.model（代理回报的实际 id）。
 fn models_in(lines: &[Obj]) -> Vec<Value> {
     let mut out = Vec::new();
     for o in lines {
         if is_str(o, "type", "assistant") {
-            if let Some(m) = message_of(o).and_then(|m| tget(m, "model")) {
+            let requested = tget(o, "requestedModel").filter(|v| v.as_str().is_some_and(|s| !s.is_empty()));
+            if let Some(m) = requested.or_else(|| message_of(o).and_then(|m| tget(m, "model"))) {
                 if m.as_str() != Some("<synthetic>") {
                     out.push(m.clone());
                 }
@@ -582,7 +585,7 @@ pub struct Source {
     pub label: Value,
     pub dir: String,
     pub entry: Value, // null = 不过滤；"x" = 等于；"!x" = 不等于
-    /// 设置后该档位下 lead 与 agents 的 model 一律替换为此值；默认档位都不设，显示 transcript 里代理真实回报的模型
+    /// 设置后该档位下 lead 与 agents 的 model 一律替换为此值；默认档位都不设，显示调用时用的模型名（requestedModel）
     pub model_label: Option<String>,
 }
 
@@ -1131,6 +1134,20 @@ impl Scanner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn models_prefer_requested_name() {
+        let mk = |s: &str| serde_json::from_str::<Value>(s).unwrap().as_object().unwrap().clone();
+        let lines = vec![
+            mk(r#"{"type":"assistant","requestedModel":"qwen-max[1m]","message":{"model":"qwen4-max"}}"#),
+            mk(r#"{"type":"assistant","message":{"model":"claude-opus-5-5"}}"#),
+            mk(r#"{"type":"assistant","requestedModel":"","message":{"model":"deepseek-v4.1-flash-1017"}}"#),
+            mk(r#"{"type":"assistant","message":{"model":"<synthetic>"}}"#),
+            mk(r#"{"type":"user","requestedModel":"x"}"#),
+        ];
+        let got: Vec<String> = models_in(&lines).iter().map(|v| v.as_str().unwrap().to_owned()).collect();
+        assert_eq!(got, vec!["qwen-max[1m]", "claude-opus-5-5", "deepseek-v4.1-flash-1017"]);
+    }
 
     #[test]
     fn archived_ids_from_app_meta() {
