@@ -274,17 +274,17 @@ function now(){return Date.now()+S.skew}
 function dur(ms){ms=Math.max(0,ms);const s=Math.round(ms/1000);if(s<60)return s+"s";const m=Math.floor(s/60);if(m<60)return m+"m "+String(s%60).padStart(2,"0")+"s";return Math.floor(m/60)+"h "+String(m%60).padStart(2,"0")+"m"}
 function ago(t){const s=Math.round((now()-t)/1000);if(s<60)return s+"s 前";const m=Math.round(s/60);if(m<120)return m+"m 前";return Math.round(m/60)+"h 前"}
 function hm(t,sec){const d=new Date(t);const p=n=>String(n).padStart(2,"0");return p(d.getHours())+":"+p(d.getMinutes())+(sec?":"+p(d.getSeconds()):"")}
-// <model> 模型名给人看：只改写法，不换名字。claude-opus-5-5 → Opus 5.5；后缀 [1m] → · 1M；第三方别名原样
+// <model> 模型名给人看：Claude → Opus 5.5 / Fable 5.2；qwen* → QWen（通义千问 Qian Wen）；deepseek* → DeepSeek（深度求索）；不显示 [1m] 等上下文后缀
 function shortModel(m){
   if(!m) return "";
-  let s=String(m).trim(), ctx="";
-  const b=s.match(/^(.*?)\[(\d+)([km])\]$/i);
-  if(b){ s=b[1]; ctx=" · "+b[2]+b[3].toUpperCase(); }
+  const s=String(m).trim().replace(/\[[^\]]*\]$/,""), k=s.toLowerCase();
+  if(k.startsWith("qwen")) return "QWen";
+  if(k.startsWith("deepseek")) return "DeepSeek";
   let c=s.match(/^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/i);          // claude-opus-5-5[-20260101]
-  if(c) return c[1][0].toUpperCase()+c[1].slice(1).toLowerCase()+" "+c[2]+(c[3]?"."+c[3]:"")+ctx;
+  if(c) return c[1][0].toUpperCase()+c[1].slice(1).toLowerCase()+" "+c[2]+(c[3]?"."+c[3]:"");
   c=s.match(/^claude-(\d+)(?:-(\d{1,2}))?-([a-z]+)(?:-\d{8})?$/i);              // 旧式 claude-3-5-sonnet-20241022
-  if(c) return c[3][0].toUpperCase()+c[3].slice(1).toLowerCase()+" "+c[1]+(c[2]?"."+c[2]:"")+ctx;
-  return s+ctx;
+  if(c) return c[3][0].toUpperCase()+c[3].slice(1).toLowerCase()+" "+c[1]+(c[2]?"."+c[2]:"");
+  return s;
 }
 // </model>
 
