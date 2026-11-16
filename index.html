@@ -428,6 +428,20 @@ body.full .office{position:fixed;inset:0;z-index:50;border-radius:0;border:0}
 
 <script>
 "use strict";
+/* 模型显示名放在顶层：3D 场景的悬停提示（showTip）与泳道模块（Deck）都要用 */
+// <model> 模型名给人看：Claude → Opus 5.5 / Fable 5.2；qwen* → QWen（通义千问 Qian Wen）；deepseek* → DeepSeek（深度求索）；不显示 [1m] 等上下文后缀
+function shortModel(m){
+  if(!m) return "";
+  const s=String(m).trim().replace(/\[[^\]]*\]$/,""), k=s.toLowerCase();
+  if(k.startsWith("qwen")) return "QWen";
+  if(k.startsWith("deepseek")) return "DeepSeek";
+  let c=s.match(/^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/i);          // claude-opus-5-5[-20260101]
+  if(c) return c[1][0].toUpperCase()+c[1].slice(1).toLowerCase()+" "+c[2]+(c[3]?"."+c[3]:"");
+  c=s.match(/^claude-(\d+)(?:-(\d{1,2}))?-([a-z]+)(?:-\d{8})?$/i);              // 旧式 claude-3-5-sonnet-20241022
+  if(c) return c[3][0].toUpperCase()+c[3].slice(1).toLowerCase()+" "+c[1]+(c[2]?"."+c[2]:"");
+  return s;
+}
+// </model>
 /* ============================================================
    Agent Office Voxel —— 平铺开放办公区（手写 WebGL2 实例化体素，零依赖，全部程序化生成）
    一个项目 = 一间办公室：项目里每个会话（主 agent）一个岛，主管坐课长席，子 agent 在岛上对坐（人多再开续岛，全办公室最多 6 个岛）；
@@ -2287,18 +2301,13 @@ function applySky(hr, L){
   sun.style.left = sp[0] + "px"; sun.style.top = sp[1] + "px";
   moon.style.left = mp[0] + "px"; moon.style.top = mp[1] + "px";
 }
-/* 日月位置（s：0 升起 → 1 落下）：在楼顶“最高角 → 最右角”这条斜线上方的天空里走，正午最高；
-   这样不会被楼挡住，也远离左上角的名牌栏。楼不在视野里时退回固定弧线。 */
+/* 日月位置（s：0 升起 → 1 落下）：只取决于可视区域（视口宽高减去右侧排班抽屉），与场景的拖动 / 缩放无关。
+   从左往右走一条弧线，正午最高；左端让开左上角的名牌栏，右端贴近可视区右缘。 */
 function skyPos(s){
-  const right = cssW - Math.max(0, fitPadRight() || 0) - 34, w = S.world;
-  let T = [cssW * .5, 60], R = [right, cssH * .45];
-  if (w){
-    const cs = [[0, 0], [w.MW, 0], [0, w.MD], [w.MW, w.MD]].map(([x, y]) => project(x, y, WALLH + .2));
-    T = cs.reduce((a, b) => b[1] < a[1] ? b : a); R = cs.reduce((a, b) => b[0] > a[0] ? b : a);
-  }
-  const x1 = Math.min(right, R[0] + 10), x0 = Math.min(x1, T[0] + (R[0] - T[0]) * .3), x = lerp(x0, x1, s);
-  const k = R[0] - T[0] > 1 ? (R[1] - T[1]) / (R[0] - T[0]) : 0, roof = T[1] + (x - T[0]) * k;
-  return [x.toFixed(1), Math.max(30, roof - 38 - 64 * Math.sin(s * Math.PI)).toFixed(1)];
+  const w = Math.max(160, cssW - Math.max(0, fitPadRight() || 0));
+  const x = lerp(w * .22, w - 40, s);
+  const top = 70, low = Math.max(top + 40, cssH * .4);
+  return [x.toFixed(1), (low - (low - top) * Math.sin(s * Math.PI)).toFixed(1)];
 }
 
 /* ============================================================
@@ -2837,19 +2846,6 @@ function now(){return Date.now()+S.skew}
 function dur(ms){ms=Math.max(0,ms);const s=Math.round(ms/1000);if(s<60)return s+"s";const m=Math.floor(s/60);if(m<60)return m+"m "+String(s%60).padStart(2,"0")+"s";return Math.floor(m/60)+"h "+String(m%60).padStart(2,"0")+"m"}
 function ago(t){const s=Math.round((now()-t)/1000);if(s<60)return s+"s 前";const m=Math.round(s/60);if(m<120)return m+"m 前";return Math.round(m/60)+"h 前"}
 function hm(t,sec){const d=new Date(t);const p=n=>String(n).padStart(2,"0");return p(d.getHours())+":"+p(d.getMinutes())+(sec?":"+p(d.getSeconds()):"")}
-// <model> 模型名给人看：Claude → Opus 5.5 / Fable 5.2；qwen* → QWen（通义千问 Qian Wen）；deepseek* → DeepSeek（深度求索）；不显示 [1m] 等上下文后缀
-function shortModel(m){
-  if(!m) return "";
-  const s=String(m).trim().replace(/\[[^\]]*\]$/,""), k=s.toLowerCase();
-  if(k.startsWith("qwen")) return "QWen";
-  if(k.startsWith("deepseek")) return "DeepSeek";
-  let c=s.match(/^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/i);          // claude-opus-5-5[-20260101]
-  if(c) return c[1][0].toUpperCase()+c[1].slice(1).toLowerCase()+" "+c[2]+(c[3]?"."+c[3]:"");
-  c=s.match(/^claude-(\d+)(?:-(\d{1,2}))?-([a-z]+)(?:-\d{8})?$/i);              // 旧式 claude-3-5-sonnet-20241022
-  if(c) return c[3][0].toUpperCase()+c[3].slice(1).toLowerCase()+" "+c[1]+(c[2]?"."+c[2]:"");
-  return s;
-}
-// </model>
 
 /* 像素头像：按 id 生成 8x8 左右对称小人，颜色由哈希决定 */
 const AV_CACHE = new Map();
