@@ -157,17 +157,17 @@ function clip(s, maxW, size){
   let out = ""; for (const c of s){ if (textW(out + c + "…", size) > maxW) break; out += c } return out + "…";
 }
 const toolName = t => (String(t).replace(/^mcp(?=_)/i, "").replace(/_+/g, " ").trim() || String(t)).toUpperCase();
-// <model> 模型名给人看：只改写法，不换名字。claude-opus-5-5 → Opus 5.5；后缀 [1m] → · 1M；第三方别名原样
+// <model> 模型名给人看：Claude → Opus 5.5 / Fable 5.2；qwen* → QWen（通义千问 Qian Wen）；deepseek* → DeepSeek（深度求索）；不显示 [1m] 等上下文后缀
 function shortModel(m){
   if(!m) return "";
-  let s=String(m).trim(), ctx="";
-  const b=s.match(/^(.*?)\[(\d+)([km])\]$/i);
-  if(b){ s=b[1]; ctx=" · "+b[2]+b[3].toUpperCase(); }
+  const s=String(m).trim().replace(/\[[^\]]*\]$/,""), k=s.toLowerCase();
+  if(k.startsWith("qwen")) return "QWen";
+  if(k.startsWith("deepseek")) return "DeepSeek";
   let c=s.match(/^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/i);          // claude-opus-5-5[-20260101]
-  if(c) return c[1][0].toUpperCase()+c[1].slice(1).toLowerCase()+" "+c[2]+(c[3]?"."+c[3]:"")+ctx;
+  if(c) return c[1][0].toUpperCase()+c[1].slice(1).toLowerCase()+" "+c[2]+(c[3]?"."+c[3]:"");
   c=s.match(/^claude-(\d+)(?:-(\d{1,2}))?-([a-z]+)(?:-\d{8})?$/i);              // 旧式 claude-3-5-sonnet-20241022
-  if(c) return c[3][0].toUpperCase()+c[3].slice(1).toLowerCase()+" "+c[1]+(c[2]?"."+c[2]:"")+ctx;
-  return s+ctx;
+  if(c) return c[3][0].toUpperCase()+c[3].slice(1).toLowerCase()+" "+c[1]+(c[2]?"."+c[2]:"");
+  return s;
 }
 // </model>
 function dur(ms){
