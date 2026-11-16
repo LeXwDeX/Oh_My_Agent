@@ -582,7 +582,7 @@ pub struct Source {
     pub label: Value,
     pub dir: String,
     pub entry: Value, // null = 不过滤；"x" = 等于；"!x" = 不等于
-    /// 设置后该档位下 lead 与 agents 的 model 一律替换为此值
+    /// 设置后该档位下 lead 与 agents 的 model 一律替换为此值；默认档位都不设，显示 transcript 里代理真实回报的模型
     pub model_label: Option<String>,
 }
 
@@ -597,8 +597,8 @@ pub fn default_sources() -> Vec<Source> {
     vec![
         mk("app", "Claude App", "~/.claude", Some("claude-desktop"), None),
         mk("cli", "claude", "~/.claude", Some("!claude-desktop"), None),
-        mk("ds", "claude-ds", "~/.claude-deepseek", None, Some("DeepSeek")),
-        mk("qwen", "claude-qwen", "~/.claude-qwen", None, Some("Qwen4")),
+        mk("ds", "claude-ds", "~/.claude-deepseek", None, None),
+        mk("qwen", "claude-qwen", "~/.claude-qwen", None, None),
     ]
 }
 

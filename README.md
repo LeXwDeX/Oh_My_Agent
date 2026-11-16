@@ -192,12 +192,12 @@ docker compose -f deploy/linux/docker-compose.push.yml up -d --build
 | `label` | 显示名 |
 | `dir` | 该档位的配置目录，支持 `~` |
 | `entry` | 按会话 `entrypoint` 过滤：`null` 不过滤，`"x"` 等于 x，`"!x"` 不等于 x。同一目录下多个档位按列表顺序匹配，先匹配到的生效 |
-| `model_label` | 可选，该档位统一显示的模型名（如 claude-ds 显示 `DeepSeek`、claude-qwen 显示 `Qwen4`）；不设则显示真实模型名 |
+| `model_label` | 可选，强制该档位统一显示的模型名。默认不设：显示 transcript 里代理真实回报的模型，页面再归一成统一显示名（`qwen-max` / `qwen4-max` / `qwen-max[1m]` → `Qwen Max`，`deepseek*` → `DeepSeek`） |
 
 ```json
 [
   {"id": "cli", "label": "claude", "dir": "~/.claude", "entry": null},
-  {"id": "alt", "label": "claude-alt", "dir": "~/.claude-alt", "entry": null, "model_label": "DeepSeek"}
+  {"id": "alt", "label": "claude-alt", "dir": "~/.claude-alt", "entry": null}
 ]
 ```
 
@@ -207,8 +207,8 @@ docker compose -f deploy/linux/docker-compose.push.yml up -d --build
 | --- | --- | --- | --- | --- |
 | `app` | Claude App | `~/.claude` | `claude-desktop` | - |
 | `cli` | claude | `~/.claude` | `!claude-desktop` | - |
-| `ds` | claude-ds | `~/.claude-deepseek` | 不过滤 | `DeepSeek` |
-| `qwen` | claude-qwen | `~/.claude-qwen` | 不过滤 | `Qwen4` |
+| `ds` | claude-ds | `~/.claude-deepseek` | 不过滤 | - |
+| `qwen` | claude-qwen | `~/.claude-qwen` | 不过滤 | - |
 
 新增档位后，为新 `id` 加上颜色，否则会使用默认灰色。`index.html` 需改三处：
 

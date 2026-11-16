@@ -22,12 +22,13 @@ from pathlib import Path
 HOME = Path.home()
 HERE = Path(__file__).resolve().parent
 
-# 档位定义：id、显示名、配置目录、入口过滤（None = 不过滤）、model_label（可选：该档位统一显示的模型名）
+# 档位定义：id、显示名、配置目录、入口过滤（None = 不过滤）、model_label（可选：强制该档位统一显示的模型名；
+# 默认不设，显示 transcript 里代理真实回报的模型，前端再归一成 Qwen Max / DeepSeek 等显示名）
 DEFAULT_SOURCES = [
     {"id": "app", "label": "Claude App", "dir": "~/.claude", "entry": "claude-desktop"},
     {"id": "cli", "label": "claude", "dir": "~/.claude", "entry": "!claude-desktop"},
-    {"id": "ds", "label": "claude-ds", "dir": "~/.claude-deepseek", "entry": None, "model_label": "DeepSeek"},
-    {"id": "qwen", "label": "claude-qwen", "dir": "~/.claude-qwen", "entry": None, "model_label": "Qwen4"},
+    {"id": "ds", "label": "claude-ds", "dir": "~/.claude-deepseek", "entry": None},
+    {"id": "qwen", "label": "claude-qwen", "dir": "~/.claude-qwen", "entry": None},
 ]
 
 LIVE_SECS = 90  # 记录文件在这段时间内有写入，视为仍在工作
