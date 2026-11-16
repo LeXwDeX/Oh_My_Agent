@@ -157,16 +157,16 @@ function clip(s, maxW, size){
   let out = ""; for (const c of s){ if (textW(out + c + "…", size) > maxW) break; out += c } return out + "…";
 }
 const toolName = t => (String(t).replace(/^mcp(?=_)/i, "").replace(/_+/g, " ").trim() || String(t)).toUpperCase();
-// <model> 模型显示名：transcript 里是代理真实回报的 id，同一模型会混着 qwen-max / qwen4-max / qwen-max[1m]，这里归一
+// <model> 模型显示名：一律显示调用时用的别名。transcript 里是代理解析后的真实 id（qwen4-max、deepseek-v4.1-flash-1017…），这里还原成别名
 function modelName(m){
   if(!m) return "";
   const s=String(m).replace(/\[[^\]]*\]$/,"").trim(), k=s.toLowerCase();
-  if(k.startsWith("deepseek")) return "DeepSeek";
-  if(k.startsWith("qwen")) return k.includes("max") ? "Qwen Max" : k.includes("flash") ? "Qwen Flash" : "Qwen";
+  if(k.startsWith("deepseek")) return "deepseek";
+  if(k.startsWith("qwen")) return k.includes("max") ? "qwen-max" : k.includes("flash") ? "qwen-flash" : "qwen";
   return s.replace(/^claude-/,"").replace(/-(\d+)-(\d+)$/,"-$1.$2");
 }
-// 详情里显示名 + 原始 id（两者不同时）
-function modelFull(m){const n=modelName(m);return n&&n!==String(m)?n+"（"+m+"）":n}
+// 详情同样只显示别名
+const modelFull = modelName;
 // </model>
 function dur(ms){
   const s = Math.max(0, Math.round(ms / 1000)); if (s < 60) return s + "s";

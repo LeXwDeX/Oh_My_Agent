@@ -23,7 +23,7 @@ HOME = Path.home()
 HERE = Path(__file__).resolve().parent
 
 # 档位定义：id、显示名、配置目录、入口过滤（None = 不过滤）、model_label（可选：强制该档位统一显示的模型名；
-# 默认不设，显示 transcript 里代理真实回报的模型，前端再归一成 Qwen Max / DeepSeek 等显示名）
+# 默认不设，显示 transcript 里代理真实回报的模型，前端再还原成调用别名 qwen-max / deepseek）
 DEFAULT_SOURCES = [
     {"id": "app", "label": "Claude App", "dir": "~/.claude", "entry": "claude-desktop"},
     {"id": "cli", "label": "claude", "dir": "~/.claude", "entry": "!claude-desktop"},
